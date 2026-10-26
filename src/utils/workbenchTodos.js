@@ -2,6 +2,7 @@
  * 工作台「待办事项」统计与跳转配置
  */
 import { ECN_STATUS } from '@/constants/ecn'
+import { CONTRACT_STATUS } from '@/constants/salesContract'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
@@ -11,6 +12,12 @@ import { outboundState } from '@/store/outboundStore'
 import { qcTaskState, QC_TASK_STATUS } from '@/store/qcTaskStore'
 import { factoryQcState } from '@/store/factoryQcStore'
 import { ecnState } from '@/store/ecnStore'
+import { salesContractState } from '@/store/salesContractStore'
+import {
+  calcPaymentDashboardStats,
+  listContractPaymentSummaries,
+  salesPaymentState,
+} from '@/store/salesPaymentStore'
 import { SALES_ORDER_STATUS, normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
 import { normalizeInboundStatus } from '@/mock/inboundOptions'
 import { normalizeOutboundStatus } from '@/mock/outboundOptions'
@@ -27,6 +34,22 @@ export const WORKBENCH_TODO_ITEMS = [
     path: '/sales/orders',
     query: { progressStatus: '待审核' },
     title: '销售订单',
+  },
+  {
+    key: 'contract-approve',
+    label: '合同待审核',
+    tone: 'geekblue',
+    path: '/sales/contracts',
+    query: { status: '待审' },
+    title: '合同管理',
+  },
+  {
+    key: 'month-payment-due',
+    label: '本月待回款',
+    tone: 'orange',
+    path: '/sales/payments',
+    query: { due: 'month' },
+    title: '回款管理',
   },
   {
     key: 'purchase-approve',
@@ -146,6 +169,16 @@ function countSalesPendingApprove() {
   ).length
 }
 
+function countContractPendingApprove() {
+  return (salesContractState.contracts || []).filter((c) => c.status === CONTRACT_STATUS.PENDING)
+    .length
+}
+
+function countMonthPaymentDue() {
+  const stats = calcPaymentDashboardStats(listContractPaymentSummaries())
+  return Number(stats.monthDueContractCount) || 0
+}
+
 function countPurchasePendingApprove() {
   return (purchaseOrderState.orders || []).filter((o) => o.status === '待审核').length
 }
@@ -201,6 +234,10 @@ export function countWorkbenchTodo(key) {
   switch (key) {
     case 'sales-approve':
       return countSalesPendingApprove()
+    case 'contract-approve':
+      return countContractPendingApprove()
+    case 'month-payment-due':
+      return countMonthPaymentDue()
     case 'purchase-approve':
       return countPurchasePendingApprove()
     case 'outsourcing-approve':
@@ -224,6 +261,9 @@ export function countWorkbenchTodo(key) {
 export function touchWorkbenchTodoSources() {
   return [
     salesOrderState.orders?.length,
+    salesContractState.contracts?.length,
+    salesPaymentState.payments?.length,
+    salesPaymentState.plans?.length,
     purchaseOrderState.orders?.length,
     outsourcingOrderState.orders?.length,
     workOrderState.orders?.length,

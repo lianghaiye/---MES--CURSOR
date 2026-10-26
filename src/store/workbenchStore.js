@@ -48,11 +48,26 @@ function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
 
+const TODO_APPEND_ONCE_KEY = 'i_doms_workbench_todo_append_v2'
+const TODO_KEYS_TO_APPEND_ONCE = ['contract-approve', 'month-payment-due']
+
 function normalizeTodoVisibleKeys(keys) {
   const defaults = getDefaultWorkbenchTodoKeys()
   const defaultSet = new Set(defaults)
   const list = (Array.isArray(keys) ? keys : []).filter((k) => defaultSet.has(k))
-  return list.length ? list : [...defaults]
+  if (!list.length) return [...defaults]
+  // 新待办一次性追加到末尾（已配置过的用户也能看到）
+  try {
+    if (localStorage.getItem(TODO_APPEND_ONCE_KEY) !== '1') {
+      TODO_KEYS_TO_APPEND_ONCE.forEach((k) => {
+        if (defaultSet.has(k) && !list.includes(k)) list.push(k)
+      })
+      localStorage.setItem(TODO_APPEND_ONCE_KEY, '1')
+    }
+  } catch {
+    /* ignore */
+  }
+  return list
 }
 
 function buildSeed() {

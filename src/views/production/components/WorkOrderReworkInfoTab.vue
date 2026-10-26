@@ -19,6 +19,9 @@
         <template v-else-if="column.key === 'status'">
           <a-tag :color="reworkOrderStatusColor(record.status)">{{ record.status }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'scheduleBatch'">
+          {{ formatScheduleBatchLabel(record) }}
+        </template>
         <template v-else-if="column.key === 'processes'">
           {{ (record.processes || []).map((p) => p.processName).join('、') || '—' }}
         </template>
@@ -38,7 +41,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 import { listReworkOrdersByWorkOrder, reworkOrderState } from '@/store/reworkOrderStore'
-import { reworkOrderStatusColor } from '@/constants/reworkOrder'
+import { reworkOrderStatusColor, formatScheduleBatchLabel } from '@/constants/reworkOrder'
 
 const props = defineProps({
   workOrder: { type: Object, required: true },
@@ -57,6 +60,7 @@ const columns = [
   { title: '返工单号', key: 'reworkNo', width: 140 },
   { title: '状态', key: 'status', width: 90 },
   { title: '来源', dataIndex: 'source', width: 100 },
+  { title: '排产批次', key: 'scheduleBatch', width: 100 },
   { title: '加工中心', dataIndex: 'workCenter', width: 110, ellipsis: true },
   { title: '返工数量', dataIndex: 'qty', width: 90, align: 'right' },
   { title: '待重做', key: 'pending', width: 80, align: 'right' },

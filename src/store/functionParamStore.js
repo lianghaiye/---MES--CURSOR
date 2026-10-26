@@ -256,6 +256,8 @@ export const AUTO_APPROVE_TYPES = {
   PURCHASE_ORDER_PRICE_CHANGE: 'purchaseOrderPriceChange',
   OUTSOURCING_ORDER_PRICE_CHANGE: 'outsourcingOrderPriceChange',
   OUTSOURCING_ORDER: 'outsourcingOrder',
+  SALES_CONTRACT: 'salesContract',
+  SALES_CONTRACT_CHANGE: 'salesContractChange',
   FINISHED_INBOUND: 'finishedInbound',
   MATERIAL_REQUISITION: 'materialRequisition',
   INVENTORY_DEDUCT: 'inventoryDeduct',
@@ -269,6 +271,8 @@ export const AUTO_APPROVE_OPTIONS = [
   { value: AUTO_APPROVE_TYPES.PURCHASE_ORDER_PRICE_CHANGE, label: '采购订单价格变更' },
   { value: AUTO_APPROVE_TYPES.OUTSOURCING_ORDER_PRICE_CHANGE, label: '外协订单价格变更' },
   { value: AUTO_APPROVE_TYPES.OUTSOURCING_ORDER, label: '外协订单' },
+  { value: AUTO_APPROVE_TYPES.SALES_CONTRACT, label: '合同审批' },
+  { value: AUTO_APPROVE_TYPES.SALES_CONTRACT_CHANGE, label: '合同变更审批' },
   { value: AUTO_APPROVE_TYPES.FINISHED_INBOUND, label: '成品入库申请' },
   { value: AUTO_APPROVE_TYPES.MATERIAL_REQUISITION, label: '领料申请' },
   { value: AUTO_APPROVE_TYPES.INVENTORY_DEDUCT, label: '库存扣减' },
@@ -276,7 +280,9 @@ export const AUTO_APPROVE_OPTIONS = [
 ]
 
 export const AUTO_APPROVE_DESCRIPTION =
-  '勾选后对应单据提交即自动审批通过。勾选「销售订单变更」后，订单变更单提交即回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行及客户等）；勾选「采购订单价格变更」后，价格变更单提交即回写采购订单有效价；勾选「外协订单价格变更」后，价格变更单提交即回写外协订单有效价。未勾选「领料申请」时，领料申请单需人工审核（待审核 → 审核通过 / 审核驳回）。' +
+  '勾选后对应单据提交即自动审批通过。勾选「销售订单变更」后，订单变更单提交即回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行及客户等）；勾选「采购订单价格变更」后，价格变更单提交即回写采购订单有效价；勾选「外协订单价格变更」后，价格变更单提交即回写外协订单有效价。' +
+  '勾选「合同审批」后，销售合同提交即自动生效；勾选「合同变更审批」后，合同变更单提交即自动应用到合同。自动审批时审核人显示为「系统自动审批」。' +
+  '未勾选「领料申请」时，领料申请单需人工审核（待审核 → 审核通过 / 审核驳回）。' +
   '未勾选「成品入库申请」时，成品入库申请单需人工审核（待审核 → 审核通过 / 审核驳回）；勾选后提交即审核通过并生成成品入库单。' +
   '「库存扣减」自动确认仅对「自主领料+完工后预扣+确认」生效：勾选后生成扣减单即自动确认；未勾选则须人工确认。' +
   '「完工后预扣+确认（无领料）」无论是否勾选，均须人工确认，不可自动确认。' +
@@ -310,6 +316,8 @@ function createDefaultAutoApproveDocs() {
     [AUTO_APPROVE_TYPES.PURCHASE_ORDER_PRICE_CHANGE]: false,
     [AUTO_APPROVE_TYPES.OUTSOURCING_ORDER_PRICE_CHANGE]: false,
     [AUTO_APPROVE_TYPES.OUTSOURCING_ORDER]: false,
+    [AUTO_APPROVE_TYPES.SALES_CONTRACT]: false,
+    [AUTO_APPROVE_TYPES.SALES_CONTRACT_CHANGE]: false,
     [AUTO_APPROVE_TYPES.FINISHED_INBOUND]: false,
     [AUTO_APPROVE_TYPES.MATERIAL_REQUISITION]: false,
     [AUTO_APPROVE_TYPES.INVENTORY_DEDUCT]: false,

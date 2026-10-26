@@ -33,8 +33,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { getCustomerOptions } from '@/store/customerStore'
+import {
+  consumeCreatedCustomerFromPicker,
+  customerPickerBridge,
+  isCustomerPickerReturnRoute,
+} from '@/store/customerPickerBridge'
 import SelectCustomerModal from './SelectCustomerModal.vue'
 
 const QUICK_LIMIT = 8
@@ -48,10 +54,34 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'change'])
 
+const route = useRoute()
 const pickerOpen = ref(false)
 const searchKeyword = ref('')
 
 const allOptions = computed(() => getCustomerOptions())
+
+/**
+ * 仅当「当前激活页」就是发起新增客户的表单页时回填，
+ * 避免其它 keep-alive 的 CustomerSelect 抢先消费，也避免在客户新建页误回填。
+ */
+function tryApplyCreatedCustomer() {
+  if (props.disabled) return
+  const created = customerPickerBridge.created
+  if (!created?.name) return
+  if (!isCustomerPickerReturnRoute(route.fullPath || route.path)) return
+  const consumed = consumeCreatedCustomerFromPicker()
+  if (!consumed?.name) return
+  emit('update:modelValue', consumed.name)
+  emit('change', consumed.name)
+}
+
+watch(
+  () => customerPickerBridge.created,
+  () => tryApplyCreatedCustomer(),
+)
+
+onMounted(() => tryApplyCreatedCustomer())
+onActivated(() => tryApplyCreatedCustomer())
 
 const displayOptions = computed(() => {
   const kw = searchKeyword.value.trim().toLowerCase()

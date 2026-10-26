@@ -49,22 +49,19 @@
               </a-col>
               <a-col :span="6">
                 <a-form-item label="合同编号">
-                  <a-select
-                    v-if="form.contractType !== '临时合同'"
-                    v-model:value="form.contractNo"
+                  <ContractSelect
+                    v-model="form.contractNo"
                     size="small"
-                    allow-clear
-                    show-search
-                    :options="contractNoOpts"
-                    placeholder="选择生效合同"
-                    style="width: 100%"
+                    :lock-contract-type="
+                      form.contractType === '临时合同' ? '' : form.contractType || ''
+                    "
+                    :preferred-customer-name="form.customerName || ''"
+                    :placeholder="
+                      form.contractType === '临时合同'
+                        ? '可直接输入临时合同编号'
+                        : '搜索选择生效合同，也可直接输入编号'
+                    "
                     @change="onContractNoChange"
-                  />
-                  <a-input
-                    v-else
-                    v-model:value="form.contractNo"
-                    size="small"
-                    placeholder="临时合同可手填编号"
                   />
                 </a-form-item>
               </a-col>
@@ -833,11 +830,7 @@ import {
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
 import { getCustomerOptions, getCustomerByName } from '@/store/customerStore'
-import {
-  checkContractQuotaWarning,
-  getActiveSalesContractOptions,
-  getSalesContractByNo,
-} from '@/store/salesContractStore'
+import { checkContractQuotaWarning, getSalesContractByNo } from '@/store/salesContractStore'
 import { resolveSalesLinePrice } from '@/utils/customerPrice'
 import {
   DISCOUNT_STRATEGIES,
@@ -853,6 +846,7 @@ import {
 } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import CustomerSelect from './CustomerSelect.vue'
+import ContractSelect from './ContractSelect.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import SalesOrderLineEditModal from './SalesOrderLineEditModal.vue'
 import ConfigureSalesSpuVariantModal from './ConfigureSalesSpuVariantModal.vue'
@@ -1130,26 +1124,158 @@ function lineBusinessTypeOpts(record) {
 const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
 const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v }))
 
-const contractNoOpts = computed(() => {
-  const type =
-    form.contractType === '标准合同' || form.contractType === '框架合同' ? form.contractType : ''
-  return getActiveSalesContractOptions(form.customerName || '', type)
-})
-
 function isContractPriceLocked(record) {
   return record?.priceSource === 'contract'
 }
 
-function onContractNoChange() {
+function mapContractLineToSalesLine(contractLine, contract) {
+  const taxInclusive = contract?.taxInclusive !== false
+  const taxRate = contractLine.taxRate != null ? Number(contractLine.taxRate) : 13
+  const qty = Number(contractLine.qty) > 0 ? Number(contractLine.qty) : 1
+  let unitInTax = Number(contractLine.unitPriceInTax)
+  let unitExTax = Number(contractLine.unitPriceExTax)
+  if (!Number.isFinite(unitInTax) || unitInTax < 0) unitInTax = 0
+  if (!Number.isFinite(unitExTax) || unitExTax < 0) unitExTax = 0
+  // 合同按含税录入时，以含税价为准反算不含税；否则以不含税为准推含税
+  if (taxInclusive) {
+    if (!(unitInTax > 0) && unitExTax > 0) {
+      unitInTax = round2(unitExTax * (1 + taxRate / 100))
+    }
+    if (unitInTax > 0) {
+      unitExTax = taxRate >= 0 ? round2(unitInTax / (1 + taxRate / 100)) : unitInTax
+    }
+  } else if (unitExTax > 0) {
+    unitInTax = round2(unitExTax * (1 + taxRate / 100))
+  } else if (unitInTax > 0) {
+    unitExTax = taxRate >= 0 ? round2(unitInTax / (1 + taxRate / 100)) : unitInTax
+  }
+
+  const line = createLineItem({
+    productId: contractLine.productId || '',
+    productCode: contractLine.productCode || '',
+    productName: contractLine.productName || '',
+    specModel: contractLine.specModel || '',
+    material: contractLine.material || '',
+    unit: contractLine.unit || '件',
+    businessType: '自产销售',
+    deliveryMode: '整机',
+    salesQty: qty,
+    taxRate,
+    listUnitPriceExTax: unitExTax,
+    lineDiscountRate: 1,
+    priceSource: 'contract',
+    unitPriceExTax: unitExTax,
+    unitPriceInTax: unitInTax,
+    packagingForm: contractLine.packagingForm || '',
+    supplementDesc: contractLine.supplementDesc || '',
+    deliveryDate: contractLine.deliveryDate || headerDeliveryDateText(),
+    bomFulfillmentPath: BOM_FULFILLMENT_PATH.DESIGN_REQUIRED,
+  })
+  applyHeaderDeliveryDateToLine(line)
+  // 含税合同：按含税口径反算不含税；不含税合同：按不含税推含税
+  recalcLine(line, 'unitPrice', !taxInclusive)
+  return line
+}
+
+function applyFrameworkContractPricing(contract) {
+  if (form.discountStrategy === DISCOUNT_STRATEGIES.NONE) {
+    form.discountStrategy = DISCOUNT_STRATEGIES.LINE
+  }
+  repriceLinesForCustomer()
+  const hitCount = (form.lineItems || []).filter((l) => l.priceSource === 'contract').length
+  if (form.lineItems.length) {
+    message.success(
+      hitCount
+        ? `已按框架合同「${contract.contractNo}」套用协议折扣（命中 ${hitCount} 行；未命中产品使用默认折扣，可继续添加合同外产品）`
+        : `已关联框架合同「${contract.contractNo}」：添加产品后将自动套用协议折扣/默认折扣，允许添加合同外产品`,
+    )
+  } else {
+    message.info(
+      `已关联框架合同「${contract.contractNo}」：添加产品后自动带出协议折扣；未在协议清单中的产品使用默认折扣，允许添加`,
+    )
+  }
+}
+
+function applyStandardContractLines(contract) {
+  const contractLines = (contract.lineItems || []).filter(
+    (l) => l.productCode?.trim() || l.productName?.trim(),
+  )
+  if (!contractLines.length) {
+    message.info(`标准合同「${contract.contractNo}」暂无明细可带出`)
+    repriceLinesForCustomer()
+    return
+  }
+
+  const doApply = () => {
+    // 订单计价口径跟随合同：含税合同带出后按含税反算不含税
+    taxModeExcluding.value = contract.taxInclusive === false
+    form.lineItems = contractLines.map((l) => mapContractLineToSalesLine(l, contract))
+    if (form.discountStrategy === DISCOUNT_STRATEGIES.NONE) {
+      form.discountStrategy = DISCOUNT_STRATEGIES.LINE
+    }
+    if (!form.customerName && contract.customerName) {
+      form.customerName = contract.customerName
+    }
+    if (contract.serviceContent && !form.remark) {
+      form.remark = contract.serviceContent
+    }
+    recalcAll()
+    message.success(
+      `已从标准合同「${contract.contractNo}」带出 ${contractLines.length} 条销售明细` +
+        (contract.taxInclusive !== false ? '（已按含税价反算不含税）' : ''),
+    )
+  }
+
+  if (form.lineItems.length) {
+    Modal.confirm({
+      title: '带出合同明细',
+      content: `当前已有 ${form.lineItems.length} 条销售明细，是否用标准合同「${contract.contractNo}」的明细覆盖？`,
+      okText: '覆盖带出',
+      cancelText: '取消',
+      onOk: doApply,
+    })
+    return
+  }
+  doApply()
+}
+
+function onContractNoChange(contractNo, contractFromSelect) {
+  if (!contractNo) {
+    repriceLinesForCustomer()
+    return
+  }
+  const contract = contractFromSelect || getSalesContractByNo(contractNo)
+  if (!contract) {
+    // 手填编号、台账中无对应合同：仅保留编号，不强制带明细
+    message.info('未在合同台账中找到该编号，已按输入编号保存（不自动带出明细）')
+    return
+  }
+  if (contract.contractType && form.contractType !== '临时合同') {
+    form.contractType = contract.contractType
+  }
+  if (!form.customerName && contract.customerName) {
+    form.customerName = contract.customerName
+  }
+  if (contract.contractType === '框架合同') {
+    applyFrameworkContractPricing(contract)
+    return
+  }
+  if (contract.contractType === '标准合同') {
+    applyStandardContractLines(contract)
+    return
+  }
   repriceLinesForCustomer()
 }
 
 watch(
   () => form.contractType,
   () => {
-    if (form.contractType === '临时合同') return
-    const stillValid = contractNoOpts.value.some((o) => o.value === form.contractNo)
-    if (!stillValid) form.contractNo = undefined
+    // 允许手填编号长期保留；仅当已选合同类型与台账不一致时清空
+    if (!form.contractNo || form.contractType === '临时合同') return
+    const contract = getSalesContractByNo(form.contractNo)
+    if (contract && contract.contractType && contract.contractType !== form.contractType) {
+      form.contractNo = ''
+    }
   },
 )
 const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v }))
@@ -1691,9 +1817,17 @@ function mapPickerToSalesLine(payload) {
   const bom = getOwnActiveBomForItem(bomItemType, payload.id)
   const master = resolveMasterRecord(payload)
   const listPrice = master?.unitPrice ?? payload.unitPrice ?? 0
-  const taxRate = master?.outputTaxRate ?? 13
   const customer = getCustomerByName(form.customerName)
   const contract = form.contractNo ? getSalesContractByNo(form.contractNo) : null
+  const contractPriceHit = (contract?.priceItems || []).find(
+    (item) =>
+      (payload.id && item.productId === payload.id) ||
+      (payload.code && item.productCode === payload.code),
+  )
+  const taxRate =
+    contractPriceHit?.taxRate != null
+      ? Number(contractPriceHit.taxRate)
+      : (master?.outputTaxRate ?? 13)
   const pricing = resolveSalesLinePrice({
     customer,
     contract,

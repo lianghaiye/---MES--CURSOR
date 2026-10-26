@@ -52,9 +52,17 @@
                   申请发货
                 </a-button>
                 <a-button size="small" @click="handleChangeDeliveryMode">变更交付方式</a-button>
+                <a-button size="small" @click="handleGenerateContract">生成合同</a-button>
                 <a-button size="small" @click="handleComplete">完成</a-button>
                 <a-button size="small" danger @click="handleTerminate">作废</a-button>
               </template>
+              <a-button
+                v-else-if="canGenerateContractBtn"
+                size="small"
+                @click="handleGenerateContract"
+              >
+                生成合同
+              </a-button>
               <a-button size="small" @click="openPrint">打印</a-button>
               <a-button size="small" @click="handleBack">返回列表</a-button>
             </a-space>
@@ -909,59 +917,7 @@
           </template>
 
           <template v-else-if="activeTab === 'approval'">
-            <DetailSectionCard title="销售订单审批">
-              <a-divider style="margin: 12px 0" />
-              <div v-if="approvalRecords.length" class="history-list">
-                <div v-for="(item, idx) in approvalRecords" :key="idx" class="history-item">
-                  <div class="history-head">
-                    <span class="history-user">{{ item.name }}</span>
-                    <span class="history-role">（{{ item.role }}）</span>
-                    <a-tag :color="approvalResultColor(item.result)" size="small">
-                      {{ item.result }}
-                    </a-tag>
-                    <span class="history-time">{{ item.time }}</span>
-                  </div>
-                  <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
-                </div>
-              </div>
-              <a-empty v-else description="暂无销售订单审批记录" />
-            </DetailSectionCard>
-
-            <DetailSectionCard title="订单变更审批">
-              <a-divider style="margin: 12px 0" />
-              <div v-if="priceChangeApprovalGroups.length" class="price-change-approval">
-                <div
-                  v-for="group in priceChangeApprovalGroups"
-                  :key="group.id"
-                  class="price-change-approval-group"
-                >
-                  <div class="group-head">
-                    <span class="group-no">{{ group.changeNo }}</span>
-                    <a-tag :color="priceChangeStatusColor(group.status)" size="small">
-                      {{ group.status }}
-                    </a-tag>
-                  </div>
-                  <div class="history-list">
-                    <div
-                      v-for="(item, idx) in group.items"
-                      :key="`${group.id}-${idx}`"
-                      class="history-item"
-                    >
-                      <div class="history-head">
-                        <span class="history-user">{{ item.name }}</span>
-                        <span class="history-role">（{{ item.role }}）</span>
-                        <a-tag :color="approvalResultColor(item.result)" size="small">
-                          {{ item.result }}
-                        </a-tag>
-                        <span v-if="item.time" class="history-time">{{ item.time }}</span>
-                      </div>
-                      <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <a-empty v-else description="暂无订单变更审批记录" />
-            </DetailSectionCard>
+            <SalesApprovalInfoPanel :order="order" :change-groups="priceChangeApprovalGroups" />
           </template>
         </div>
       </template>
@@ -1118,6 +1074,12 @@ import {
   withdrawSalesOrder,
   resubmitSalesOrder,
 } from '@/store/salesOrderStore'
+import {
+  canGenerateContractFromSalesOrder,
+  listContractsBySourceSalesOrder,
+} from '@/store/salesContractStore'
+import { CONTRACT_TYPE } from '@/constants/salesContract'
+import { findCreatePageByListPath } from '@/config/createPages'
 import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
 import { deliveryTypeLabel, normalizeDeliveryType } from '@/utils/accessoryReship'
 import {
@@ -1125,7 +1087,7 @@ import {
   hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
-import { buildPriceChangeApprovalGroups, priceChangeStatusColor } from '@/utils/salesPriceChange'
+import { buildPriceChangeApprovalGroups } from '@/utils/salesPriceChange'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
 import SalesPriceChangeHistoryPanel from './components/SalesPriceChangeHistoryPanel.vue'
@@ -1168,6 +1130,7 @@ import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.
 import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
 import SalesOrderEbomDiffSection from './components/SalesOrderEbomDiffSection.vue'
 import SalesOrderShipAccessorySection from './components/SalesOrderShipAccessorySection.vue'
+import SalesApprovalInfoPanel from './components/SalesApprovalInfoPanel.vue'
 import {
   summarizeLineShipAccessories,
   summarizeUnassignedShipAccessories,
@@ -1282,16 +1245,6 @@ const inboundRows = computed(() => {
   })
   return flattenPurchaseOrderInboundLines(orders)
 })
-
-const approvalRecords = computed(() => order.value?.approvalRecords || [])
-
-function approvalResultColor(result) {
-  if (result === '已通过') return 'success'
-  if (result === '已驳回' || result === '已拒绝') return 'error'
-  if (result === '待审核') return 'warning'
-  if (result === '已提交') return 'processing'
-  return 'default'
-}
 
 const orderPricing = computed(() => {
   if (!order.value) {
@@ -1985,6 +1938,44 @@ function openApprovePage() {
   const path = `/sales/orders/${order.value.id}/approve`
   openTab(path, `审核销售订单 ${order.value.orderNo || ''}`.trim())
   router.push({ name: 'sales-orders-approve', params: { id: order.value.id } })
+}
+
+const canGenerateContractBtn = computed(() => {
+  if (!order.value) return false
+  if (canRevokeSalesOrderApproval(order.value)) return false
+  return canGenerateContractFromSalesOrder(order.value).ok
+})
+
+function handleGenerateContract() {
+  if (!order.value) return
+  const guard = canGenerateContractFromSalesOrder(order.value)
+  if (!guard.ok) {
+    message.warning(guard.message)
+    return
+  }
+  const existing = listContractsBySourceSalesOrder(order.value.id)
+  const go = () => {
+    const page = findCreatePageByListPath('/sales/contracts')
+    if (!page) return
+    openCreateTab(router, openTab, {
+      path: page.newPath,
+      title: `生成合同 ${order.value.orderNo || ''}`.trim(),
+      query: {
+        type: CONTRACT_TYPE.STANDARD,
+        fromOrderId: order.value.id,
+      },
+    })
+  }
+  if (existing.length) {
+    Modal.confirm({
+      title: '已有关联合同',
+      content: `该订单已生成过合同（${existing.map((c) => c.contractNo || c.status).join('、')}），是否继续新建？`,
+      okText: '继续新建',
+      onOk: go,
+    })
+    return
+  }
+  go()
 }
 
 function handleSubmit() {

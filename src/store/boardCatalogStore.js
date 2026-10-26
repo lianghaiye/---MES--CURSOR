@@ -4,7 +4,7 @@ import { createBoardCatalogSeed } from '@/mock/boardCatalogSeed'
 
 const STORAGE_KEY = 'i_doms_board_catalog'
 const SEED_VERSION_KEY = 'i_doms_board_catalog_seed_v'
-const CURRENT_SEED_VERSION = '1'
+const CURRENT_SEED_VERSION = '2'
 
 function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')

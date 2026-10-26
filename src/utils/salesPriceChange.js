@@ -8,6 +8,12 @@ export const PRICE_CHANGE_STATUS = {
   REJECTED: '已驳回',
 }
 
+export const priceChangeStatusOptions = [
+  { label: PRICE_CHANGE_STATUS.PENDING, value: PRICE_CHANGE_STATUS.PENDING },
+  { label: PRICE_CHANGE_STATUS.APPROVED, value: PRICE_CHANGE_STATUS.APPROVED },
+  { label: PRICE_CHANGE_STATUS.REJECTED, value: PRICE_CHANGE_STATUS.REJECTED },
+]
+
 export const PRICE_CHANGE_REASON_OPTIONS = [
   { value: '客户增配', label: '客户增配' },
   { value: '客户取消订货', label: '客户取消订货' },
@@ -448,6 +454,7 @@ export function buildPriceChangeApprovalGroups(changes = []) {
       {
         name: change.submitter || change.creator || '—',
         role: '订单变更申请',
+        step: '提交',
         result: '已提交',
         time: change.submittedAt || change.createdAt || '—',
         opinion: [
@@ -465,15 +472,18 @@ export function buildPriceChangeApprovalGroups(changes = []) {
       items.push({
         name: change.approver || '—',
         role: change.autoApproved ? '系统自动审批' : '订单变更审核',
+        step: '审核',
         result: change.status === PRICE_CHANGE_STATUS.APPROVED ? '已通过' : '已驳回',
         time: change.approvedAt || '—',
         opinion: change.opinion || '',
       })
     } else {
       items.push({
-        name: '—',
+        name: '',
         role: '订单变更审核',
+        step: '审核',
         result: '待审核',
+        pending: true,
         time: '',
         opinion: '',
       })

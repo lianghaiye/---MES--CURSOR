@@ -363,9 +363,11 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
+import { useTabs } from '@/composables/useTabs'
 import {
   customerGradeOptions,
   enterpriseScaleOptions,
@@ -380,6 +382,7 @@ import {
 } from '@/constants/customerMaster'
 import { getCustomerTypeOptions } from '@/store/customerTypeStore'
 import { addCustomer, updateCustomer } from '@/store/customerStore'
+import { markCustomerCreatedFromPicker } from '@/store/customerPickerBridge'
 import {
   createDefaultCustomerForm,
   mapCustomerPriceListForForm,
@@ -401,16 +404,24 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'saved'])
 
+const route = useRoute()
+const router = useRouter()
+const { openTab, closeTab } = useTabs()
+
 const activeTab = ref('org')
 const saving = ref(false)
 const form = reactive(createDefaultCustomerForm())
 
 const isEdit = computed(() => Boolean(props.record?.id))
 
-const { isActive, shellTitle, handleCancel, closeAfterSave } = useFormCreateModal(props, emit, {
-  listPath: props.listPath,
-  getTitle: () => (isEdit.value ? '编辑客户' : '新增客户'),
-})
+const { isActive, shellTitle, handleCancel, closeAfterSave, goBack } = useFormCreateModal(
+  props,
+  emit,
+  {
+    listPath: props.listPath,
+    getTitle: () => (isEdit.value ? '编辑客户' : '新增客户'),
+  },
+)
 
 const customerTypeOpts = computed(() => getCustomerTypeOptions())
 const priceLevelOpts = PRICE_LEVEL_OPTIONS.map((v) => ({ label: v, value: v }))
@@ -489,14 +500,42 @@ function handleSave() {
   if (!validate()) return
   saving.value = true
   const payload = buildPayload()
-  const res = isEdit.value ? updateCustomer(props.record.id, payload) : addCustomer(payload)
+  const raw = isEdit.value ? updateCustomer(props.record.id, payload) : addCustomer(payload)
   saving.value = false
-  if (!res.ok) {
-    message.warning(res.message)
+  // store 返回记录本身；兼容 { ok, data } 结构
+  const data = raw && typeof raw === 'object' && 'data' in raw ? raw.data : raw
+  if (!data || raw?.ok === false) {
+    message.warning(raw?.message || '保存失败')
     return
   }
   message.success(isEdit.value ? '已更新' : '已创建')
-  emit('saved', res.data)
+  emit('saved', data)
+
+  // 从选客弹窗「新增客户」进入：标记待回填 → 关本标签 → 回到原表单（由 CustomerSelect onActivated 消费）
+  if (!isEdit.value) {
+    const queryReturnTo = String(route.query.returnTo || '').trim()
+    const fromPickerQuery = String(route.query.fromCustomerPicker || '') === '1'
+    const pendingMeta = markCustomerCreatedFromPicker(
+      data,
+      queryReturnTo || fromPickerQuery
+        ? { returnPath: queryReturnTo || '', returnTitle: '' }
+        : null,
+    )
+    const fromPicker = Boolean(pendingMeta) || fromPickerQuery
+    if (fromPicker) {
+      const returnPath = pendingMeta?.returnPath || queryReturnTo || ''
+      const createPath = route.fullPath
+      closeTab(createPath)
+      if (returnPath) {
+        // 切回原标签时不要传 title，避免用 document.title 覆盖「新增合同」等标签名
+        openTab(returnPath)
+        router.push(returnPath).catch(() => {})
+      } else {
+        goBack()
+      }
+      return
+    }
+  }
   closeAfterSave()
 }
 </script>

@@ -11,9 +11,18 @@ import {
   REWORK_ORDER_STATUS,
   REWORK_ORDER_SOURCE,
   isReworkOrderOpen,
+  listReworkableScheduleBatches,
+  resolveReworkScheduleBatch,
+  reworkOrderMatchesScheduleBatch,
 } from '@/constants/reworkOrder'
 import { workOrderState, updateWorkOrder } from '@/store/workOrderStore'
 import { assemblyWorkOrderState, updateAssemblyWorkOrder } from '@/store/assemblyWorkOrderStore'
+
+export {
+  listReworkableScheduleBatches,
+  resolveReworkScheduleBatch,
+  formatScheduleBatchLabel,
+} from '@/constants/reworkOrder'
 
 const STORAGE_KEY = 'i_doms_rework_orders'
 
@@ -118,10 +127,13 @@ export function workOrderHasOpenRework(workOrder) {
   return listReworkOrdersByWorkOrder(workOrder).some((o) => isReworkOrderOpen(o.status))
 }
 
-/** 工单某工序待重做数量汇总 */
-export function getProcessPendingReworkQty(workOrderId, processName) {
+/** 工单某工序待重做数量汇总（可按排产批次过滤） */
+export function getProcessPendingReworkQty(workOrderId, processName, scheduleBatchId = '') {
   if (!workOrderId || !processName) return 0
+  const wo = findWorkOrder(workOrderId)
+  const batches = listReworkableScheduleBatches(wo)
   return listOpenReworkOrdersByWorkOrderId(workOrderId).reduce((sum, order) => {
+    if (!reworkOrderMatchesScheduleBatch(order, scheduleBatchId, batches)) return sum
     const line = (order.processes || []).find((p) => p.processName === processName)
     return sum + Math.max(0, Number(line?.pendingQty) || 0)
   }, 0)
@@ -285,6 +297,8 @@ export function createReworkFromProductionQc(task) {
     source,
     qcTaskId: task.id,
     qcTaskNo: task.qcNo || '',
+    scheduleBatchId: task.scheduleBatchId || '',
+    scheduleBatchNo: task.scheduleBatchNo,
     creator: task.inspector || 'admin1',
   })
   if (!result.ok) {
@@ -319,6 +333,17 @@ export function createReworkOrderRecord(payload = {}) {
   if (!(qty > 0)) return { ok: false, message: '返工数量须大于 0' }
   const processNames = payload.processNames || []
   if (!processNames.length) return { ok: false, message: '请至少勾选一道重做工序' }
+  const batch = resolveReworkScheduleBatch(wo, payload)
+  if (!batch) {
+    return {
+      ok: false,
+      message: payload.qcTaskId ? '质检单未关联排产批次' : '请选择排产批次',
+    }
+  }
+  const batchQty = Number(batch.qty) || 0
+  if (batchQty > 0 && qty > batchQty) {
+    return { ok: false, message: `返工数量不能超过该批次排产数量 ${batchQty}` }
+  }
   const reason = String(payload.reason || '').trim()
 
   const woProcesses = wo?.processes || []
@@ -355,6 +380,9 @@ export function createReworkOrderRecord(payload = {}) {
     processRouteName: wo?.processRouteName || payload.processRouteName || '',
     scheduleQty: Number(wo?.scheduleQty) || Number(wo?.planQty) || 0,
     planQty: Number(wo?.planQty) || Number(wo?.scheduleQty) || 0,
+    scheduleBatchId: batch.id || '',
+    scheduleBatchNo: batch.batchNo ?? '',
+    scheduleBatchQty: batchQty,
     qty,
     reason,
     remark: payload.remark || '',

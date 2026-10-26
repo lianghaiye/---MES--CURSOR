@@ -1,11 +1,40 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
-import { CONTRACT_STATUS, CONTRACT_TYPE, DEFAULT_PAYMENT_NODES } from '@/constants/salesContract'
+import {
+  CONTRACT_SIGN_STATUS,
+  CONTRACT_SOURCE,
+  CONTRACT_STATUS,
+  CONTRACT_TYPE,
+  PAYMENT_PLAN_BASE,
+  DEFAULT_PAYMENT_NODES,
+  resolveContractSource,
+} from '@/constants/salesContract'
+import { normalizeSalesOrderProgressStatus, SALES_ORDER_STATUS } from '@/utils/salesOrderStatus'
+import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+import { getPresetPaymentNodes } from '@/store/contractPaymentNodePresetStore'
+
+const SYSTEM_AUTO_APPROVER = '系统自动审批'
 
 const STORAGE_KEY = 'i_doms_sales_contracts'
 const LEGACY_FRAMEWORK_KEY = 'i_doms_framework_contracts'
-const DATA_VERSION = 1
+const DATA_VERSION = 5
+
+/** 合同明细默认税率（%） */
+export const CONTRACT_DEFAULT_TAX_RATE = 13
+
+export function createEmptyPartyLegal(partial = {}) {
+  return {
+    name: partial.name || '',
+    legalRepresentative: partial.legalRepresentative || '',
+    unifiedSocialCreditCode: partial.unifiedSocialCreditCode || '',
+    openingBank: partial.openingBank || '',
+    bankAccount: partial.bankAccount || '',
+    invoiceName: partial.invoiceName || '',
+    invoiceTaxNo: partial.invoiceTaxNo || '',
+    address: partial.address || '',
+  }
+}
 
 function createPaymentNode(partial = {}) {
   return {
@@ -14,15 +43,23 @@ function createPaymentNode(partial = {}) {
     /** 0~1；与 amount 二选一为主，也可都填（金额优先） */
     ratio: partial.ratio != null && partial.ratio !== '' ? Number(partial.ratio) : null,
     amount: partial.amount != null && partial.amount !== '' ? Number(partial.amount) : null,
+    /** 本节点账期起算类型（可不同于合同默认；如预付款=签订日、发货款=发货日） */
+    termStartType: partial.termStartType || '',
+    /** 计划回款时间（可选，生成计划时优先作为到期日） */
+    planDate: partial.planDate ? String(partial.planDate).slice(0, 10) : '',
     remark: partial.remark || '',
   }
 }
 
-export function createDefaultPaymentNodes() {
+/** 取公司级预设回款节点；未配置时回退系统默认 */
+export function createDefaultPaymentNodes(contractType) {
+  const preset = getPresetPaymentNodes(contractType)
+  if (preset.length) return preset.map((item) => createPaymentNode({ ...item }))
   return DEFAULT_PAYMENT_NODES.map((item) => createPaymentNode({ ...item }))
 }
 
 function seedContracts() {
+  const nodes = () => createDefaultPaymentNodes()
   return [
     {
       id: 'sc-fc-1',
@@ -44,17 +81,87 @@ function seedContracts() {
           id: 'fci-1',
           productCode: 'MD-200-BLK',
           productId: '',
+          productName: '迷你电机黑',
+          specModel: 'MD-200',
+          material: '铝合金',
+          unit: '台',
           agreementDiscountRate: 0.9,
+        },
+        {
+          id: 'fci-2',
+          productCode: 'CP2610004',
+          productId: '',
+          productName: '控制面板',
+          specModel: 'CP26',
+          material: 'ABS',
+          unit: '台',
+          agreementDiscountRate: 0.92,
         },
       ],
       lineItems: [],
-      paymentNodes: createDefaultPaymentNodes(),
-      attachments: [],
-      remark: '战略合作客户框架价',
+      paymentNodes: nodes(),
+      attachments: [{ id: 'att-fc-1', name: '华东框架合同扫描件.pdf' }],
+      salesperson: '王五',
+      signer: '李法务',
+      taxInclusive: true,
+      partyLegal: {
+        name: '华东机械制造有限公司',
+        legalRepresentative: '张三',
+        unifiedSocialCreditCode: '91310000MA1FL3XX',
+        openingBank: '中国银行上海支行',
+        bankAccount: '4512345678901234',
+        invoiceName: '华东机械制造有限公司',
+        invoiceTaxNo: '91310000MA1FL3XX',
+      },
+      remark: '战略合作客户框架价，季度复盘协议折扣。',
       status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+      signedAt: '2026-01-08 15:20',
+      signedBy: '李法务',
       createdAt: '2026-01-05 10:00',
-      updatedAt: '2026-01-05 10:00',
+      updatedAt: '2026-01-08 15:20',
       approvedAt: '2026-01-05 11:00',
+      approvedBy: 'admin',
+    },
+    {
+      id: 'sc-fc-2',
+      contractNo: 'HT-20260301-FW',
+      contractName: '山东化工泵业框架协议',
+      customerName: '山东化工泵业集团',
+      contractType: CONTRACT_TYPE.FRAMEWORK,
+      salesperson: '李四',
+      signer: '',
+      taxInclusive: true,
+      defaultDiscountRate: 0.97,
+      settlementCycle: '月结',
+      paymentTermStart: '发货日',
+      paymentTermDays: 45,
+      validFrom: '2026-03-01',
+      validTo: '2027-02-28',
+      limitAmount: 8000000,
+      limitQty: 50,
+      allowExceedQuota: true,
+      priceItems: [
+        {
+          id: 'fci-3',
+          productCode: 'SP-QH-100',
+          productId: '',
+          productName: '气动夹具',
+          specModel: 'QH-100',
+          material: '钢',
+          unit: '台',
+          agreementDiscountRate: 0.95,
+        },
+      ],
+      lineItems: [],
+      paymentNodes: nodes(),
+      attachments: [],
+      remark: '华北区域重点客户，额度含数量上限。',
+      status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+      createdAt: '2026-02-28 14:00',
+      updatedAt: '2026-03-01 09:30',
+      approvedAt: '2026-03-01 09:30',
       approvedBy: 'admin',
     },
     {
@@ -78,20 +185,248 @@ function seedContracts() {
           id: 'sci-1',
           productCode: 'CP2610004',
           productName: '潜水电泵 QJ200-40/3',
+          specModel: 'QJ200-40/3',
+          material: '不锈钢',
           qty: 2,
           unit: '台',
           unitPriceExTax: 160000,
           amountExTax: 320000,
           deliveryDate: '2026-11-30',
+          packagingForm: '木箱',
+          supplementDesc: '',
         },
       ],
-      paymentNodes: createDefaultPaymentNodes(),
+      paymentNodes: nodes(),
       attachments: [],
-      remark: '标准合同示例',
+      salesperson: '王五',
+      signer: '王五',
+      taxInclusive: false,
+      remark: '标准合同示例，已生效未签署。',
       status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
       createdAt: '2026-10-01 09:00',
       updatedAt: '2026-10-01 09:30',
       approvedAt: '2026-10-01 10:00',
+      approvedBy: 'admin',
+    },
+    {
+      id: 'sc-st-2',
+      contractNo: 'HT-20260915-STD',
+      contractName: '齐鲁石化多级泵采购合同',
+      customerName: '齐鲁石化装备分公司',
+      contractType: CONTRACT_TYPE.STANDARD,
+      salesperson: '赵六',
+      signer: '赵六',
+      taxInclusive: true,
+      settlementCycle: '月结',
+      paymentTermStart: '验收日',
+      paymentTermDays: 60,
+      validFrom: '2026-09-15',
+      validTo: '2026-12-31',
+      limitAmount: 580000,
+      limitQty: 4,
+      allowExceedQuota: false,
+      priceItems: [],
+      lineItems: [
+        {
+          id: 'sci-2',
+          productCode: 'DG-85-80',
+          productName: '多级离心泵 DG85-80',
+          specModel: 'DG85-80',
+          material: '铸铁',
+          qty: 4,
+          unit: '台',
+          unitPriceExTax: 145000,
+          amountExTax: 580000,
+          deliveryDate: '2026-11-15',
+          packagingForm: '铁架+木箱',
+          supplementDesc: '现场指导安装',
+        },
+      ],
+      paymentNodes: nodes(),
+      attachments: [{ id: 'att-st-2', name: '齐鲁石化合同盖章件.pdf' }],
+      remark: '履约完毕，已正常完成。',
+      status: CONTRACT_STATUS.COMPLETED,
+      signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+      signedAt: '2026-09-20 11:00',
+      signedBy: '赵六',
+      completedAt: '2026-10-15 16:00',
+      createdAt: '2026-09-15 10:20',
+      updatedAt: '2026-10-15 16:00',
+      approvedAt: '2026-09-16 09:00',
+      approvedBy: 'admin',
+    },
+    {
+      id: 'sc-st-3',
+      contractNo: 'HT-20261018-DFT',
+      contractName: '滨州港务清水泵供货合同（草稿）',
+      customerName: '滨州港务集团',
+      contractType: CONTRACT_TYPE.STANDARD,
+      salesperson: '李四',
+      taxInclusive: true,
+      settlementCycle: '月结',
+      paymentTermStart: '开票日',
+      paymentTermDays: 15,
+      validFrom: '2026-10-20',
+      validTo: '2027-01-31',
+      limitAmount: 96000,
+      limitQty: 3,
+      allowExceedQuota: true,
+      priceItems: [],
+      lineItems: [
+        {
+          id: 'sci-3',
+          productCode: 'IS-100-65',
+          productName: '清水离心泵 IS100-65',
+          specModel: 'IS100-65-200',
+          material: '铸铁',
+          qty: 3,
+          unit: '台',
+          unitPriceExTax: 32000,
+          amountExTax: 96000,
+          deliveryDate: '2026-12-10',
+          packagingForm: '纸箱',
+          supplementDesc: '',
+        },
+      ],
+      paymentNodes: nodes(),
+      attachments: [],
+      remark: '商务条款待客户确认。',
+      status: CONTRACT_STATUS.DRAFT,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+      createdAt: '2026-10-18 16:40',
+      updatedAt: '2026-10-18 16:40',
+    },
+    {
+      id: 'sc-st-4',
+      contractNo: 'HT-20261012-PEN',
+      contractName: '烟台造船厂消防泵合同',
+      customerName: '烟台造船厂有限公司',
+      contractType: CONTRACT_TYPE.STANDARD,
+      settlementCycle: '月结',
+      paymentTermStart: '合同签订日',
+      paymentTermDays: 30,
+      validFrom: '2026-10-12',
+      validTo: '2027-04-30',
+      limitAmount: 210000,
+      limitQty: 2,
+      allowExceedQuota: false,
+      priceItems: [],
+      lineItems: [
+        {
+          id: 'sci-4',
+          productCode: 'XBD-5.0',
+          productName: '消防泵组 XBD5.0/30-100',
+          specModel: 'XBD5.0/30-100',
+          material: '球墨铸铁',
+          qty: 2,
+          unit: '套',
+          unitPriceExTax: 105000,
+          amountExTax: 210000,
+          deliveryDate: '2027-01-20',
+          packagingForm: '木箱',
+          supplementDesc: '含控制柜',
+        },
+      ],
+      paymentNodes: nodes(),
+      attachments: [],
+      remark: '已提交审核，待法务复核。',
+      status: CONTRACT_STATUS.PENDING,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+      submittedAt: '2026-10-13 09:10',
+      createdAt: '2026-10-12 11:00',
+      updatedAt: '2026-10-13 09:10',
+    },
+    {
+      id: 'sc-st-5',
+      contractNo: 'HT-20260928-REJ',
+      contractName: '潍坊水务污水泵合同',
+      customerName: '潍坊水务集团',
+      contractType: CONTRACT_TYPE.STANDARD,
+      settlementCycle: '月结',
+      paymentTermStart: '对账日',
+      paymentTermDays: 45,
+      validFrom: '2026-10-01',
+      validTo: '2027-03-31',
+      limitAmount: 175000,
+      limitQty: 5,
+      allowExceedQuota: false,
+      priceItems: [],
+      lineItems: [
+        {
+          id: 'sci-5',
+          productCode: 'WQ-100',
+          productName: '潜水排污泵 WQ100-10-7.5',
+          specModel: 'WQ100-10-7.5',
+          material: '铸铁',
+          qty: 5,
+          unit: '台',
+          unitPriceExTax: 35000,
+          amountExTax: 175000,
+          deliveryDate: '2026-12-01',
+          packagingForm: '木箱',
+          supplementDesc: '',
+        },
+      ],
+      paymentNodes: nodes(),
+      attachments: [],
+      remark: '价格条款需重新谈判。',
+      status: CONTRACT_STATUS.REJECTED,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+      rejectReason: '单价高于近期同类成交价，请商务重新议价后再提交。',
+      submittedAt: '2026-09-29 10:00',
+      approvalRecords: [
+        {
+          name: 'admin',
+          role: '审核人',
+          result: '已驳回',
+          opinion: '单价高于近期同类成交价，请商务重新议价后再提交。',
+          time: '2026-09-29 15:30',
+        },
+      ],
+      createdAt: '2026-09-28 14:20',
+      updatedAt: '2026-09-29 15:30',
+    },
+    {
+      id: 'sc-fc-3',
+      contractNo: 'HT-20260110-FW',
+      contractName: '青岛港务年度框架（已终止）',
+      customerName: '青岛港国际股份有限公司',
+      contractType: CONTRACT_TYPE.FRAMEWORK,
+      defaultDiscountRate: 0.96,
+      settlementCycle: '季结',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
+      validFrom: '2025-01-01',
+      validTo: '2025-12-31',
+      limitAmount: 3000000,
+      limitQty: null,
+      allowExceedQuota: false,
+      priceItems: [
+        {
+          id: 'fci-4',
+          productCode: 'MD-200-BLK',
+          productId: '',
+          productName: '迷你电机黑',
+          specModel: 'MD-200',
+          material: '铝合金',
+          unit: '台',
+          agreementDiscountRate: 0.93,
+        },
+      ],
+      lineItems: [],
+      paymentNodes: nodes(),
+      attachments: [],
+      remark: '年度到期终止，续签另立新约。',
+      status: CONTRACT_STATUS.TERMINATED,
+      signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+      signedAt: '2025-01-15 10:00',
+      signedBy: 'admin',
+      terminatedAt: '2026-01-10 09:00',
+      terminateReason: '合同到期终止',
+      createdAt: '2025-01-08 09:00',
+      updatedAt: '2026-01-10 09:00',
+      approvedAt: '2025-01-10 11:00',
       approvedBy: 'admin',
     },
   ]
@@ -119,15 +454,13 @@ function loadFromStorage() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
+      // 仅接受当前版本；升版本时重新灌入 seed，避免旧 mock 卡住演示数据
       if (parsed.version === DATA_VERSION && Array.isArray(parsed.contracts)) {
-        return parsed.contracts.map(normalizeContractRecord)
-      }
-      if (Array.isArray(parsed.contracts)) {
         return parsed.contracts.map(normalizeContractRecord)
       }
     }
     const legacy = localStorage.getItem(LEGACY_FRAMEWORK_KEY)
-    if (legacy) {
+    if (legacy && DATA_VERSION === 1) {
       const parsed = JSON.parse(legacy)
       if (Array.isArray(parsed.contracts) && parsed.contracts.length) {
         return migrateFromFramework(parsed.contracts)
@@ -136,7 +469,7 @@ function loadFromStorage() {
   } catch {
     /* ignore */
   }
-  return seedContracts()
+  return seedContracts().map(normalizeContractRecord)
 }
 
 function persist() {
@@ -146,42 +479,127 @@ function persist() {
   )
 }
 
+/**
+ * 签署状态：已填写签署日期且当前日期 ≥ 签署日期时，视为已签署
+ */
+export function resolveContractSignStatus(contract = {}) {
+  if (contract.signStatus === CONTRACT_SIGN_STATUS.SIGNED) {
+    return CONTRACT_SIGN_STATUS.SIGNED
+  }
+  const raw = contract.signedAt || ''
+  if (!raw) return contract.signStatus || CONTRACT_SIGN_STATUS.UNSIGNED
+  const d = dayjs(String(raw).slice(0, 10))
+  if (!d.isValid()) return contract.signStatus || CONTRACT_SIGN_STATUS.UNSIGNED
+  if (dayjs().format('YYYY-MM-DD') >= d.format('YYYY-MM-DD')) {
+    return CONTRACT_SIGN_STATUS.SIGNED
+  }
+  return contract.signStatus || CONTRACT_SIGN_STATUS.UNSIGNED
+}
+
 export function normalizeContractRecord(row = {}) {
+  const signedAt = row.signedAt || ''
   return {
     id: row.id || `sc-${Date.now()}`,
     contractNo: row.contractNo || '',
     contractName: row.contractName || '',
     customerName: row.customerName || '',
     contractType: row.contractType || CONTRACT_TYPE.FRAMEWORK,
+    salesperson: row.salesperson || '',
+    signer: row.signer || '',
+    taxInclusive: row.taxInclusive !== false,
+    partyLegal: createEmptyPartyLegal(row.partyLegal || {}),
     defaultDiscountRate: normalizeDiscountRate(row.defaultDiscountRate, 1),
     settlementCycle: row.settlementCycle || '',
+    /** 兼容旧数据；新合同以节点 termStartType 为准 */
     paymentTermStart: row.paymentTermStart || '',
     paymentTermDays:
-      row.paymentTermDays != null && row.paymentTermDays !== ''
-        ? Number(row.paymentTermDays)
-        : null,
+      row.paymentTermDays != null && row.paymentTermDays !== '' ? Number(row.paymentTermDays) : 30,
     validFrom: row.validFrom || '',
     validTo: row.validTo || '',
     limitAmount: row.limitAmount != null && row.limitAmount !== '' ? Number(row.limitAmount) : null,
     limitQty: row.limitQty != null && row.limitQty !== '' ? Number(row.limitQty) : null,
     allowExceedQuota: row.allowExceedQuota !== false,
+    /** 框架合同：回款计划按额度还是按关联销售订单金额 */
+    paymentPlanBase:
+      row.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT
+        ? PAYMENT_PLAN_BASE.LIMIT
+        : PAYMENT_PLAN_BASE.ORDERS,
     priceItems: Array.isArray(row.priceItems) ? row.priceItems : [],
     lineItems: Array.isArray(row.lineItems) ? row.lineItems : [],
     paymentNodes: Array.isArray(row.paymentNodes)
       ? row.paymentNodes.map(createPaymentNode)
-      : createDefaultPaymentNodes(),
+      : createDefaultPaymentNodes(row.contractType),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     remark: row.remark || '',
+    serviceContent: row.serviceContent || '',
     status: row.status || CONTRACT_STATUS.DRAFT,
+    signedAt,
+    signStatus: resolveContractSignStatus({
+      signStatus: row.signStatus || CONTRACT_SIGN_STATUS.UNSIGNED,
+      signedAt,
+    }),
+    signedBy: row.signedBy || '',
     sourceSalesOrderId: row.sourceSalesOrderId || '',
     sourceSalesOrderNo: row.sourceSalesOrderNo || '',
+    sourceType: resolveContractSource(row),
+    creator: row.creator || 'admin',
     createdAt: row.createdAt || dayjs().format('YYYY-MM-DD HH:mm'),
     updatedAt: row.updatedAt || dayjs().format('YYYY-MM-DD HH:mm'),
+    submittedAt: row.submittedAt || '',
     approvedAt: row.approvedAt || '',
     approvedBy: row.approvedBy || '',
+    rejectReason: row.rejectReason || '',
+    approvalRecords: Array.isArray(row.approvalRecords) ? row.approvalRecords : [],
     terminatedAt: row.terminatedAt || '',
     terminateReason: row.terminateReason || '',
+    completedAt: row.completedAt || '',
   }
+}
+
+function pushApprovalRecord(contract, { result, opinion = '', operator = 'admin' }) {
+  if (!contract.approvalRecords) contract.approvalRecords = []
+  contract.approvalRecords.unshift({
+    name: operator,
+    role: '审核人',
+    result,
+    opinion: opinion || '',
+    time: dayjs().format('YYYY-MM-DD HH:mm'),
+  })
+}
+
+export function canEditSalesContract(contract) {
+  const status = contract?.status
+  return status === CONTRACT_STATUS.DRAFT || status === CONTRACT_STATUS.REJECTED
+}
+
+export function canSubmitSalesContract(contract) {
+  return contract?.status === CONTRACT_STATUS.DRAFT
+}
+
+export function canResubmitSalesContract(contract) {
+  return contract?.status === CONTRACT_STATUS.REJECTED
+}
+
+export function canWithdrawSalesContract(contract) {
+  return contract?.status === CONTRACT_STATUS.PENDING
+}
+
+export function canApproveSalesContract(contract) {
+  return contract?.status === CONTRACT_STATUS.PENDING
+}
+
+export function canDeleteSalesContract(contract) {
+  const status = contract?.status
+  // 已完成不可删；已终止/草稿/已驳回可删
+  return (
+    status === CONTRACT_STATUS.DRAFT ||
+    status === CONTRACT_STATUS.REJECTED ||
+    status === CONTRACT_STATUS.TERMINATED
+  )
+}
+
+export function canCompleteSalesContract(contract) {
+  return contract?.status === CONTRACT_STATUS.ACTIVE
 }
 
 export const salesContractState = reactive({
@@ -193,6 +611,17 @@ watch(
   () => persist(),
   { deep: true },
 )
+
+// 版本升级后首次加载 seed 时立即写入，避免旧版 localStorage 卡住演示数据
+try {
+  const raw = localStorage.getItem(STORAGE_KEY)
+  const parsed = raw ? JSON.parse(raw) : null
+  if (!parsed || parsed.version !== DATA_VERSION) {
+    persist()
+  }
+} catch {
+  persist()
+}
 
 export function listSalesContracts({ contractType, customerName, status } = {}) {
   return salesContractState.contracts.filter((item) => {
@@ -290,6 +719,11 @@ export function resolveContractPrice(contract, productId, productCode, baseListP
   }
 }
 
+function isOrderCountedInContractQuota(order) {
+  const status = normalizeSalesOrderProgressStatus(order?.progressStatus)
+  return status !== SALES_ORDER_STATUS.VOIDED
+}
+
 export function getOrdersLinkedToContract(contractNo) {
   if (!contractNo) return []
   // 延迟加载，避免 frameworkContractStore → salesContractStore → salesOrderStore → productionPlanStore 循环依赖
@@ -299,24 +733,28 @@ export function getOrdersLinkedToContract(contractNo) {
   return (salesOrderState.orders || []).filter((o) => o.contractNo === contractNo)
 }
 
-/** 已执行金额：关联销售订单含税/不含税合计 */
+/** 参与额度占用的关联订单（排除已作废） */
+export function getOrdersCountedInContractQuota(contractNo) {
+  return getOrdersLinkedToContract(contractNo).filter(isOrderCountedInContractQuota)
+}
+
+/** 已执行金额：关联销售订单当前含税金额合计（订单变更生效后按新金额重算） */
 export function calcContractExecutedAmount(contract) {
   if (!contract?.contractNo) return 0
-  const orders = getOrdersLinkedToContract(contract.contractNo)
+  const orders = getOrdersCountedInContractQuota(contract.contractNo)
   return (
     Math.round(
-      orders.reduce((sum, o) => sum + (Number(o.totalAmountInTax ?? o.totalAmountExTax) || 0), 0) *
-        100,
+      orders.reduce((sum, o) => sum + (Number(o.totalAmountInTax ?? o.amountInTax) || 0), 0) * 100,
     ) / 100
   )
 }
 
 export function calcContractExecutedQty(contract) {
   if (!contract?.contractNo) return 0
-  const orders = getOrdersLinkedToContract(contract.contractNo)
+  const orders = getOrdersCountedInContractQuota(contract.contractNo)
   return orders.reduce((sum, o) => {
     const lines = o.lineItems || []
-    return sum + lines.reduce((s, l) => s + (Number(l.qty) || 0), 0)
+    return sum + lines.reduce((s, l) => s + (Number(l.salesQty ?? l.qty) || 0), 0)
   }, 0)
 }
 
@@ -340,6 +778,100 @@ export function getContractQuotaSummary(contract) {
     remainAmount,
     remainQty,
     allowExceedQuota: contract?.allowExceedQuota !== false,
+  }
+}
+
+export function listContractsBySourceSalesOrder(orderId) {
+  if (!orderId) return []
+  return salesContractState.contracts.filter(
+    (c) => c.sourceSalesOrderId === orderId && c.status !== CONTRACT_STATUS.TERMINATED,
+  )
+}
+
+/** 是否可从销售订单生成标准合同 */
+export function canGenerateContractFromSalesOrder(order) {
+  if (!order?.id) return { ok: false, message: '订单不存在' }
+  const status = order.progressStatus || ''
+  if (status === '已作废') return { ok: false, message: '已作废订单不可生成合同' }
+  if (!order.customerName?.trim()) return { ok: false, message: '订单缺少客户' }
+  if (!order.lineItems?.length) return { ok: false, message: '订单无明细，无法生成合同' }
+  return { ok: true }
+}
+
+/**
+ * 由销售订单预填标准合同草稿（不落库）
+ * @returns {{ ok: boolean, message?: string, data?: object, existing?: object[] }}
+ */
+export function buildContractDraftFromSalesOrder(order) {
+  const guard = canGenerateContractFromSalesOrder(order)
+  if (!guard.ok) return guard
+
+  const existing = listContractsBySourceSalesOrder(order.id)
+  const lineItems = (order.lineItems || []).map((line, idx) => {
+    const qty = Number(line.salesQty ?? line.qty) || 0
+    const unitPriceExTax =
+      line.unitPriceExTax != null && line.unitPriceExTax !== '' ? Number(line.unitPriceExTax) : null
+    let amountExTax =
+      line.totalPriceExTax != null && line.totalPriceExTax !== ''
+        ? Number(line.totalPriceExTax)
+        : line.amountExTax != null && line.amountExTax !== ''
+          ? Number(line.amountExTax)
+          : null
+    if (amountExTax == null && unitPriceExTax != null) {
+      amountExTax = Math.round(qty * unitPriceExTax * 100) / 100
+    }
+    return {
+      id: `sci-from-so-${order.id}-${line.id || idx}`,
+      productId: line.productId || '',
+      productCode: line.productCode || '',
+      productName: line.productName || '',
+      specModel: line.specModel || '',
+      material: line.material || '',
+      qty,
+      unit: line.unit || '台',
+      unitPriceExTax,
+      amountExTax,
+      deliveryDate: line.deliveryDate || '',
+      packagingForm: line.packagingForm || '',
+      supplementDesc: line.supplementDesc || '',
+    }
+  })
+
+  const limitAmount =
+    order.amountExTax != null && order.amountExTax !== ''
+      ? Number(order.amountExTax)
+      : Math.round(lineItems.reduce((s, l) => s + (Number(l.amountExTax) || 0), 0) * 100) / 100
+  const limitQty = Math.round(lineItems.reduce((s, l) => s + (Number(l.qty) || 0), 0) * 1000) / 1000
+
+  return {
+    ok: true,
+    existing,
+    data: {
+      contractType: CONTRACT_TYPE.STANDARD,
+      contractNo: '',
+      contractName: `${order.customerName}销售合同`,
+      customerName: order.customerName,
+      settlementCycle: order.settlementCycle || '',
+      paymentTermDays:
+        order.paymentTermDays != null && order.paymentTermDays !== ''
+          ? Number(order.paymentTermDays)
+          : 30,
+      validFrom: '',
+      validTo: '',
+      limitAmount: Number.isFinite(limitAmount) ? limitAmount : null,
+      limitQty: Number.isFinite(limitQty) && limitQty > 0 ? limitQty : null,
+      allowExceedQuota: true,
+      remark: `由销售订单 ${order.orderNo || ''} 生成`.trim(),
+      lineItems,
+      priceItems: [],
+      paymentNodes: createDefaultPaymentNodes(CONTRACT_TYPE.STANDARD),
+      attachments: [],
+      status: CONTRACT_STATUS.DRAFT,
+      sourceType: CONTRACT_SOURCE.FROM_ORDER,
+      sourceSalesOrderId: order.id,
+      sourceSalesOrderNo: order.orderNo || '',
+      creator: 'admin',
+    },
   }
 }
 
@@ -383,6 +915,10 @@ export function addSalesContract(payload) {
     ...payload,
     id: payload.id || `sc-${Date.now()}`,
     status: payload.status || CONTRACT_STATUS.DRAFT,
+    sourceType:
+      payload.sourceType ||
+      (payload.sourceSalesOrderId ? CONTRACT_SOURCE.FROM_ORDER : CONTRACT_SOURCE.MANUAL),
+    creator: payload.creator || 'admin',
     createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
   })
@@ -426,23 +962,83 @@ export function deleteSalesContract(id) {
 export function submitSalesContract(id) {
   const row = getSalesContractById(id)
   if (!row) return { ok: false, message: '合同不存在' }
-  if (row.status !== CONTRACT_STATUS.DRAFT && row.status !== CONTRACT_STATUS.TERMINATED) {
-    return { ok: false, message: '仅草稿可提交审核' }
+  if (!canSubmitSalesContract(row) && !canResubmitSalesContract(row)) {
+    return { ok: false, message: '仅草稿或已驳回可提交审核' }
   }
-  return updateSalesContract(id, { status: CONTRACT_STATUS.PENDING })
+  const res = updateSalesContract(id, {
+    status: CONTRACT_STATUS.PENDING,
+    submittedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    rejectReason: '',
+  })
+  if (!res.ok) return res
+  if (isAutoApproveEnabled(AUTO_APPROVE_TYPES.SALES_CONTRACT)) {
+    const approved = approveSalesContract(id, '系统自动审批通过', SYSTEM_AUTO_APPROVER)
+    if (!approved.ok) return approved
+    return {
+      ok: true,
+      autoApproved: true,
+      message: `合同「${row.contractNo}」已自动审批通过并生效`,
+      data: approved.data,
+    }
+  }
+  return { ok: true, message: `合同「${row.contractNo}」已提交审核`, data: res.data }
 }
 
-export function approveSalesContract(id, operator = 'admin') {
+export function withdrawSalesContract(id) {
   const row = getSalesContractById(id)
   if (!row) return { ok: false, message: '合同不存在' }
-  if (row.status !== CONTRACT_STATUS.PENDING && row.status !== CONTRACT_STATUS.DRAFT) {
-    return { ok: false, message: '当前状态不可审核' }
+  if (!canWithdrawSalesContract(row)) {
+    return { ok: false, message: '仅待审合同可撤回' }
   }
-  return updateSalesContract(id, {
+  const res = updateSalesContract(id, {
+    status: CONTRACT_STATUS.DRAFT,
+    submittedAt: '',
+  })
+  if (!res.ok) return res
+  return { ok: true, message: `合同「${row.contractNo}」已撤回`, data: res.data }
+}
+
+export function approveSalesContract(id, opinion = '', operator = 'admin') {
+  const row = getSalesContractById(id)
+  if (!row) return { ok: false, message: '合同不存在' }
+  if (!canApproveSalesContract(row)) {
+    return { ok: false, message: '仅待审合同可审核通过' }
+  }
+  const res = updateSalesContract(id, {
     status: CONTRACT_STATUS.ACTIVE,
     approvedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     approvedBy: operator,
+    rejectReason: '',
   })
+  if (!res.ok) return res
+  pushApprovalRecord(res.data, { result: '已通过', opinion, operator })
+  persist()
+  // 生效后按付款条款落库生成回款计划（动态导入避免循环依赖）
+  import('@/store/salesPaymentStore')
+    .then((m) => m.ensurePaymentPlansForContract(res.data))
+    .catch(() => {})
+  return { ok: true, message: `合同「${row.contractNo}」已生效`, data: res.data }
+}
+
+export function rejectSalesContract(id, opinion = '', operator = 'admin') {
+  const row = getSalesContractById(id)
+  if (!row) return { ok: false, message: '合同不存在' }
+  if (!canApproveSalesContract(row)) {
+    return { ok: false, message: '仅待审合同可驳回' }
+  }
+  if (!String(opinion || '').trim()) {
+    return { ok: false, message: '驳回时请填写审批意见' }
+  }
+  const res = updateSalesContract(id, {
+    status: CONTRACT_STATUS.REJECTED,
+    rejectReason: String(opinion).trim(),
+    approvedAt: '',
+    approvedBy: '',
+  })
+  if (!res.ok) return res
+  pushApprovalRecord(res.data, { result: '已驳回', opinion: String(opinion).trim(), operator })
+  persist()
+  return { ok: true, message: `合同「${row.contractNo}」已驳回`, data: res.data }
 }
 
 export function terminateSalesContract(id, reason = '') {
@@ -455,5 +1051,68 @@ export function terminateSalesContract(id, reason = '') {
     status: CONTRACT_STATUS.TERMINATED,
     terminatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
     terminateReason: reason || '',
+  })
+}
+
+export function canMarkContractSigned(contract) {
+  if (!contract) return false
+  if (
+    contract.status === CONTRACT_STATUS.TERMINATED ||
+    contract.status === CONTRACT_STATUS.COMPLETED
+  ) {
+    return false
+  }
+  return resolveContractSignStatus(contract) !== CONTRACT_SIGN_STATUS.SIGNED
+}
+
+export function canUnmarkContractSigned(contract) {
+  if (!contract || contract.signStatus !== CONTRACT_SIGN_STATUS.SIGNED) return false
+  return (
+    contract.status !== CONTRACT_STATUS.TERMINATED && contract.status !== CONTRACT_STATUS.COMPLETED
+  )
+}
+
+/** 确认合同已签署（与审批状态独立）；需填写签署时间，签署人选填 */
+export function markContractSigned(id, { signedAt, signedBy } = {}) {
+  const row = getSalesContractById(id)
+  if (!row) return { ok: false, message: '合同不存在' }
+  if (row.status === CONTRACT_STATUS.TERMINATED || row.status === CONTRACT_STATUS.COMPLETED) {
+    return { ok: false, message: '已完成/已终止合同不可标记签署' }
+  }
+  if (row.signStatus === CONTRACT_SIGN_STATUS.SIGNED) {
+    return { ok: false, message: '合同已是已签署状态' }
+  }
+  if (!signedAt) return { ok: false, message: '请填写签署时间' }
+  const at = dayjs(signedAt)
+  if (!at.isValid()) return { ok: false, message: '签署时间格式不正确' }
+  return updateSalesContract(id, {
+    signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+    signedAt: at.format('YYYY-MM-DD HH:mm'),
+    signedBy: String(signedBy || '').trim(),
+  })
+}
+
+export function completeSalesContract(id) {
+  const row = getSalesContractById(id)
+  if (!row) return { ok: false, message: '合同不存在' }
+  if (row.status !== CONTRACT_STATUS.ACTIVE) {
+    return { ok: false, message: '仅生效中的合同可标记完成' }
+  }
+  return updateSalesContract(id, {
+    status: CONTRACT_STATUS.COMPLETED,
+    completedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+  })
+}
+
+export function unmarkContractSigned(id) {
+  const row = getSalesContractById(id)
+  if (!row) return { ok: false, message: '合同不存在' }
+  if (row.signStatus !== CONTRACT_SIGN_STATUS.SIGNED) {
+    return { ok: false, message: '合同尚未签署' }
+  }
+  return updateSalesContract(id, {
+    signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+    signedAt: '',
+    signedBy: '',
   })
 }

@@ -131,6 +131,7 @@ import {
   reworkOrderStatusColor,
   isReworkOrderOpen,
   resolveReworkTaskStatus,
+  formatScheduleBatchLabel,
 } from '@/constants/reworkOrder'
 import { scheduleTaskStatusColor } from '@/utils/workOrderRelatedInfo'
 import { listProcessReportsByReworkOrderId, processReportState } from '@/store/processReportStore'
@@ -208,6 +209,7 @@ const basicFields = computed(() => {
   return [
     { key: 'reworkNo', label: '返工单号', value: display(r.reworkNo) },
     { key: 'workOrderNo', label: '工单号', value: display(r.workOrderNo) },
+    { key: 'scheduleBatch', label: '排产批次', value: formatScheduleBatchLabel(r) },
     { key: 'workOrderCategory', label: '工单类型', value: display(r.workOrderCategory) },
     { key: 'workCenter', label: '加工中心', value: display(r.workCenter) },
     { key: 'productName', label: '产品名称', value: display(r.productName) },
@@ -221,6 +223,11 @@ const basicFields = computed(() => {
       key: 'scheduleQty',
       label: '排产数量',
       value: display(r.scheduleQty || r.planQty),
+    },
+    {
+      key: 'scheduleBatchQty',
+      label: '本批数量',
+      value: display(r.scheduleBatchQty),
     },
     { key: 'qcTaskNo', label: '质检单', value: display(r.qcTaskNo) },
     { key: 'reason', label: '返工原因', value: display(r.reason), fullRow: true },

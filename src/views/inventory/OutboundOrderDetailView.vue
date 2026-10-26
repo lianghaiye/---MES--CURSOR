@@ -777,6 +777,7 @@ const relatedStocktakes = computed(() => {
   return listRelatedStocktakesForOutbound(record.value)
 })
 
+/** 发料出库：关联外协订单（listRelatedOutsourcingOrdersForOutbound） */
 const relatedOutsourcingOrders = computed(() => {
   void outsourcingOrderState.orders
   return listRelatedOutsourcingOrdersForOutbound(record.value)

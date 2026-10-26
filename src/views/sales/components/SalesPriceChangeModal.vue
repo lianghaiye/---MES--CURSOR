@@ -1,493 +1,554 @@
 <template>
-  <a-modal
+  <FormCreateShell
+    :page-mode="pageMode"
     :open="open"
-    :title="modalTitle"
+    :title="shellTitle"
     width="96%"
-    :style="{ top: '16px' }"
     :mask-closable="false"
     destroy-on-close
+    class="price-change-form-shell"
     @cancel="handleCancel"
+    @update:open="(val) => emit('update:open', val)"
   >
     <div class="price-change-body" :class="{ 'is-review': isReview }">
-      <a-alert
-        v-if="isReview"
-        type="warning"
-        show-icon
-        class="pending-alert"
-        message="待审核：通过后将回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行）。后续发货按变更后数量与单价计算。"
-      />
-
-      <div v-if="isReview" class="meta-display">
-        <div class="header-display-item">
-          <span class="field-name">变更原因：</span>
-          <span class="field-value">{{ formatReasonTypes(form.reasonType) }}</span>
-        </div>
-        <div class="header-display-item is-wide">
-          <span class="field-name">变更说明：</span>
-          <span class="field-value">{{ form.reason || '—' }}</span>
-        </div>
-      </div>
-      <a-form v-else layout="vertical" class="price-change-form">
-        <a-row :gutter="12">
-          <a-col :span="6">
-            <a-form-item label="变更原因" required>
-              <a-select
-                v-model:value="form.reasonType"
-                mode="multiple"
-                :options="PRICE_CHANGE_REASON_OPTIONS"
-                placeholder="请选择变更原因"
-                :max-tag-count="2"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="18">
-            <a-form-item label="变更说明">
-              <a-input
-                v-model:value="form.reason"
-                placeholder="如：客户取消某产品、交期调整、未发货部分按新单价执行（选填）"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
-
-      <div class="section-block modal-basic-card" :class="{ 'is-collapsed': basicInfoCollapsed }">
+      <div v-if="needPickOrder" class="section-block pick-order-block">
         <div class="section-title-row">
-          <span class="section-title">基本信息</span>
-          <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
-            {{ basicInfoCollapsed ? '展开' : '收起' }}
-          </a-button>
+          <span class="section-title">选择销售订单</span>
         </div>
-        <div v-show="!basicInfoCollapsed && isReview" class="header-display">
-          <div
-            v-for="field in headerDisplayFields"
-            :key="field.key"
-            class="header-display-item"
-            :class="{ 'is-changed': field.changed, 'is-full': field.fullRow }"
-          >
-            <div class="header-display-line">
-              <span class="field-name">{{ field.label }}：</span>
-              <span class="field-value">{{ field.value }}</span>
-            </div>
-            <FieldChangeHint :diff="field.diff" />
+        <a-form layout="vertical">
+          <a-form-item label="进行中订单" required>
+            <a-select
+              v-model:value="pickedOrderId"
+              show-search
+              allow-clear
+              placeholder="请选择销售订单"
+              :options="orderSelectOptions"
+              option-filter-prop="label"
+              style="width: 100%"
+              @change="onPickOrder"
+            />
+          </a-form-item>
+          <div class="field-tip">
+            仅可对「进行中」且无待审变更单的销售订单发起变更。已有待审变更的订单不可选，选项中展示变更状态。
           </div>
-        </div>
-        <a-form v-show="!basicInfoCollapsed && !isReview" layout="inline" class="header-form">
-          <a-row :gutter="[12, 8]" style="width: 100%">
-            <a-col :span="6">
-              <a-form-item label="销售单号">
-                <a-input :value="form.orderNo" size="small" readonly />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="紧急度" :class="{ 'is-changed': !!headerDiffs.urgency }">
-                <a-select v-model:value="form.header.urgency" size="small" :options="urgencyOpts" />
-                <FieldChangeHint :diff="headerDiffs.urgency" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="合同类型" :class="{ 'is-changed': !!headerDiffs.contractType }">
-                <a-select
-                  v-model:value="form.header.contractType"
-                  size="small"
-                  :options="contractTypeOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.contractType" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="合同编号" :class="{ 'is-changed': !!headerDiffs.contractNo }">
-                <a-input
-                  v-model:value="form.header.contractNo"
-                  size="small"
-                  placeholder="请输入 合同编号"
-                />
-                <FieldChangeHint :diff="headerDiffs.contractNo" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item
-                label="结算币种"
-                :class="{ 'is-changed': !!headerDiffs.settlementCurrency }"
-              >
-                <a-select
-                  v-model:value="form.header.settlementCurrency"
-                  size="small"
-                  :options="currencyOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.settlementCurrency" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="订单类型" :class="{ 'is-changed': !!headerDiffs.orderType }">
-                <a-select
-                  v-model:value="form.header.orderType"
-                  size="small"
-                  :options="orderTypeOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.orderType" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item
-                label="客户名称"
-                required
-                :class="{ 'is-changed': !!headerDiffs.customerName }"
-              >
-                <CustomerSelect
-                  v-model="form.header.customerName"
-                  size="small"
-                  placeholder="请搜索或选择客户名称"
-                  @change="onCustomerChange"
-                />
-                <FieldChangeHint :diff="headerDiffs.customerName" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="联系人" :class="{ 'is-changed': !!headerDiffs.contactPerson }">
-                <a-select
-                  v-model:value="form.header.contactPerson"
-                  size="small"
-                  placeholder="请选择 联系人"
-                  allow-clear
-                  :options="contactOpts"
-                  @change="onContactChange"
-                />
-                <FieldChangeHint :diff="headerDiffs.contactPerson" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="联系人电话" :class="{ 'is-changed': !!headerDiffs.contactPhone }">
-                <a-input
-                  v-model:value="form.header.contactPhone"
-                  size="small"
-                  placeholder="请输入 联系人电话"
-                />
-                <FieldChangeHint :diff="headerDiffs.contactPhone" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item
-                label="交货地址"
-                :class="{ 'is-changed': !!headerDiffs.deliveryAddress }"
-              >
-                <a-input
-                  v-model:value="form.header.deliveryAddress"
-                  size="small"
-                  placeholder="请输入 交货地址"
-                />
-                <FieldChangeHint :diff="headerDiffs.deliveryAddress" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="交货方式" :class="{ 'is-changed': !!headerDiffs.deliveryMethod }">
-                <a-select
-                  v-model:value="form.header.deliveryMethod"
-                  size="small"
-                  :options="deliveryMethodOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.deliveryMethod" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item
-                label="技术规范编码"
-                :class="{ 'is-changed': !!headerDiffs.techSpecCode }"
-              >
-                <a-input
-                  v-model:value="form.header.techSpecCode"
-                  size="small"
-                  placeholder="请输入 技术规范编码"
-                />
-                <FieldChangeHint :diff="headerDiffs.techSpecCode" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="交货日期" :class="{ 'is-changed': !!headerDiffs.reminderDate }">
-                <a-date-picker
-                  v-model:value="form.header.reminderDate"
-                  size="small"
-                  style="width: 100%"
-                  placeholder="请选择 交货日期"
-                />
-                <FieldChangeHint :diff="headerDiffs.reminderDate" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="业务员" :class="{ 'is-changed': !!headerDiffs.salesperson }">
-                <a-select
-                  v-model:value="form.header.salesperson"
-                  size="small"
-                  :options="salespersonOpts"
-                  show-search
-                />
-                <FieldChangeHint :diff="headerDiffs.salesperson" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="结算类型" :class="{ 'is-changed': !!headerDiffs.settlementType }">
-                <a-select
-                  v-model:value="form.header.settlementType"
-                  size="small"
-                  allow-clear
-                  placeholder="请选择 结算类型"
-                  :options="settlementTypeOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.settlementType" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item label="付款比例" :class="{ 'is-changed': !!headerDiffs.paymentRatio }">
-                <a-select
-                  v-model:value="form.header.paymentRatio"
-                  size="small"
-                  allow-clear
-                  placeholder="请选择 付款比例"
-                  :options="paymentRatioOpts"
-                />
-                <FieldChangeHint :diff="headerDiffs.paymentRatio" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="6">
-              <a-form-item
-                label="首付/定金金额"
-                :class="{ 'is-changed': !!headerDiffs.downPaymentAmount }"
-              >
-                <a-input-number
-                  v-model:value="form.header.downPaymentAmount"
-                  size="small"
-                  :min="0"
-                  :precision="2"
-                  style="width: 100%"
-                  placeholder="请输入 首付/定金金额"
-                />
-                <FieldChangeHint :diff="headerDiffs.downPaymentAmount" />
-              </a-form-item>
-            </a-col>
-            <a-col :span="24">
-              <a-form-item
-                label="备注"
-                class="remark-item"
-                :class="{ 'is-changed': !!headerDiffs.remark }"
-              >
-                <a-textarea
-                  v-model:value="form.header.remark"
-                  :rows="2"
-                  :maxlength="1000"
-                  show-count
-                  placeholder="请输入 备注"
-                />
-                <FieldChangeHint :diff="headerDiffs.remark" />
-              </a-form-item>
-            </a-col>
-          </a-row>
         </a-form>
       </div>
 
-      <div class="table-toolbar">
-        <div class="toolbar-left">
-          <a-button class="tax-toggle-btn" @click="toggleTaxMode">
-            切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
-          </a-button>
-          <span class="tax-hint">{{ taxModeHint }}</span>
+      <template v-if="activeOrder">
+        <a-alert
+          v-if="isReview"
+          type="warning"
+          show-icon
+          class="pending-alert"
+          message="待审核：通过后将回写基本信息与销售明细（数量、交期、税率、单价、折扣、取消行）。后续发货按变更后数量与单价计算。"
+        />
+
+        <div class="section-block reason-block">
+          <div class="section-title-row">
+            <span class="section-title">变更原因</span>
+          </div>
+          <div v-if="isReview" class="meta-display reason-meta">
+            <div class="header-display-item">
+              <span class="field-name">变更原因：</span>
+              <span class="field-value">{{ formatReasonTypes(form.reasonType) }}</span>
+            </div>
+            <div class="header-display-item is-wide">
+              <span class="field-name">变更说明：</span>
+              <span class="field-value">{{ form.reason || '—' }}</span>
+            </div>
+          </div>
+          <a-form v-else layout="inline" class="header-form reason-form">
+            <a-row :gutter="[12, 8]" style="width: 100%">
+              <a-col :span="8">
+                <a-form-item label="变更原因" required>
+                  <a-select
+                    v-model:value="form.reasonType"
+                    mode="multiple"
+                    size="small"
+                    :options="PRICE_CHANGE_REASON_OPTIONS"
+                    placeholder="请选择变更原因"
+                    :max-tag-count="2"
+                    style="width: 100%"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="16">
+                <a-form-item label="变更说明">
+                  <a-input
+                    v-model:value="form.reason"
+                    size="small"
+                    placeholder="如：客户取消某产品、交期调整、未发货部分按新单价执行（选填）"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
-        <a-radio-group v-model:value="columnDisplayMode" button-style="solid" size="small">
-          <a-radio-button value="all">展示全部</a-radio-button>
-          <a-radio-button value="inTax">仅展示含税</a-radio-button>
-          <a-radio-button value="exTax">仅展示不含税</a-radio-button>
-        </a-radio-group>
-      </div>
 
-      <a-table
-        size="small"
-        bordered
-        row-key="salesLineId"
-        class="price-change-table"
-        :columns="visibleColumns"
-        :data-source="form.lines"
-        :pagination="false"
-        :row-class-name="lineRowClassName"
-        :scroll="{ x: tableScrollX, y: 'calc(100vh - 480px)' }"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'productName'">
-            <span>{{ record.productName || '—' }}</span>
-            <a-tag v-if="record.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
-          </template>
-          <template v-else-if="isMoneyKey(column.key)">
-            {{ formatPriceChangeAbsMoney(record[column.key]) }}
-          </template>
-          <template v-else-if="column.key === 'oldLineDiscountRate'">
-            {{ formatPriceChangeDiscount(record.oldLineDiscountRate) }}
-          </template>
-          <template v-else-if="column.key === 'newQty'">
-            <a-input-number
-              v-if="!isReview && !record.cancelled"
-              v-model:value="record.newQty"
-              :min="Number(record.appliedShipQty) || 0"
-              :precision="4"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              class="line-editor"
-              :class="{ 'cell-changed': qtyChanged(record) }"
-              style="width: 100%"
-              @change="() => onPriceChange(record, 'unitPrice')"
-            />
-            <span v-else :class="{ 'cell-changed': qtyChanged(record) }">{{
-              record.newQty ?? '—'
-            }}</span>
-          </template>
-          <template v-else-if="column.key === 'newDeliveryDate'">
-            <a-date-picker
-              v-if="!isReview"
-              :value="record.newDeliveryDate ? dayjs(record.newDeliveryDate) : null"
-              size="small"
-              style="width: 100%"
-              :disabled="record.cancelled"
-              @change="(val) => onDeliveryDateChange(record, val)"
-            />
-            <span v-else>{{ record.newDeliveryDate || '—' }}</span>
-          </template>
-          <template v-else-if="column.key === 'newTaxRate'">
-            <a-input-number
-              v-if="!isReview"
-              v-model:value="record.newTaxRate"
-              :min="0"
-              :max="100"
-              :precision="2"
-              :disabled="record.cancelled"
-              class="line-editor"
-              :class="{ 'cell-changed': taxChanged(record) }"
-              style="width: 100%"
-              @change="() => onPriceChange(record, 'unitPrice')"
-            />
-            <span v-else :class="{ 'cell-changed': taxChanged(record) }">{{
-              record.newTaxRate ?? '—'
-            }}</span>
-          </template>
-          <template v-else-if="column.key === 'newUnitPriceExTax'">
-            <a-input-number
-              v-if="!isReview && taxModeExcluding"
-              v-model:value="record.newUnitPriceExTax"
-              :min="0"
-              :precision="2"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              :disabled="record.cancelled"
-              class="line-editor"
-              :class="{ 'cell-changed': priceExChanged(record) }"
-              style="width: 100%"
-              @change="() => onPriceChange(record, 'unitPrice')"
-            />
-            <span v-else :class="{ 'cell-changed': priceExChanged(record) }">{{
-              formatPriceChangeAbsMoney(record.newUnitPriceExTax)
-            }}</span>
-          </template>
-          <template v-else-if="column.key === 'newUnitPriceInTax'">
-            <a-input-number
-              v-if="!isReview && !taxModeExcluding"
-              v-model:value="record.newUnitPriceInTax"
-              :min="0"
-              :precision="2"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              :disabled="record.cancelled"
-              class="line-editor"
-              :class="{ 'cell-changed': priceInChanged(record) }"
-              style="width: 100%"
-              @change="() => onPriceChange(record, 'unitPrice')"
-            />
-            <span v-else :class="{ 'cell-changed': priceInChanged(record) }">{{
-              formatPriceChangeAbsMoney(record.newUnitPriceInTax)
-            }}</span>
-          </template>
-          <template v-else-if="column.key === 'newLineDiscountRate'">
-            <a-input-number
-              v-if="canEditDiscount && !record.cancelled"
-              v-model:value="record._newDiscountPercent"
-              :min="0"
-              :precision="2"
-              :formatter="inputNumberFormatter"
-              :parser="inputNumberParser"
-              style="width: 100%"
-              @change="() => onDiscountPercentChange(record)"
-            />
-            <span v-else>{{ formatPriceChangeDiscount(record.newLineDiscountRate) }}</span>
-          </template>
-          <template v-else-if="column.key === 'deltaAmountExTax'">
-            <span :class="deltaClass(record.deltaAmountExTax)">
-              {{ formatPriceChangeMoney(record.deltaAmountExTax) }}
-            </span>
-          </template>
-          <template v-else-if="column.key === 'deltaAmountInTax'">
-            <span :class="deltaClass(record.deltaAmountInTax)">
-              {{ formatPriceChangeMoney(record.deltaAmountInTax) }}
-            </span>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <template v-if="isReview">
-              <a-tag v-if="record.cancelled" color="default">已取消</a-tag>
-              <span v-else>—</span>
+        <div class="section-block modal-basic-card" :class="{ 'is-collapsed': basicInfoCollapsed }">
+          <div class="section-title-row">
+            <span class="section-title">基本信息</span>
+            <a-button type="link" size="small" class="collapse-btn" @click="toggleBasicInfo">
+              {{ basicInfoCollapsed ? '展开' : '收起' }}
+            </a-button>
+          </div>
+          <div v-show="!basicInfoCollapsed && isReview" class="header-display">
+            <div
+              v-for="field in headerDisplayFields"
+              :key="field.key"
+              class="header-display-item"
+              :class="{ 'is-changed': field.changed, 'is-full': field.fullRow }"
+            >
+              <div class="header-display-line">
+                <span class="field-name">{{ field.label }}：</span>
+                <span class="field-value">{{ field.value }}</span>
+              </div>
+              <FieldChangeHint :diff="field.diff" />
+            </div>
+          </div>
+          <a-form v-show="!basicInfoCollapsed && !isReview" layout="inline" class="header-form">
+            <a-row :gutter="[12, 8]" style="width: 100%">
+              <a-col :span="6">
+                <a-form-item label="销售单号">
+                  <a-input :value="form.orderNo" size="small" readonly />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="紧急度" :class="{ 'is-changed': !!headerDiffs.urgency }">
+                  <a-select
+                    v-model:value="form.header.urgency"
+                    size="small"
+                    :options="urgencyOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.urgency" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="合同类型" :class="{ 'is-changed': !!headerDiffs.contractType }">
+                  <a-select
+                    v-model:value="form.header.contractType"
+                    size="small"
+                    :options="contractTypeOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.contractType" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="合同编号" :class="{ 'is-changed': !!headerDiffs.contractNo }">
+                  <a-input
+                    v-model:value="form.header.contractNo"
+                    size="small"
+                    placeholder="请输入 合同编号"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.contractNo" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="结算币种"
+                  :class="{ 'is-changed': !!headerDiffs.settlementCurrency }"
+                >
+                  <a-select
+                    v-model:value="form.header.settlementCurrency"
+                    size="small"
+                    :options="currencyOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.settlementCurrency" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="订单类型" :class="{ 'is-changed': !!headerDiffs.orderType }">
+                  <a-select
+                    v-model:value="form.header.orderType"
+                    size="small"
+                    :options="orderTypeOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.orderType" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="客户名称"
+                  required
+                  :class="{ 'is-changed': !!headerDiffs.customerName }"
+                >
+                  <CustomerSelect
+                    v-model="form.header.customerName"
+                    size="small"
+                    placeholder="请搜索或选择客户名称"
+                    @change="onCustomerChange"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.customerName" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="联系人" :class="{ 'is-changed': !!headerDiffs.contactPerson }">
+                  <a-select
+                    v-model:value="form.header.contactPerson"
+                    size="small"
+                    placeholder="请选择 联系人"
+                    allow-clear
+                    :options="contactOpts"
+                    @change="onContactChange"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.contactPerson" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="联系人电话"
+                  :class="{ 'is-changed': !!headerDiffs.contactPhone }"
+                >
+                  <a-input
+                    v-model:value="form.header.contactPhone"
+                    size="small"
+                    placeholder="请输入 联系人电话"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.contactPhone" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="交货地址"
+                  :class="{ 'is-changed': !!headerDiffs.deliveryAddress }"
+                >
+                  <a-input
+                    v-model:value="form.header.deliveryAddress"
+                    size="small"
+                    placeholder="请输入 交货地址"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.deliveryAddress" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="交货方式"
+                  :class="{ 'is-changed': !!headerDiffs.deliveryMethod }"
+                >
+                  <a-select
+                    v-model:value="form.header.deliveryMethod"
+                    size="small"
+                    :options="deliveryMethodOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.deliveryMethod" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="技术规范编码"
+                  :class="{ 'is-changed': !!headerDiffs.techSpecCode }"
+                >
+                  <a-input
+                    v-model:value="form.header.techSpecCode"
+                    size="small"
+                    placeholder="请输入 技术规范编码"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.techSpecCode" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="交货日期" :class="{ 'is-changed': !!headerDiffs.reminderDate }">
+                  <a-date-picker
+                    v-model:value="form.header.reminderDate"
+                    size="small"
+                    style="width: 100%"
+                    placeholder="请选择 交货日期"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.reminderDate" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="业务员" :class="{ 'is-changed': !!headerDiffs.salesperson }">
+                  <a-select
+                    v-model:value="form.header.salesperson"
+                    size="small"
+                    :options="salespersonOpts"
+                    show-search
+                  />
+                  <FieldChangeHint :diff="headerDiffs.salesperson" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="结算类型"
+                  :class="{ 'is-changed': !!headerDiffs.settlementType }"
+                >
+                  <a-select
+                    v-model:value="form.header.settlementType"
+                    size="small"
+                    allow-clear
+                    placeholder="请选择 结算类型"
+                    :options="settlementTypeOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.settlementType" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="付款比例" :class="{ 'is-changed': !!headerDiffs.paymentRatio }">
+                  <a-select
+                    v-model:value="form.header.paymentRatio"
+                    size="small"
+                    allow-clear
+                    placeholder="请选择 付款比例"
+                    :options="paymentRatioOpts"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.paymentRatio" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item
+                  label="首付/定金金额"
+                  :class="{ 'is-changed': !!headerDiffs.downPaymentAmount }"
+                >
+                  <a-input-number
+                    v-model:value="form.header.downPaymentAmount"
+                    size="small"
+                    :min="0"
+                    :precision="2"
+                    style="width: 100%"
+                    placeholder="请输入 首付/定金金额"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.downPaymentAmount" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="24">
+                <a-form-item
+                  label="备注"
+                  class="remark-item"
+                  :class="{ 'is-changed': !!headerDiffs.remark }"
+                >
+                  <a-textarea
+                    v-model:value="form.header.remark"
+                    :rows="2"
+                    :maxlength="1000"
+                    show-count
+                    placeholder="请输入 备注"
+                  />
+                  <FieldChangeHint :diff="headerDiffs.remark" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
+        </div>
+
+        <div class="section-block lines-block">
+          <div class="section-title-row">
+            <span class="section-title">销售明细</span>
+          </div>
+          <div class="table-toolbar">
+            <div class="toolbar-left">
+              <a-button size="small" class="tax-toggle-btn" @click="toggleTaxMode">
+                切换为：{{ taxModeExcluding ? '计算含税' : '计算不含税' }}
+              </a-button>
+              <span class="tax-hint">{{ taxModeHint }}</span>
+            </div>
+            <a-radio-group v-model:value="columnDisplayMode" button-style="solid" size="small">
+              <a-radio-button value="all">展示全部</a-radio-button>
+              <a-radio-button value="inTax">仅展示含税</a-radio-button>
+              <a-radio-button value="exTax">仅展示不含税</a-radio-button>
+            </a-radio-group>
+          </div>
+
+          <a-table
+            size="small"
+            bordered
+            row-key="salesLineId"
+            class="price-change-table"
+            :columns="visibleColumns"
+            :data-source="form.lines"
+            :pagination="false"
+            :row-class-name="lineRowClassName"
+            :scroll="{ x: tableScrollX, y: 'calc(100vh - 520px)' }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'productName'">
+                <span>{{ record.productName || '—' }}</span>
+                <a-tag v-if="record.cancelled" color="default" class="cancelled-tag">已取消</a-tag>
+              </template>
+              <template v-else-if="isMoneyKey(column.key)">
+                {{ formatPriceChangeAbsMoney(record[column.key]) }}
+              </template>
+              <template v-else-if="column.key === 'oldLineDiscountRate'">
+                {{ formatPriceChangeDiscount(record.oldLineDiscountRate) }}
+              </template>
+              <template v-else-if="column.key === 'newQty'">
+                <a-input-number
+                  v-if="!isReview && !record.cancelled"
+                  v-model:value="record.newQty"
+                  :min="Number(record.appliedShipQty) || 0"
+                  :precision="4"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  class="line-editor"
+                  :class="{ 'cell-changed': qtyChanged(record) }"
+                  style="width: 100%"
+                  @change="() => onPriceChange(record, 'unitPrice')"
+                />
+                <span v-else :class="{ 'cell-changed': qtyChanged(record) }">{{
+                  record.newQty ?? '—'
+                }}</span>
+              </template>
+              <template v-else-if="column.key === 'newDeliveryDate'">
+                <a-date-picker
+                  v-if="!isReview"
+                  :value="record.newDeliveryDate ? dayjs(record.newDeliveryDate) : null"
+                  size="small"
+                  style="width: 100%"
+                  :disabled="record.cancelled"
+                  @change="(val) => onDeliveryDateChange(record, val)"
+                />
+                <span v-else>{{ record.newDeliveryDate || '—' }}</span>
+              </template>
+              <template v-else-if="column.key === 'newTaxRate'">
+                <a-input-number
+                  v-if="!isReview"
+                  v-model:value="record.newTaxRate"
+                  :min="0"
+                  :max="100"
+                  :precision="2"
+                  :disabled="record.cancelled"
+                  class="line-editor"
+                  :class="{ 'cell-changed': taxChanged(record) }"
+                  style="width: 100%"
+                  @change="() => onPriceChange(record, 'unitPrice')"
+                />
+                <span v-else :class="{ 'cell-changed': taxChanged(record) }">{{
+                  record.newTaxRate ?? '—'
+                }}</span>
+              </template>
+              <template v-else-if="column.key === 'newUnitPriceExTax'">
+                <a-input-number
+                  v-if="!isReview && taxModeExcluding"
+                  v-model:value="record.newUnitPriceExTax"
+                  :min="0"
+                  :precision="2"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  :disabled="record.cancelled"
+                  class="line-editor"
+                  :class="{ 'cell-changed': priceExChanged(record) }"
+                  style="width: 100%"
+                  @change="() => onPriceChange(record, 'unitPrice')"
+                />
+                <span v-else :class="{ 'cell-changed': priceExChanged(record) }">{{
+                  formatPriceChangeAbsMoney(record.newUnitPriceExTax)
+                }}</span>
+              </template>
+              <template v-else-if="column.key === 'newUnitPriceInTax'">
+                <a-input-number
+                  v-if="!isReview && !taxModeExcluding"
+                  v-model:value="record.newUnitPriceInTax"
+                  :min="0"
+                  :precision="2"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  :disabled="record.cancelled"
+                  class="line-editor"
+                  :class="{ 'cell-changed': priceInChanged(record) }"
+                  style="width: 100%"
+                  @change="() => onPriceChange(record, 'unitPrice')"
+                />
+                <span v-else :class="{ 'cell-changed': priceInChanged(record) }">{{
+                  formatPriceChangeAbsMoney(record.newUnitPriceInTax)
+                }}</span>
+              </template>
+              <template v-else-if="column.key === 'newLineDiscountRate'">
+                <a-input-number
+                  v-if="canEditDiscount && !record.cancelled"
+                  v-model:value="record._newDiscountPercent"
+                  :min="0"
+                  :precision="2"
+                  :formatter="inputNumberFormatter"
+                  :parser="inputNumberParser"
+                  style="width: 100%"
+                  @change="() => onDiscountPercentChange(record)"
+                />
+                <span v-else>{{ formatPriceChangeDiscount(record.newLineDiscountRate) }}</span>
+              </template>
+              <template v-else-if="column.key === 'deltaAmountExTax'">
+                <span :class="deltaClass(record.deltaAmountExTax)">
+                  {{ formatPriceChangeMoney(record.deltaAmountExTax) }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'deltaAmountInTax'">
+                <span :class="deltaClass(record.deltaAmountInTax)">
+                  {{ formatPriceChangeMoney(record.deltaAmountInTax) }}
+                </span>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <template v-if="isReview">
+                  <a-tag v-if="record.cancelled" color="default">已取消</a-tag>
+                  <span v-else>—</span>
+                </template>
+                <a-button
+                  v-else-if="record.cancelled"
+                  type="link"
+                  size="small"
+                  @click="toggleCancelLine(record)"
+                >
+                  恢复
+                </a-button>
+                <a-tooltip
+                  v-else-if="!canCancelPriceChangeLine(record)"
+                  title="该明细已全部占用发货，无法取消未发部分"
+                >
+                  <a-button type="link" size="small" disabled>取消行</a-button>
+                </a-tooltip>
+                <a-button v-else type="link" size="small" danger @click="toggleCancelLine(record)">
+                  取消行
+                </a-button>
+              </template>
+              <template v-else>
+                {{ record[column.dataIndex] ?? '—' }}
+              </template>
             </template>
-            <a-button
-              v-else-if="record.cancelled"
-              type="link"
-              size="small"
-              @click="toggleCancelLine(record)"
-            >
-              恢复
-            </a-button>
-            <a-tooltip
-              v-else-if="!canCancelPriceChangeLine(record)"
-              title="该明细已全部占用发货，无法取消未发部分"
-            >
-              <a-button type="link" size="small" disabled>取消行</a-button>
-            </a-tooltip>
-            <a-button v-else type="link" size="small" danger @click="toggleCancelLine(record)">
-              取消行
-            </a-button>
-          </template>
-          <template v-else>
-            {{ record[column.dataIndex] ?? '—' }}
-          </template>
-        </template>
-      </a-table>
+          </a-table>
 
-      <div class="summary-bar">
-        <template v-if="showExTaxColumns">
-          <span>原总额（不含税） {{ formatPriceChangeAbsMoney(summary.oldAmountExTax) }}</span>
-        </template>
-        <template v-if="showInTaxColumns">
-          <span>原总额（含税） {{ formatPriceChangeAbsMoney(summary.oldAmountInTax) }}</span>
-        </template>
-        <template v-if="showExTaxColumns">
-          <span>变更后总额（不含税） {{ formatPriceChangeAbsMoney(summary.newAmountExTax) }}</span>
-        </template>
-        <template v-if="showInTaxColumns">
-          <span>变更后总额（含税） {{ formatPriceChangeAbsMoney(summary.newAmountInTax) }}</span>
-        </template>
-        <span v-if="showExTaxColumns" :class="deltaClass(summary.deltaAmountExTax)">
-          差额（不含税） {{ formatPriceChangeMoney(summary.deltaAmountExTax) }}
-        </span>
-        <span v-if="showInTaxColumns" :class="deltaClass(summary.deltaAmountInTax)">
-          差额（含税） {{ formatPriceChangeMoney(summary.deltaAmountInTax) }}
-        </span>
-        <span>已改 {{ summary.changedCount }} 行</span>
-      </div>
-      <p class="hint">
-        「取消行」保留明细履历，未发部分不再交付；已占用发货的数量不能再往下调。改单价仅互算含税/不含税金额，不联动行折扣；改折扣会按标准价反算含税/不含税单价。
-      </p>
+          <div class="summary-bar">
+            <template v-if="showExTaxColumns">
+              <span>原总额（不含税） {{ formatPriceChangeAbsMoney(summary.oldAmountExTax) }}</span>
+            </template>
+            <template v-if="showInTaxColumns">
+              <span>原总额（含税） {{ formatPriceChangeAbsMoney(summary.oldAmountInTax) }}</span>
+            </template>
+            <template v-if="showExTaxColumns">
+              <span
+                >变更后总额（不含税） {{ formatPriceChangeAbsMoney(summary.newAmountExTax) }}</span
+              >
+            </template>
+            <template v-if="showInTaxColumns">
+              <span
+                >变更后总额（含税） {{ formatPriceChangeAbsMoney(summary.newAmountInTax) }}</span
+              >
+            </template>
+            <span v-if="showExTaxColumns" :class="deltaClass(summary.deltaAmountExTax)">
+              差额（不含税） {{ formatPriceChangeMoney(summary.deltaAmountExTax) }}
+            </span>
+            <span v-if="showInTaxColumns" :class="deltaClass(summary.deltaAmountInTax)">
+              差额（含税） {{ formatPriceChangeMoney(summary.deltaAmountInTax) }}
+            </span>
+            <span>已改 {{ summary.changedCount }} 行</span>
+          </div>
+          <p class="hint">
+            「取消行」保留明细履历，未发部分不再交付；已占用发货的数量不能再往下调。改单价仅互算含税/不含税金额，不联动行折扣；改折扣会按标准价反算含税/不含税单价。
+          </p>
+        </div>
+      </template>
     </div>
 
     <template #footer>
-      <a-button @click="handleCancel">取消</a-button>
+      <a-button size="small" @click="handleCancel">取消</a-button>
       <template v-if="isReview">
-        <a-button danger @click="handleReject">驳回</a-button>
-        <a-button type="primary" @click="handleApprove">通过</a-button>
+        <a-button size="small" danger :disabled="!activeOrder" @click="handleReject">驳回</a-button>
+        <a-button type="primary" size="small" :disabled="!activeOrder" @click="handleApprove">
+          通过
+        </a-button>
       </template>
-      <a-button v-else type="primary" @click="handleSubmit">提交审核</a-button>
+      <a-button v-else type="primary" size="small" :disabled="!activeOrder" @click="handleSubmit">
+        提交审核
+      </a-button>
     </template>
-  </a-modal>
+  </FormCreateShell>
 </template>
 
 <script>
@@ -522,9 +583,13 @@ import {
 } from '@/utils/salesPriceChange'
 import {
   approveSalesPriceChange,
+  canApplySalesPriceChange,
+  getPendingPriceChange,
   rejectSalesPriceChange,
+  resolveSalesOrderChangeStatus,
   submitSalesPriceChange,
 } from '@/store/salesPriceChangeStore'
+import { getSalesOrderById, salesOrderState } from '@/store/salesOrderStore'
 import { getCustomerOptions } from '@/store/customerStore'
 import {
   urgencyOptions,
@@ -536,6 +601,8 @@ import {
   paymentRatioOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
+import FormCreateShell from '@/components/FormCreateShell.vue'
+import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import CustomerSelect from './CustomerSelect.vue'
 
 const FieldChangeHint = defineComponent({
@@ -557,13 +624,54 @@ const FieldChangeHint = defineComponent({
 
 const props = defineProps({
   open: { type: Boolean, default: false },
+  pageMode: { type: Boolean, default: false },
+  listPath: { type: String, default: '/sales/order-changes' },
   salesOrder: { type: Object, default: null },
   pendingChange: { type: Object, default: null },
+  /** 新建页预选销售订单 id */
+  initialSalesOrderId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'done'])
 
-const isReview = computed(() => props.pendingChange?.status === PRICE_CHANGE_STATUS.PENDING)
+const pickedOrderId = ref(undefined)
+const pickedOrder = ref(null)
+
+const activeOrder = computed(() => props.salesOrder || pickedOrder.value)
+const activePending = computed(() => props.pendingChange || null)
+const isReview = computed(() => activePending.value?.status === PRICE_CHANGE_STATUS.PENDING)
+const needPickOrder = computed(() => props.pageMode && !props.pendingChange && !activeOrder.value)
+
+const {
+  shellTitle,
+  handleCancel: shellCancel,
+  closeAfterSave,
+} = useFormCreateModal(props, emit, {
+  listPath: props.listPath,
+  getTitle: () => {
+    if (isReview.value && activePending.value?.changeNo) {
+      return `审核订单变更 · ${activePending.value.changeNo}`
+    }
+    if (activeOrder.value?.orderNo) return `订单变更 · ${activeOrder.value.orderNo}`
+    return '发起订单变更'
+  },
+})
+
+const orderSelectOptions = computed(() => {
+  void salesOrderState.orders
+  return (salesOrderState.orders || [])
+    .filter((o) => canApplySalesPriceChange(o))
+    .map((o) => {
+      const changeStatus = resolveSalesOrderChangeStatus(o.id)
+      const blocked = Boolean(getPendingPriceChange(o.id))
+      const statusText = changeStatus === '-' ? '无变更' : changeStatus
+      return {
+        label: `${o.orderNo || o.id} · ${o.customerName || '—'} · ${statusText}`,
+        value: o.id,
+        disabled: blocked,
+      }
+    })
+})
 
 const taxModeExcluding = ref(true)
 const columnDisplayMode = ref('all')
@@ -592,12 +700,6 @@ const settlementTypeOpts = settlementTypeOptions.map((v) => ({ label: v, value: 
 const paymentRatioOpts = paymentRatioOptions.map((v) => ({ label: v, value: v }))
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
-const modalTitle = computed(() =>
-  isReview.value
-    ? `审核订单变更 ${props.pendingChange?.changeNo || ''}`.trim()
-    : `订单变更 ${props.salesOrder?.orderNo || ''}`.trim(),
-)
-
 const taxModeHint = computed(() =>
   taxModeExcluding.value
     ? '当前：按不含税单价录入，系统自动反算含税价（不联动行折扣）'
@@ -605,7 +707,7 @@ const taxModeHint = computed(() =>
 )
 
 const canEditDiscount = computed(
-  () => !isReview.value && !isLineDiscountDisabled(props.salesOrder?.discountStrategy),
+  () => !isReview.value && !isLineDiscountDisabled(activeOrder.value?.discountStrategy),
 )
 
 const form = reactive({
@@ -768,43 +870,110 @@ function lineRowClassName(record) {
   return record.cancelled ? 'line-cancelled' : ''
 }
 
-watch(
-  () => [props.open, props.salesOrder?.id, props.pendingChange?.id],
-  ([visible]) => {
-    if (!visible) return
-    columnDisplayMode.value = 'all'
-    basicInfoCollapsed.value = false
-    if (props.pendingChange) {
-      form.reasonType = normalizeReasonTypes(props.pendingChange.reasonType)
-      form.reason = props.pendingChange.reason || ''
-      form.orderNo = props.pendingChange.salesOrderNo || props.salesOrder?.orderNo || ''
-      form.headerOld = snapshotOrderChangeHeader(
-        props.pendingChange.headerOld || {
-          customerName: props.pendingChange.oldCustomerName || props.salesOrder?.customerName,
-        },
-      )
-      form.header = toHeaderDraft(
-        props.pendingChange.headerNew || {
-          ...(props.salesOrder || {}),
-          customerName: props.pendingChange.newCustomerName || form.headerOld.customerName,
-        },
-      )
-      form.oldCustomerName = String(form.headerOld.customerName || '').trim()
-      form.newCustomerName = String(form.header.customerName || form.oldCustomerName).trim()
-      taxModeExcluding.value = props.pendingChange.taxModeExcluding !== false
-      form.lines = attachDiscountPercent(props.pendingChange.lines)
-      return
-    }
+function resetDraftFromOrder(order) {
+  form.reasonType = []
+  form.reason = ''
+  form.orderNo = order?.orderNo || ''
+  form.headerOld = snapshotOrderChangeHeader(order)
+  form.header = toHeaderDraft(order)
+  form.oldCustomerName = String(form.headerOld.customerName || '').trim()
+  form.newCustomerName = form.oldCustomerName
+  taxModeExcluding.value = true
+  form.lines = attachDiscountPercent(buildPriceChangeDraftLines(order))
+}
+
+function loadFromPending(change, order) {
+  form.reasonType = normalizeReasonTypes(change.reasonType)
+  form.reason = change.reason || ''
+  form.orderNo = change.salesOrderNo || order?.orderNo || ''
+  form.headerOld = snapshotOrderChangeHeader(
+    change.headerOld || {
+      customerName: change.oldCustomerName || order?.customerName,
+    },
+  )
+  form.header = toHeaderDraft(
+    change.headerNew || {
+      ...(order || {}),
+      customerName: change.newCustomerName || form.headerOld.customerName,
+    },
+  )
+  form.oldCustomerName = String(form.headerOld.customerName || '').trim()
+  form.newCustomerName = String(form.header.customerName || form.oldCustomerName).trim()
+  taxModeExcluding.value = change.taxModeExcluding !== false
+  form.lines = attachDiscountPercent(change.lines)
+}
+
+function hydrateForm() {
+  columnDisplayMode.value = 'all'
+  basicInfoCollapsed.value = false
+  const order = activeOrder.value
+  if (props.pendingChange) {
+    loadFromPending(props.pendingChange, order)
+    return
+  }
+  if (!order) {
     form.reasonType = []
     form.reason = ''
-    form.orderNo = props.salesOrder?.orderNo || ''
-    form.headerOld = snapshotOrderChangeHeader(props.salesOrder)
-    form.header = toHeaderDraft(props.salesOrder)
-    form.oldCustomerName = String(form.headerOld.customerName || '').trim()
-    form.newCustomerName = form.oldCustomerName
-    taxModeExcluding.value = true
-    form.lines = attachDiscountPercent(buildPriceChangeDraftLines(props.salesOrder))
+    form.orderNo = ''
+    form.headerOld = snapshotOrderChangeHeader()
+    form.header = toHeaderDraft()
+    form.oldCustomerName = ''
+    form.newCustomerName = ''
+    form.lines = []
+    return
+  }
+  resetDraftFromOrder(order)
+}
+
+function onPickOrder(orderId) {
+  if (!orderId) {
+    pickedOrder.value = null
+    hydrateForm()
+    return
+  }
+  if (getPendingPriceChange(orderId)) {
+    message.warning('已有待审核的订单变更，请先完成审核')
+    pickedOrderId.value = undefined
+    pickedOrder.value = null
+    return
+  }
+  const order = getSalesOrderById(orderId)
+  if (!order) {
+    message.warning('销售订单不存在')
+    pickedOrderId.value = undefined
+    return
+  }
+  if (!canApplySalesPriceChange(order)) {
+    message.warning('仅「进行中」的销售订单可申请订单变更')
+    pickedOrderId.value = undefined
+    return
+  }
+  pickedOrder.value = order
+  resetDraftFromOrder(order)
+}
+
+watch(
+  () => [
+    props.open,
+    props.pageMode,
+    props.salesOrder?.id,
+    props.pendingChange?.id,
+    props.initialSalesOrderId,
+  ],
+  () => {
+    if (!props.pageMode && !props.open) return
+    if (!props.salesOrder && !props.pendingChange) {
+      pickedOrder.value = null
+      pickedOrderId.value = undefined
+      if (props.initialSalesOrderId) {
+        pickedOrderId.value = props.initialSalesOrderId
+        onPickOrder(props.initialSalesOrderId)
+        return
+      }
+    }
+    hydrateForm()
   },
+  { immediate: true },
 )
 
 function onPriceChange(record, editMode = 'unitPrice') {
@@ -860,7 +1029,7 @@ function deltaClass(val) {
 }
 
 function handleCancel() {
-  emit('update:open', false)
+  shellCancel()
 }
 
 function onCustomerChange(nextName) {
@@ -879,9 +1048,13 @@ function onContactChange(name) {
 }
 
 function handleSubmit() {
+  if (!activeOrder.value) {
+    message.warning('请先选择销售订单')
+    return
+  }
   form.newCustomerName = form.header.customerName
   const res = submitSalesPriceChange({
-    salesOrder: props.salesOrder,
+    salesOrder: activeOrder.value,
     lines: form.lines,
     reasonType: form.reasonType,
     reason: form.reason,
@@ -897,29 +1070,39 @@ function handleSubmit() {
   }
   message.success(res.message)
   emit('done')
-  emit('update:open', false)
+  closeAfterSave()
 }
 
 function handleApprove() {
-  const res = approveSalesPriceChange(props.pendingChange.id)
+  const pending = activePending.value
+  if (!pending?.id) {
+    message.warning('未找到待审变更单')
+    return
+  }
+  const res = approveSalesPriceChange(pending.id)
   if (!res.ok) {
     message.warning(res.message)
     return
   }
   message.success(res.message)
   emit('done')
-  emit('update:open', false)
+  closeAfterSave()
 }
 
 function handleReject() {
-  const res = rejectSalesPriceChange(props.pendingChange.id)
+  const pending = activePending.value
+  if (!pending?.id) {
+    message.warning('未找到待审变更单')
+    return
+  }
+  const res = rejectSalesPriceChange(pending.id)
   if (!res.ok) {
     message.warning(res.message)
     return
   }
   message.success(res.message)
   emit('done')
-  emit('update:open', false)
+  closeAfterSave()
 }
 </script>
 
@@ -928,8 +1111,29 @@ function handleReject() {
   margin-bottom: 12px;
 }
 
-.price-change-form {
-  margin-bottom: 4px;
+.reason-form {
+  :deep(.ant-form-item-row) {
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label) {
+    padding-top: 0;
+  }
+
+  :deep(.ant-select-selector),
+  :deep(.ant-input) {
+    min-height: 24px;
+  }
+}
+
+.reason-meta {
+  margin-bottom: 0;
+}
+
+.field-tip {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 
 .section-block {
@@ -950,6 +1154,7 @@ function handleReject() {
 .section-title {
   font-weight: 600;
   font-size: 14px;
+  color: rgba(0, 0, 0, 0.88);
 }
 
 .collapse-btn {

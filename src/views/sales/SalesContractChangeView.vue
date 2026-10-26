@@ -1,165 +1,359 @@
 <template>
-  <div class="contract-change-page">
-    <div class="toolbar-row">
-      <a-space>
-        <a-select
-          v-model:value="filters.status"
-          allow-clear
-          size="small"
-          placeholder="状态"
-          style="width: 120px"
-          :options="contractChangeStatusOptions"
-        />
-        <a-input
-          v-model:value="filters.keyword"
-          allow-clear
-          size="small"
-          placeholder="变更单号/合同号/客户"
-          style="width: 220px"
-        />
-      </a-space>
-      <span class="hint">从合同详情发起变更；此处审核、驳回、编辑草稿</span>
+  <div class="contract-change-page list-page">
+    <div class="filter-card">
+      <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.status"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="contractChangeStatusOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="变更单号">
+              <a-input
+                v-model:value="filters.changeNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="客户名称">
+              <a-input
+                v-model:value="filters.customerName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="合同编号">
+              <a-input
+                v-model:value="filters.contractNo"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="合同名称">
+              <a-input
+                v-model:value="filters.contractName"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="合同类型">
+              <a-select
+                v-model:value="filters.contractType"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="contractTypeOptions"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="发起人">
+              <a-input
+                v-model:value="filters.creator"
+                allow-clear
+                placeholder="请输入"
+                size="small"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="发起时间">
+              <a-range-picker
+                v-model:value="filters.createdRange"
+                size="small"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="10">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
     </div>
+
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openInitiateChange">
+          <PlusOutlined />
+          发起变更
+        </a-button>
+        <a-button size="small" @click="openToolbarApprove">
+          <CheckOutlined />
+          审核
+        </a-button>
+        <a-button size="small" danger @click="openToolbarCancel">作废</a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+      </a-space>
+    </div>
+
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>
+          当前表格已选择 <strong>{{ selectedRowKeys.length }}</strong> 项
+          <a-button type="link" size="small" @click="selectedRowKeys = []">清空</a-button>
+          共计 {{ filteredList.length }} 条变更单。
+        </span>
+      </template>
+    </a-alert>
 
     <div class="table-card">
       <a-table
         :columns="columns"
-        :data-source="filteredList"
+        :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
-        :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
-        :scroll="{ x: 1200 }"
+        :row-selection="rowSelection"
+        :pagination="false"
+        :scroll="{ x: 1600 }"
       >
         <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-if="column.key === 'index'">
+            {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
+          </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="contractChangeStatusColor(record.status)">{{ record.status }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'changeNo'">
+            <a class="link-code" @click="openDetail(record)">{{ record.changeNo }}</a>
           </template>
           <template v-else-if="column.key === 'diffCount'">
             {{ diffCount(record) }}
           </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || '—' }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ record.createdAt || '—' }}
+          </template>
+          <template v-else-if="column.key === 'approvedBy'">
+            {{ record.approvedBy || '—' }}
+          </template>
+          <template v-else-if="column.key === 'approvedAt'">
+            {{ record.approvedAt || '—' }}
+          </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space :size="8">
-              <a @click="openDetail(record)">查看</a>
+            <a-space :size="8" wrap>
               <a v-if="canEdit(record)" @click="openEdit(record)">编辑</a>
               <a v-if="canSubmit(record)" @click="handleSubmit(record)">提交</a>
-              <a v-if="canApprove(record)" @click="handleApprove(record)">审核生效</a>
-              <a v-if="canReject(record)" class="warn-link" @click="handleReject(record)">驳回</a>
+              <a v-if="canApprove(record)" @click="openApprove(record)">审核</a>
+              <a v-if="canWithdraw(record)" @click="handleWithdraw(record)">撤回</a>
               <a v-if="canCancel(record)" class="danger-link" @click="handleCancel(record)">作废</a>
             </a-space>
           </template>
         </template>
       </a-table>
-    </div>
-
-    <SalesContractChangeFormModal v-model:open="editOpen" :record="editRecord" @saved="refresh" />
-
-    <a-modal
-      v-model:open="detailOpen"
-      :title="`变更单 ${detailRecord?.changeNo || ''}`"
-      width="720px"
-      :footer="null"
-    >
-      <template v-if="detailRecord">
-        <a-descriptions bordered size="small" :column="2" class="mb-12">
-          <a-descriptions-item label="合同">{{ detailRecord.contractNo }}</a-descriptions-item>
-          <a-descriptions-item label="客户">{{ detailRecord.customerName }}</a-descriptions-item>
-          <a-descriptions-item label="状态">
-            <a-tag :color="contractChangeStatusColor(detailRecord.status)">
-              {{ detailRecord.status }}
-            </a-tag>
-          </a-descriptions-item>
-          <a-descriptions-item label="创建时间">{{ detailRecord.createdAt }}</a-descriptions-item>
-          <a-descriptions-item label="变更原因" :span="2">
-            {{ detailRecord.reason || '—' }}
-          </a-descriptions-item>
-          <a-descriptions-item v-if="detailRecord.rejectReason" label="驳回原因" :span="2">
-            {{ detailRecord.rejectReason }}
-          </a-descriptions-item>
-        </a-descriptions>
-        <a-table
-          :columns="diffColumns"
-          :data-source="detailDiffRows"
-          row-key="field"
+      <div class="table-pagination">
+        <a-pagination
+          v-model:current="pagination.current"
+          v-model:page-size="pagination.pageSize"
           size="small"
-          bordered
-          :pagination="false"
+          show-size-changer
+          :total="filteredList.length"
+          :show-total="(total) => `共 ${total} 条`"
         />
-      </template>
-    </a-modal>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 import { Modal, message } from 'ant-design-vue'
+import { CheckOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
-  approveContractChange,
   cancelContractChange,
   diffContractSnapshots,
-  formatContractChangeDiffRows,
-  rejectContractChange,
   salesContractChangeState,
   submitContractChange,
+  withdrawContractChange,
 } from '@/store/salesContractChangeStore'
 import {
   CONTRACT_CHANGE_STATUS,
   contractChangeStatusColor,
   contractChangeStatusOptions,
+  contractTypeOptions,
 } from '@/constants/salesContract'
-import SalesContractChangeFormModal from './components/SalesContractChangeFormModal.vue'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { useTabs } from '@/composables/useTabs'
+
+const router = useRouter()
+const { openTab } = useTabs()
 
 const filters = reactive({
   status: undefined,
-  keyword: '',
+  changeNo: '',
+  customerName: '',
+  contractNo: '',
+  contractName: '',
+  contractType: undefined,
+  creator: '',
+  createdRange: null,
 })
-const editOpen = ref(false)
-const editRecord = ref(null)
-const detailOpen = ref(false)
-const detailRecord = ref(null)
+const appliedFilters = ref({ ...filters, createdRange: null })
+const pagination = reactive({ current: 1, pageSize: 10 })
+const selectedRowKeys = ref([])
 const tick = ref(0)
 
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys) => {
+    selectedRowKeys.value = keys
+  },
+}))
+
+function getSelectedChange() {
+  if (selectedRowKeys.value.length !== 1) return null
+  return salesContractChangeState.changes.find((c) => c.id === selectedRowKeys.value[0]) || null
+}
+
 const columns = [
-  { title: '#', key: 'index', width: 48, align: 'center' },
-  { title: '变更单号', dataIndex: 'changeNo', width: 150 },
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '变更单号', key: 'changeNo', width: 150, fixed: 'left' },
   { title: '合同编号', dataIndex: 'contractNo', width: 140 },
   { title: '合同类型', dataIndex: 'contractType', width: 100 },
-  { title: '客户', dataIndex: 'customerName', width: 160, ellipsis: true },
-  { title: '状态', key: 'status', width: 90 },
-  { title: '变更项', key: 'diffCount', width: 80 },
-  { title: '创建时间', dataIndex: 'createdAt', width: 140 },
-  { title: '操作', key: 'actions', width: 260, fixed: 'right' },
+  { title: '客户名称', dataIndex: 'customerName', width: 160, ellipsis: true },
+  { title: '合同名称', dataIndex: 'contractName', width: 160, ellipsis: true },
+  { title: '变更项数', key: 'diffCount', width: 90 },
+  { title: '发起人', key: 'creator', width: 90 },
+  { title: '发起时间', key: 'createdAt', width: 140 },
+  { title: '审核人', key: 'approvedBy', width: 90 },
+  { title: '审核时间', key: 'approvedAt', width: 140 },
+  { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
 
-const diffColumns = [
-  { title: '字段', dataIndex: 'label', width: 120 },
-  { title: '变更前', dataIndex: 'beforeText' },
-  { title: '变更后', dataIndex: 'afterText' },
-]
+function inCreatedRange(createdAt, range) {
+  if (!range || !range[0] || !range[1]) return true
+  const t = dayjs(createdAt)
+  if (!t.isValid()) return false
+  const start = dayjs(range[0]).startOf('day')
+  const end = dayjs(range[1]).endOf('day')
+  return (t.isAfter(start) || t.isSame(start)) && (t.isBefore(end) || t.isSame(end))
+}
 
 const filteredList = computed(() => {
   void salesContractChangeState.changes
   void tick.value
-  const kw = String(filters.keyword || '')
+  const f = appliedFilters.value
+  const changeNo = String(f.changeNo || '')
+    .trim()
+    .toLowerCase()
+  const customer = String(f.customerName || '')
+    .trim()
+    .toLowerCase()
+  const contractNo = String(f.contractNo || '')
+    .trim()
+    .toLowerCase()
+  const contractName = String(f.contractName || '')
+    .trim()
+    .toLowerCase()
+  const creator = String(f.creator || '')
     .trim()
     .toLowerCase()
   return salesContractChangeState.changes.filter((item) => {
-    if (filters.status && item.status !== filters.status) return false
-    if (kw) {
-      const text = `${item.changeNo} ${item.contractNo} ${item.customerName}`.toLowerCase()
-      if (!text.includes(kw)) return false
-    }
+    if (f.status && item.status !== f.status) return false
+    if (f.contractType && item.contractType !== f.contractType) return false
+    if (
+      changeNo &&
+      !String(item.changeNo || '')
+        .toLowerCase()
+        .includes(changeNo)
+    )
+      return false
+    if (
+      customer &&
+      !String(item.customerName || '')
+        .toLowerCase()
+        .includes(customer)
+    )
+      return false
+    if (
+      contractNo &&
+      !String(item.contractNo || '')
+        .toLowerCase()
+        .includes(contractNo)
+    )
+      return false
+    if (
+      contractName &&
+      !String(item.contractName || '')
+        .toLowerCase()
+        .includes(contractName)
+    )
+      return false
+    if (
+      creator &&
+      !String(item.creator || '')
+        .toLowerCase()
+        .includes(creator)
+    )
+      return false
+    if (!inCreatedRange(item.createdAt, f.createdRange)) return false
     return true
   })
 })
 
-const detailDiffRows = computed(() => {
-  if (!detailRecord.value) return []
-  return formatContractChangeDiffRows(
-    diffContractSnapshots(detailRecord.value.beforeSnapshot, detailRecord.value.afterSnapshot),
-  )
+const pagedList = computed(() => {
+  const start = (pagination.current - 1) * pagination.pageSize
+  return filteredList.value.slice(start, start + pagination.pageSize)
 })
+
+function handleSearch() {
+  appliedFilters.value = {
+    ...filters,
+    createdRange: filters.createdRange ? [...filters.createdRange] : null,
+  }
+  pagination.current = 1
+}
+
+function handleReset() {
+  filters.status = undefined
+  filters.changeNo = ''
+  filters.customerName = ''
+  filters.contractNo = ''
+  filters.contractName = ''
+  filters.contractType = undefined
+  filters.creator = ''
+  filters.createdRange = null
+  handleSearch()
+}
 
 function refresh() {
   tick.value += 1
@@ -181,32 +375,69 @@ function canSubmit(record) {
 }
 
 function canApprove(record) {
-  return (
-    record.status === CONTRACT_CHANGE_STATUS.PENDING ||
-    record.status === CONTRACT_CHANGE_STATUS.DRAFT
-  )
+  return record.status === CONTRACT_CHANGE_STATUS.PENDING
 }
 
-function canReject(record) {
+function canWithdraw(record) {
   return record.status === CONTRACT_CHANGE_STATUS.PENDING
 }
 
 function canCancel(record) {
   return (
     record.status === CONTRACT_CHANGE_STATUS.DRAFT ||
-    record.status === CONTRACT_CHANGE_STATUS.PENDING ||
     record.status === CONTRACT_CHANGE_STATUS.REJECTED
   )
 }
 
 function openEdit(record) {
-  editRecord.value = record
-  editOpen.value = true
+  const path = `/sales/contract-changes/${record.id}/edit`
+  openTab(path, `编辑变更 ${record.changeNo || ''}`.trim())
+  router.push(path)
 }
 
 function openDetail(record) {
-  detailRecord.value = record
-  detailOpen.value = true
+  const path = `/sales/contract-changes/${record.id}`
+  openTab(path, `变更单 ${record.changeNo || ''}`.trim())
+  router.push(path)
+}
+
+function openInitiateChange() {
+  openCreateTab(router, openTab, {
+    path: '/sales/contract-changes/new',
+    title: '发起合同变更',
+  })
+}
+
+function openApprove(record) {
+  const path = `/sales/contract-changes/${record.id}/approve`
+  openTab(path, `审核变更 ${record.changeNo || ''}`.trim())
+  router.push(path)
+}
+
+function openToolbarApprove() {
+  const row = getSelectedChange()
+  if (!row) {
+    message.warning('请勾选一条待审变更单')
+    return
+  }
+  if (!canApprove(row)) {
+    message.warning('仅「待审」的变更单可审核，请先提交')
+    return
+  }
+  openApprove(row)
+}
+
+function openToolbarCancel() {
+  const row = getSelectedChange()
+  if (!row) {
+    message.warning('请勾选一条可作废的变更单')
+    return
+  }
+  if (!canCancel(row)) {
+    message.warning('待审变更单请先撤回后再作废')
+    return
+  }
+  handleCancel(row)
 }
 
 function handleSubmit(record) {
@@ -215,37 +446,21 @@ function handleSubmit(record) {
     message.warning(res.message)
     return
   }
-  message.success('已提交审核')
+  message.success(res.message || '已提交审核')
   refresh()
 }
 
-function handleApprove(record) {
+function handleWithdraw(record) {
   Modal.confirm({
-    title: '审核变更单',
-    content: `确认将变更「${record.changeNo}」应用到合同「${record.contractNo}」？`,
+    title: '撤回变更单',
+    content: `确认撤回「${record.changeNo}」？撤回后变为草稿，可继续编辑或作废。`,
     onOk: () => {
-      const res = approveContractChange(record.id)
+      const res = withdrawContractChange(record.id)
       if (!res.ok) {
         message.warning(res.message)
         return
       }
-      message.success('变更已生效')
-      refresh()
-    },
-  })
-}
-
-function handleReject(record) {
-  Modal.confirm({
-    title: '驳回变更单',
-    content: `确认驳回「${record.changeNo}」？`,
-    onOk: () => {
-      const res = rejectContractChange(record.id, '审核驳回')
-      if (!res.ok) {
-        message.warning(res.message)
-        return
-      }
-      message.success('已驳回')
+      message.success('已撤回为草稿')
       refresh()
     },
   })
@@ -263,37 +478,57 @@ function handleCancel(record) {
         return
       }
       message.success('已作废')
+      selectedRowKeys.value = []
       refresh()
     },
   })
 }
 </script>
 
-<style scoped>
+<style lang="less" scoped>
 .contract-change-page {
-  .toolbar-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-  .hint {
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.45);
-  }
-  .table-card {
-    background: #fff;
-    border-radius: 4px;
-    padding: 12px;
-  }
   .danger-link {
     color: #ff4d4f;
   }
-  .warn-link {
-    color: #fa8c16;
+
+  .link-code {
+    color: #1677ff;
+    cursor: pointer;
   }
+
   .mb-12 {
     margin-bottom: 12px;
+  }
+
+  .field-tip {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.45);
+  }
+
+  .horizontal-form {
+    width: 100%;
+
+    :deep(.ant-form-item) {
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    :deep(.ant-form-item-row) {
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+
+    :deep(.ant-form-item-label > label) {
+      height: 24px;
+      line-height: 24px;
+      font-size: 13px;
+    }
+
+    .filter-actions-item {
+      :deep(.ant-form-item-label) {
+        display: none;
+      }
+    }
   }
 }
 </style>

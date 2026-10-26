@@ -18,6 +18,7 @@ import {
   summarizePriceChangeLines,
 } from '@/utils/salesPriceChange'
 import { SALES_ORDER_STATUS, normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
+import { ensureSalesApprovalDemoPriceChanges } from '@/mock/salesApprovalDemoSeed'
 
 const STORAGE_KEY = 'i_doms_sales_price_changes'
 const DATA_VERSION = 4
@@ -90,7 +91,7 @@ function buildSeed() {
 const stored = loadFromStorage()
 
 export const salesPriceChangeState = reactive({
-  orders: stored || buildSeed(),
+  orders: ensureSalesApprovalDemoPriceChanges(stored || buildSeed()),
 })
 
 watch(() => salesPriceChangeState.orders, persist, { deep: true })
@@ -106,6 +107,16 @@ function nextChangeNo() {
 export function listPriceChangesByOrderId(salesOrderId) {
   return (salesPriceChangeState.orders || [])
     .filter((o) => o.salesOrderId === salesOrderId)
+    .slice()
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
+}
+
+export function getPriceChangeById(id) {
+  return (salesPriceChangeState.orders || []).find((o) => o.id === id) || null
+}
+
+export function listAllPriceChanges() {
+  return (salesPriceChangeState.orders || [])
     .slice()
     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
 }

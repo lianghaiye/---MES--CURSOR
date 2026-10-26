@@ -45,6 +45,7 @@ export const paymentTermStartOptions = [
   { label: '验收日', value: '验收日' },
   { label: '对账日', value: '对账日' },
   { label: '合同签订日', value: '合同签订日' },
+  { label: '自定义', value: '自定义' },
 ]
 
 /** 常用账期天数快捷选项；表单仍可手填其他天数 */

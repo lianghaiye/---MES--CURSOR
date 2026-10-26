@@ -617,6 +617,12 @@ function openRework() {
       processNames: processNames.join(','),
       qcTaskId: t.id,
       qcTaskNo: t.qcNo,
+      scheduleBatchId: t.scheduleBatchId || '',
+      scheduleBatchNo:
+        t.scheduleBatchNo === undefined || t.scheduleBatchNo === null
+          ? ''
+          : String(t.scheduleBatchNo),
+      lockBatch: '1',
     },
   })
 }

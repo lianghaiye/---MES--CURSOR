@@ -1,5 +1,9 @@
 import dayjs from 'dayjs'
-import { REWORK_ORDER_STATUS, REWORK_ORDER_SOURCE } from '@/constants/reworkOrder'
+import {
+  REWORK_ORDER_STATUS,
+  REWORK_ORDER_SOURCE,
+  fallbackScheduleBatchId,
+} from '@/constants/reworkOrder'
 
 export function createReworkProcessLine(partial = {}) {
   const qty = Number(partial.qty) || 0
@@ -41,6 +45,9 @@ export function createReworkOrder(partial = {}) {
     processRouteName: '',
     scheduleQty: 0,
     planQty: 0,
+    scheduleBatchId: '',
+    scheduleBatchNo: '',
+    scheduleBatchQty: 0,
     reason: '',
     remark: '',
     qcTaskId: '',
@@ -56,7 +63,7 @@ export function createReworkOrder(partial = {}) {
   }
 }
 
-export const REWORK_ORDER_SEED_VERSION = '2'
+export const REWORK_ORDER_SEED_VERSION = '3'
 export const REWORK_ORDER_SEED_VERSION_KEY = 'i_doms_rework_orders_seed_v'
 
 export function seedReworkOrders() {
@@ -81,6 +88,9 @@ export function seedReworkOrders() {
       processRouteName: '机加标准路线',
       scheduleQty: 20,
       planQty: 20,
+      scheduleBatchId: fallbackScheduleBatchId('wo-rework-mock-1'),
+      scheduleBatchNo: 1,
+      scheduleBatchQty: 20,
       qty: 2,
       creator: '质检员',
       createdAt: today,
@@ -124,6 +134,9 @@ export function seedReworkOrders() {
       processRouteName: '机加标准路线',
       scheduleQty: 10,
       planQty: 10,
+      scheduleBatchId: fallbackScheduleBatchId('wo-lh-demo-1'),
+      scheduleBatchNo: 1,
+      scheduleBatchQty: 10,
       qty: 3,
       creator: 'admin1',
       createdAt: yesterday,
@@ -159,6 +172,9 @@ export function seedReworkOrders() {
       processRouteName: '标准焊接工艺 v2',
       scheduleQty: 25,
       planQty: 25,
+      scheduleBatchId: fallbackScheduleBatchId('wo-pr-1'),
+      scheduleBatchNo: 1,
+      scheduleBatchQty: 25,
       qty: 4,
       creator: '质检员',
       createdAt: twoDaysAgo,
@@ -195,6 +211,9 @@ export function seedReworkOrders() {
       processRouteName: '机加标准路线',
       scheduleQty: 10,
       planQty: 10,
+      scheduleBatchId: fallbackScheduleBatchId('wo-rework-mock-2'),
+      scheduleBatchNo: 1,
+      scheduleBatchQty: 10,
       qty: 1,
       creator: '车间工人',
       createdAt: twoDaysAgo,

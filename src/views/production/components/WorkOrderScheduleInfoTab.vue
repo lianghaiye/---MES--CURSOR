@@ -178,7 +178,7 @@ const columns = [
 
 function pendingReworkOf(record) {
   void reworkOrderState.orders
-  return getProcessPendingReworkQty(props.workOrder?.id, record.processName)
+  return getProcessPendingReworkQty(props.workOrder?.id, record.processName, record.batchId)
 }
 
 function isBatchCompleted(status) {

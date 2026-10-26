@@ -9,6 +9,7 @@
  */
 import dayjs from 'dayjs'
 import { DEMO_MATERIAL_DEFS } from '@/mock/laborHourDemoSeed'
+import { fallbackScheduleBatchId } from '@/constants/reworkOrder'
 
 /** 小程序现场图片 MOCK（WEB 详情展示/预览/下载） */
 export const MOCK_SCENE_IMAGES = {
@@ -79,6 +80,9 @@ export function createProcessReportTaskSeed() {
       reworkNo: 'FG20261021001',
       workOrderId: 'wo-rework-mock-1',
       workOrderNo: 'WO-RW-001',
+      scheduleBatchId: fallbackScheduleBatchId('wo-rework-mock-1'),
+      scheduleBatchNo: 1,
+      batchId: fallbackScheduleBatchId('wo-rework-mock-1'),
       taskNo: `RW${today.replace(/-/g, '')}001`,
       processName: '粗车',
       productName: '潜水电泵 QJ200-40/3',
@@ -107,6 +111,9 @@ export function createProcessReportTaskSeed() {
       reworkNo: 'FG20261021001',
       workOrderId: 'wo-rework-mock-1',
       workOrderNo: 'WO-RW-001',
+      scheduleBatchId: fallbackScheduleBatchId('wo-rework-mock-1'),
+      scheduleBatchNo: 1,
+      batchId: fallbackScheduleBatchId('wo-rework-mock-1'),
       taskNo: `RW${today.replace(/-/g, '')}002`,
       processName: '精车',
       productName: '潜水电泵 QJ200-40/3',
@@ -135,6 +142,9 @@ export function createProcessReportTaskSeed() {
       reworkNo: 'FG20261021002',
       workOrderId: 'wo-lh-demo-1',
       workOrderNo: 'WO202605270-LH01',
+      scheduleBatchId: fallbackScheduleBatchId('wo-lh-demo-1'),
+      scheduleBatchNo: 1,
+      batchId: fallbackScheduleBatchId('wo-lh-demo-1'),
       taskNo: `RW${yesterday.replace(/-/g, '')}003`,
       processName: LH['LH-MAT-01'].processName,
       productName: LH['LH-MAT-01'].name,
@@ -164,6 +174,9 @@ export function createProcessReportTaskSeed() {
       reworkNo: 'FG20261020003',
       workOrderId: 'wo-pr-1',
       workOrderNo: 'WO-062',
+      scheduleBatchId: fallbackScheduleBatchId('wo-pr-1'),
+      scheduleBatchNo: 1,
+      batchId: fallbackScheduleBatchId('wo-pr-1'),
       taskNo: `RW${twoDaysAgo.replace(/-/g, '')}004`,
       processName: '点焊',
       productName: '货架支架',

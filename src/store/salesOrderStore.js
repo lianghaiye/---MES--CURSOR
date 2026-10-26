@@ -71,6 +71,7 @@ import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
 import { ensureSalesLineShipInfoDemoSalesOrders } from '@/mock/salesLineShipInfoDemoSeed'
 import { ensureShipAccessoryDemoSalesOrders } from '@/mock/shipAccessoryDemoSeed'
+import { ensureSalesApprovalDemoSalesOrders } from '@/mock/salesApprovalDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
@@ -127,11 +128,13 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return ensureShipAccessoryDemoSalesOrders(
-    ensureIndustrialLabelDemoSalesOrder(
-      ensureScatterEbomShipDemoSalesOrders(
-        ensureDedicatedShipDemoSalesOrders(
-          ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+  return ensureSalesApprovalDemoSalesOrders(
+    ensureShipAccessoryDemoSalesOrders(
+      ensureIndustrialLabelDemoSalesOrder(
+        ensureScatterEbomShipDemoSalesOrders(
+          ensureDedicatedShipDemoSalesOrders(
+            ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+          ),
         ),
       ),
     ),

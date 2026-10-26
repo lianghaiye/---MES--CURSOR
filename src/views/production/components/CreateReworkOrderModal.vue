@@ -26,11 +26,29 @@
             </a-form-item>
           </a-col>
           <a-col :span="6">
-            <a-form-item label="返工数量" required>
-              <a-input-number v-model:value="form.qty" :min="1" style="width: 100%" />
+            <a-form-item label="排产批次" required>
+              <a-select
+                v-if="showBatchSelect"
+                v-model:value="form.scheduleBatchId"
+                placeholder="请选择排产批次"
+                :options="batchSelectOptions"
+                allow-clear
+                style="width: 100%"
+              />
+              <a-input v-else :value="selectedBatchLabel" disabled />
             </a-form-item>
           </a-col>
           <a-col :span="6">
+            <a-form-item label="返工数量" required>
+              <a-input-number
+                v-model:value="form.qty"
+                :min="1"
+                :max="batchQtyMax || undefined"
+                style="width: 100%"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="24">
             <a-form-item label="返工原因">
               <a-input v-model:value="form.reason" allow-clear placeholder="选填" />
             </a-form-item>
@@ -75,6 +93,10 @@
             <div class="preview-row">
               <span class="preview-label">排产数量</span>
               <span>{{ scheduleQtyDisplay }}</span>
+            </div>
+            <div class="preview-row">
+              <span class="preview-label">本批数量</span>
+              <span>{{ batchQtyMax || '—' }}</span>
             </div>
             <div class="preview-row">
               <span class="preview-label">加工中心</span>
@@ -144,6 +166,9 @@ import { CloseCircleOutlined, PlusCircleOutlined } from '@ant-design/icons-vue'
 import {
   createReworkOrderRecord,
   listReworkableWorkOrders,
+  listReworkableScheduleBatches,
+  resolveReworkScheduleBatch,
+  formatScheduleBatchLabel,
   REWORK_ORDER_SOURCE,
 } from '@/store/reworkOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
@@ -177,11 +202,13 @@ const saving = ref(false)
 const form = reactive({
   workOrderCode: '',
   workOrderId: undefined,
+  scheduleBatchId: '',
   qty: 1,
   reason: '',
   remark: '',
   processNames: [],
   processAssignees: {},
+  lockBatch: false,
 })
 
 const reworkCategoryOpts = ['生产工单', '总装工单']
@@ -206,6 +233,32 @@ const scheduleQtyDisplay = computed(() => {
   return n || '—'
 })
 
+const scheduleBatches = computed(() => listReworkableScheduleBatches(selectedWo.value))
+
+const selectedBatch = computed(
+  () => scheduleBatches.value.find((b) => b.id === form.scheduleBatchId) || null,
+)
+
+const selectedBatchLabel = computed(() =>
+  selectedBatch.value ? formatScheduleBatchLabel(selectedBatch.value) : '—',
+)
+
+const showBatchSelect = computed(
+  () => Boolean(selectedWo.value) && scheduleBatches.value.length > 1 && !form.lockBatch,
+)
+
+const batchSelectOptions = computed(() =>
+  scheduleBatches.value.map((b) => ({
+    value: b.id,
+    label: `${formatScheduleBatchLabel(b)}（${Number(b.qty) || 0}）`,
+  })),
+)
+
+const batchQtyMax = computed(() => {
+  const n = Number(selectedBatch.value?.qty) || 0
+  return n > 0 ? n : 0
+})
+
 const processPreviewCols = [
   { title: '工序', dataIndex: 'name', width: 110 },
   { title: '原执行人', dataIndex: 'executors', width: 140, ellipsis: true },
@@ -220,6 +273,7 @@ const processPreviewRows = computed(() => {
   if (!wo) return []
   const qtyMap = {}
   buildWorkOrderScheduleInfoBatchGroups(wo).forEach((g) => {
+    if (form.scheduleBatchId && g.batchId && g.batchId !== form.scheduleBatchId) return
     ;(g.rows || []).forEach((row) => {
       const name = row.processName
       if (!name) return
@@ -231,13 +285,15 @@ const processPreviewRows = computed(() => {
   })
   return (wo.processes || []).map((p) => {
     const q = qtyMap[p.name] || { reportQty: 0, goodQty: 0, badQty: 0 }
+    const batchExecutors = executorsFromSelectedBatch(wo, p.name)
+    const displayProc = batchExecutors.length ? { ...p, executors: batchExecutors } : p
     return {
       name: p.name,
-      executors: formatProcessExecutors(p),
+      executors: formatProcessExecutors(displayProc),
       reportQty: q.reportQty,
       goodQty: q.goodQty,
       badQty: q.badQty,
-      defaultAssignee: (p.executors || [])[0] || '',
+      defaultAssignee: batchExecutors[0] || (p.executors || [])[0] || '',
     }
   })
 })
@@ -273,6 +329,9 @@ function resolvePreset() {
     processNames,
     qcTaskId: q.qcTaskId || '',
     qcTaskNo: q.qcTaskNo || '',
+    scheduleBatchId: q.scheduleBatchId || '',
+    scheduleBatchNo: q.scheduleBatchNo === '' || q.scheduleBatchNo == null ? '' : q.scheduleBatchNo,
+    lockBatch: q.lockBatch === '1' || Boolean(q.qcTaskId),
   }
 }
 
@@ -280,6 +339,8 @@ function resetForm() {
   const preset = resolvePreset() || {}
   form.workOrderCode = ''
   form.workOrderId = preset.workOrderId || undefined
+  form.scheduleBatchId = ''
+  form.lockBatch = Boolean(preset.lockBatch)
   form.qty = preset.qty || 1
   form.reason = preset.reason || ''
   form.remark = preset.remark || ''
@@ -289,6 +350,7 @@ function resetForm() {
     const wo = reworkableOrders.value.find((o) => o.id === form.workOrderId)
     if (wo) {
       form.workOrderCode = wo.code
+      applyDefaultBatch(wo, preset)
       initAssigneesFromWo(wo)
     }
   }
@@ -310,10 +372,31 @@ watch(
   },
 )
 
+function executorsFromSelectedBatch(wo, processName) {
+  const batch = selectedBatch.value
+  const assignment = (batch?.processAssignments || []).find(
+    (a) => a.processName === processName || a.processId === processName,
+  )
+  if (assignment?.executors?.length) return [...assignment.executors]
+  const hit = (wo?.processes || []).find((p) => p.name === processName)
+  return [...(hit?.executors || [])]
+}
+
+function applyDefaultBatch(wo, preset = {}) {
+  const resolved = resolveReworkScheduleBatch(wo, {
+    scheduleBatchId: preset.scheduleBatchId || form.scheduleBatchId,
+    scheduleBatchNo: preset.scheduleBatchNo,
+  })
+  form.scheduleBatchId = resolved?.id || ''
+  const max = Number(resolved?.qty) || 0
+  if (max > 0 && Number(form.qty) > max) form.qty = max
+}
+
 function initAssigneesFromWo(wo) {
   const next = { ...form.processAssignees }
   ;(wo?.processes || []).forEach((p) => {
-    if (!next[p.name] && p.executors?.[0]) next[p.name] = p.executors[0]
+    const execs = executorsFromSelectedBatch(wo, p.name)
+    if (!next[p.name] && execs[0]) next[p.name] = execs[0]
   })
   form.processAssignees = next
 }
@@ -323,6 +406,8 @@ function onWorkOrderSelect(wo) {
   form.workOrderCode = wo?.code || ''
   form.processNames = []
   form.processAssignees = {}
+  if (!form.lockBatch) applyDefaultBatch(wo, {})
+  else applyDefaultBatch(wo, resolvePreset() || {})
   initAssigneesFromWo(wo)
 }
 
@@ -336,9 +421,24 @@ function resolveSource() {
   return REWORK_ORDER_SOURCE.WORKSHOP_WEB
 }
 
+watch(
+  () => form.scheduleBatchId,
+  () => {
+    const wo = selectedWo.value
+    if (!wo) return
+    const max = batchQtyMax.value
+    if (max > 0 && Number(form.qty) > max) form.qty = max
+    initAssigneesFromWo(wo)
+  },
+)
+
 function handleOk() {
   if (!selectedWo.value && !form.workOrderCode) {
     message.warning('请选择工单')
+    return
+  }
+  if (showBatchSelect.value && !form.scheduleBatchId) {
+    message.warning('请选择排产批次')
     return
   }
   if (!form.processNames.length) {
@@ -358,6 +458,8 @@ function handleOk() {
     source: resolveSource(),
     qcTaskId: preset.qcTaskId,
     qcTaskNo: preset.qcTaskNo,
+    scheduleBatchId: form.scheduleBatchId,
+    scheduleBatchNo: selectedBatch.value?.batchNo,
   })
   saving.value = false
   if (!res.ok) {

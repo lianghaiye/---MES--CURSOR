@@ -57,6 +57,14 @@ export const createPageRegistry = [
     keepAlive: 'SalesContractCreateView',
   },
   {
+    listPath: '/sales/contract-changes',
+    newPath: '/sales/contract-changes/new',
+    title: '发起合同变更',
+    name: 'sales-contract-changes-new',
+    view: () => import('@/views/sales/SalesContractChangeCreateView.vue'),
+    keepAlive: 'SalesContractChangeCreateView',
+  },
+  {
     listPath: '/sales/delivery',
     newPath: '/sales/delivery/new',
     title: '新增发货单',

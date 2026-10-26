@@ -136,21 +136,26 @@
 
         <div class="section-card">
           <div class="section-title">审批记录</div>
-          <a-divider style="margin: 12px 0" />
-          <div v-if="historyRecords.length" class="history-list">
-            <div v-for="(item, idx) in historyRecords" :key="idx" class="history-item">
-              <div class="history-head">
-                <span class="history-user">{{ item.name }}</span>
-                <span class="history-role">（{{ item.role }}）</span>
-                <a-tag :color="approvalResultColor(item.result)" size="small">
-                  {{ item.result }}
-                </a-tag>
-                <span class="history-time">{{ item.time }}</span>
+          <a-timeline v-if="historyRecords.length" class="appr-timeline">
+            <a-timeline-item
+              v-for="(item, idx) in historyRecords"
+              :key="idx"
+              :color="approvalTimelineColor(item.result)"
+            >
+              <div class="appr-node">
+                <div class="history-head">
+                  <a-tag :color="approvalResultColor(item.result)" size="small">
+                    {{ item.result }}
+                  </a-tag>
+                  <span class="history-user">{{ item.step || item.role }}</span>
+                  <span class="history-role">{{ item.displayName || item.name }}</span>
+                  <span class="history-time">{{ item.time }}</span>
+                </div>
+                <div v-if="item.opinion" class="history-opinion">意见：{{ item.opinion }}</div>
               </div>
-              <div v-if="item.opinion" class="history-opinion">{{ item.opinion }}</div>
-            </div>
-          </div>
-          <a-empty v-else description="暂无审批记录" />
+            </a-timeline-item>
+          </a-timeline>
+          <a-empty v-else :image="false" description="暂无审批记录" />
         </div>
       </template>
       <a-empty v-else description="未找到该销售订单" />
@@ -174,6 +179,11 @@ import {
   approveSalesOrder,
   rejectSalesOrder,
 } from '@/store/salesOrderStore'
+import {
+  approvalResultColor,
+  approvalTimelineColor,
+  buildSalesOrderApprovalTimeline,
+} from '@/utils/salesApprovalDisplay'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
@@ -215,7 +225,7 @@ const moneyKeys = new Set([
 
 const record = computed(() => getSalesOrderById(route.params.id))
 const canApprove = computed(() => record.value && canApproveSalesOrder(record.value))
-const historyRecords = computed(() => record.value?.approvalRecords || [])
+const historyRecords = computed(() => buildSalesOrderApprovalTimeline(record.value))
 
 watch(
   record,
@@ -319,12 +329,6 @@ function previewPlanQty(line) {
 function displayCell(line, column) {
   const val = line[column.dataIndex]
   return val !== undefined && val !== null && val !== '' ? val : '—'
-}
-
-function approvalResultColor(result) {
-  if (result === '已通过') return 'success'
-  if (result === '已驳回') return 'error'
-  return 'default'
 }
 
 function formatMoney(val) {
@@ -481,6 +485,10 @@ function handleReject() {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 12px;
+}
+
+.appr-timeline {
+  margin: 8px 0 0 8px;
 }
 
 .history-item {

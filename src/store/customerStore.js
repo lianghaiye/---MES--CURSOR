@@ -2,6 +2,7 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import {
   createDefaultCustomerForm,
+  createEmptyAddress,
   generateCustomerCode,
   normalizeCustomerRecord,
 } from '@/utils/customerMaster'
@@ -259,6 +260,74 @@ export function getCustomerByName(name) {
 
 export function getCustomerById(id) {
   return customerState.customers.find((c) => c.id === id) || null
+}
+
+/** 客户主数据地址展示文案（优先注册地址） */
+export function resolveCustomerAddressText(customer) {
+  if (!customer) return ''
+  const list = Array.isArray(customer.addresses) ? customer.addresses : []
+  const preferred =
+    list.find((a) => a.addressType === '注册地址' && (a.detailAddress || a.detail)) ||
+    list.find((a) => a.isDefault && (a.detailAddress || a.detail)) ||
+    list.find((a) => a.detailAddress || a.detail)
+  if (preferred) return String(preferred.detailAddress || preferred.detail || '').trim()
+  return String(customer.invoiceAddressPhone || customer.registeredAddress || '').trim()
+}
+
+/**
+ * 合同客户资质/开票信息 → 回写客户主数据中仍为空的字段（不覆盖已有值）
+ * @returns {{ ok: boolean, skipped?: boolean, count?: number, message?: string }}
+ */
+export function writeBackEmptyCustomerPartyFields(partyLegal = {}) {
+  const name = String(partyLegal.name || '').trim()
+  if (!name) return { ok: false, skipped: true, message: '未选择客户' }
+  const customer = getCustomerByName(name)
+  if (!customer) {
+    return { ok: false, skipped: true, message: '客户未匹配到主数据' }
+  }
+
+  const isEmpty = (val) => val == null || String(val).trim() === ''
+  const patch = {}
+  const fill = (key, value) => {
+    const next = value == null ? '' : String(value).trim()
+    if (!next) return
+    if (isEmpty(customer[key])) patch[key] = next
+  }
+
+  fill('legalRepresentative', partyLegal.legalRepresentative)
+  fill('unifiedSocialCreditCode', partyLegal.unifiedSocialCreditCode)
+  fill('openingBank', partyLegal.openingBank)
+  fill('bankAccount', partyLegal.bankAccount)
+  fill('invoiceName', partyLegal.invoiceName)
+  fill('invoiceTaxNo', partyLegal.invoiceTaxNo)
+
+  const addressText = String(partyLegal.address || '').trim()
+  if (addressText && !resolveCustomerAddressText(customer)) {
+    const addresses = Array.isArray(customer.addresses)
+      ? customer.addresses.map((a) => ({ ...a }))
+      : []
+    const emptyIdx = addresses.findIndex((a) => isEmpty(a.detailAddress) && isEmpty(a.detail))
+    if (emptyIdx >= 0) {
+      addresses[emptyIdx] = {
+        ...addresses[emptyIdx],
+        detailAddress: addressText,
+      }
+    } else {
+      addresses.push(
+        createEmptyAddress({
+          addressType: '注册地址',
+          detailAddress: addressText,
+          isDefault: !addresses.some((a) => a.isDefault),
+        }),
+      )
+    }
+    patch.addresses = addresses
+  }
+
+  const keys = Object.keys(patch)
+  if (!keys.length) return { ok: true, skipped: true, count: 0 }
+  updateCustomer(customer.id, patch)
+  return { ok: true, count: keys.length, fields: keys }
 }
 
 export function addCustomer(payload) {

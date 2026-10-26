@@ -4,6 +4,11 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { disassemblyWorkOrderState } from '@/store/disassemblyWorkOrderStore'
 import { qcWorkOrderState } from '@/store/qcWorkOrderStore'
 import { salesOrderState } from '@/store/salesOrderStore'
+import { salesContractState } from '@/store/salesContractStore'
+import { salesContractChangeState } from '@/store/salesContractChangeStore'
+import { salesPriceChangeState } from '@/store/salesPriceChangeStore'
+import { CONTRACT_CHANGE_STATUS, CONTRACT_STATUS } from '@/constants/salesContract'
+import { PRICE_CHANGE_STATUS } from '@/utils/salesPriceChange'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { outsourcingOrderState } from '@/store/outsourcingOrderStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
@@ -34,6 +39,9 @@ const WORK_ORDER_BADGE_PATHS = [
 
 const ORDER_APPROVE_BADGE_PATHS = [
   '/sales/orders',
+  '/sales/order-changes',
+  '/sales/contracts',
+  '/sales/contract-changes',
   '/procurement/purchase-orders',
   '/procurement/outsourcing-orders',
 ]
@@ -76,6 +84,23 @@ export const BADGE_PATHS = [
 function countSalesPendingApprove() {
   return (salesOrderState.orders || []).filter(
     (o) => normalizeSalesOrderProgressStatus(o.progressStatus) === SALES_ORDER_STATUS.PENDING,
+  ).length
+}
+
+function countContractPendingApprove() {
+  return (salesContractState.contracts || []).filter((c) => c.status === CONTRACT_STATUS.PENDING)
+    .length
+}
+
+function countContractChangePendingApprove() {
+  return (salesContractChangeState.changes || []).filter(
+    (c) => c.status === CONTRACT_CHANGE_STATUS.PENDING,
+  ).length
+}
+
+function countOrderChangePendingApprove() {
+  return (salesPriceChangeState.orders || []).filter(
+    (c) => c.status === PRICE_CHANGE_STATUS.PENDING,
   ).length
 }
 
@@ -143,6 +168,12 @@ export function countPendingByPath(path) {
       return qcWorkOrderState.orders.filter((o) => o.status === PENDING_DISPATCH).length
     case '/sales/orders':
       return countSalesPendingApprove()
+    case '/sales/order-changes':
+      return countOrderChangePendingApprove()
+    case '/sales/contracts':
+      return countContractPendingApprove()
+    case '/sales/contract-changes':
+      return countContractChangePendingApprove()
     case '/procurement/purchase-orders':
       return countPurchasePendingApprove()
     case '/procurement/outsourcing-orders':
@@ -185,6 +216,8 @@ export function useWorkOrderMenuBadges() {
     void disassemblyWorkOrderState.orders
     void qcWorkOrderState.orders
     void salesOrderState.orders
+    void salesContractState.contracts
+    void salesContractChangeState.changes
     void purchaseOrderState.orders
     void outsourcingOrderState.orders
 

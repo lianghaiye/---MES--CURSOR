@@ -199,6 +199,8 @@ export function createReworkProcessReportTasks(reworkOrder, workOrder = null) {
         : wo?.workCenter || ''
     const taskNo = `RW${dateStr}${String((stamp % 1000) + index + 1).padStart(3, '0')}`
     const id = `pr-rw-${reworkOrder.id}-${index}`
+    const scheduleBatchId = reworkOrder.scheduleBatchId || ''
+    const scheduleBatchNo = reworkOrder.scheduleBatchNo ?? ''
 
     records.push(
       normalizeProcessReport({
@@ -209,6 +211,9 @@ export function createReworkProcessReportTasks(reworkOrder, workOrder = null) {
         reworkNo: reworkOrder.reworkNo,
         workOrderId: reworkOrder.workOrderId || wo?.id || '',
         workOrderNo: reworkOrder.workOrderNo || wo?.code || '',
+        scheduleBatchId,
+        scheduleBatchNo,
+        batchId: scheduleBatchId,
         taskNo,
         productCode: reworkOrder.productCode || wo?.productCode || wo?.materialCode || '',
         productName: reworkOrder.productName || wo?.productName || '',
@@ -263,6 +268,9 @@ export function createReworkProcessReportTasks(reworkOrder, workOrder = null) {
       reworkNo: reworkOrder.reworkNo,
       processReportId: id,
       orderCategory: wo?.orderCategory || '生产工单',
+      scheduleBatchId,
+      scheduleBatchNo,
+      batchId: scheduleBatchId,
       createdAt,
       remark: `返工任务 · ${reworkOrder.reworkNo}`,
     })

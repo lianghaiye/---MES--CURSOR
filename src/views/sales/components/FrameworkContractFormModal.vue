@@ -52,23 +52,12 @@
           </a-form-item>
         </a-col>
         <a-col :span="12">
-          <a-form-item label="账期起算">
-            <a-select
-              v-model:value="form.paymentTermStart"
-              allow-clear
-              :options="paymentTermStartOptions"
-              placeholder="从哪一天起算"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="12">
           <a-form-item label="账期天数">
             <a-input-number
               v-model:value="form.paymentTermDays"
               :min="0"
               :precision="0"
-              placeholder="如 30、60"
+              placeholder="默认 30"
               style="width: 100%"
             />
           </a-form-item>
@@ -90,7 +79,7 @@
         </a-col>
       </a-row>
 
-      <div class="price-list-title">产品协议价（可选）</div>
+      <div class="price-list-title">产品协议折扣（可选）</div>
       <a-table
         :columns="priceColumns"
         :data-source="form.priceItems"
@@ -119,7 +108,7 @@
         </template>
       </a-table>
       <a-button type="dashed" block class="add-price-btn" @click="addPriceRow"
-        >+ 添加协议价</a-button
+        >+ 添加协议折扣</a-button
       >
     </a-form>
 
@@ -136,7 +125,7 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { getCustomerByName, getCustomerOptions } from '@/store/customerStore'
 import { addFrameworkContract, updateFrameworkContract } from '@/store/frameworkContractStore'
-import { paymentTermStartOptions, settlementCycleOptions } from '@/constants/customerMaster'
+import { settlementCycleOptions } from '@/constants/customerMaster'
 import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
 
 const props = defineProps({
@@ -168,8 +157,7 @@ const form = reactive({
   customerName: undefined,
   defaultDiscountPercent: 100,
   settlementCycle: undefined,
-  paymentTermStart: undefined,
-  paymentTermDays: undefined,
+  paymentTermDays: 30,
   validFrom: null,
   validTo: null,
   remark: '',
@@ -182,14 +170,11 @@ function applyCustomerPaymentTerms(customerName, { force = false } = {}) {
   if (force || !form.settlementCycle) {
     form.settlementCycle = customer.settlementCycle || undefined
   }
-  if (force || !form.paymentTermStart) {
-    form.paymentTermStart = customer.paymentTermStart || undefined
-  }
   if (force || form.paymentTermDays == null || form.paymentTermDays === '') {
     form.paymentTermDays =
       customer.paymentTermDays != null && customer.paymentTermDays !== ''
         ? Number(customer.paymentTermDays)
-        : undefined
+        : 30
   }
 }
 
@@ -209,11 +194,8 @@ watch(
       ? Number((r.defaultDiscountRate * 100).toFixed(2))
       : 100
     form.settlementCycle = r?.settlementCycle || undefined
-    form.paymentTermStart = r?.paymentTermStart || undefined
     form.paymentTermDays =
-      r?.paymentTermDays != null && r?.paymentTermDays !== ''
-        ? Number(r.paymentTermDays)
-        : undefined
+      r?.paymentTermDays != null && r?.paymentTermDays !== '' ? Number(r.paymentTermDays) : 30
     form.validFrom = r?.validFrom ? dayjs(r.validFrom) : null
     form.validTo = r?.validTo ? dayjs(r.validTo) : null
     form.remark = r?.remark || ''
@@ -255,11 +237,10 @@ function handleSave() {
     contractType: '框架合同',
     defaultDiscountRate: normalizeDiscountRate(form.defaultDiscountPercent / 100, 1),
     settlementCycle: form.settlementCycle || '',
-    paymentTermStart: form.paymentTermStart || '',
     paymentTermDays:
       form.paymentTermDays != null && form.paymentTermDays !== ''
         ? Number(form.paymentTermDays)
-        : null,
+        : 30,
     validFrom: form.validFrom ? form.validFrom.format('YYYY-MM-DD') : '',
     validTo: form.validTo ? form.validTo.format('YYYY-MM-DD') : '',
     remark: form.remark,

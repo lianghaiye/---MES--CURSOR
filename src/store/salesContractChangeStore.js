@@ -11,6 +11,9 @@ import {
   normalizeContractRecord,
   updateSalesContract,
 } from '@/store/salesContractStore'
+import { AUTO_APPROVE_TYPES, isAutoApproveEnabled } from '@/store/functionParamStore'
+
+const SYSTEM_AUTO_APPROVER = '系统自动审批'
 
 const STORAGE_KEY = 'i_doms_sales_contract_changes'
 const DATA_VERSION = 1
@@ -49,10 +52,21 @@ export function diffContractSnapshots(before = {}, after = {}) {
 function formatDiffValue(field, value) {
   if (value == null || value === '') return '—'
   if (field === 'allowExceedQuota') return value ? '允许' : '不允许'
+  if (field === 'taxInclusive') return value ? '含税' : '不含税'
   if (field === 'defaultDiscountRate') {
     const n = Number(value)
     if (!Number.isFinite(n)) return '—'
     return `${Number((n * 100).toFixed(2))}%`
+  }
+  if (field === 'partyLegal') {
+    const p = value || {}
+    const parts = [
+      p.legalRepresentative,
+      p.unifiedSocialCreditCode,
+      p.invoiceName,
+      p.invoiceTaxNo,
+    ].filter(Boolean)
+    return parts.length ? parts.join(' / ') : '—'
   }
   if (field === 'priceItems' || field === 'lineItems' || field === 'paymentNodes') {
     const list = Array.isArray(value) ? value : []
@@ -155,6 +169,28 @@ export function getPendingContractChange(contractId) {
   )
 }
 
+/**
+ * 合同列表「变更状态」（与销售订单一致）：
+ * 未发起 → `-`；草稿/待审 → `变更审核中`；最近一次已审结 → `已通过` / `已拒绝`
+ */
+export function resolveSalesContractChangeStatus(contractId) {
+  if (!contractId) return '-'
+  const pending = getPendingContractChange(contractId)
+  if (pending) return '变更审核中'
+  const latest = listContractChangesByContract(contractId)[0]
+  if (!latest) return '-'
+  if (latest.status === CONTRACT_CHANGE_STATUS.APPROVED) return '已通过'
+  if (latest.status === CONTRACT_CHANGE_STATUS.REJECTED) return '已拒绝'
+  return '-'
+}
+
+export function salesContractChangeStatusLabelColor(label) {
+  if (label === '已通过') return 'success'
+  if (label === '已拒绝') return 'error'
+  if (label === '变更审核中') return 'warning'
+  return 'default'
+}
+
 export function canCreateContractChange(contract) {
   if (!contract || contract.status !== CONTRACT_STATUS.ACTIVE) {
     return { ok: false, message: '仅生效中的合同可发起变更' }
@@ -205,6 +241,7 @@ export function updateContractChange(id, patch) {
   ) {
     return { ok: false, message: '仅草稿或已驳回的变更单可编辑' }
   }
+  const nextAfter = patch.afterSnapshot || row.afterSnapshot
   salesContractChangeState.changes[idx] = normalizeChange({
     ...row,
     ...patch,
@@ -212,6 +249,8 @@ export function updateContractChange(id, patch) {
     changeNo: row.changeNo,
     contractId: row.contractId,
     beforeSnapshot: row.beforeSnapshot,
+    customerName: nextAfter?.customerName ?? patch.customerName ?? row.customerName,
+    contractName: nextAfter?.contractName ?? patch.contractName ?? row.contractName,
     status: CONTRACT_CHANGE_STATUS.DRAFT,
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
   })
@@ -238,17 +277,25 @@ export function submitContractChange(id) {
     rejectedAt: '',
     rejectReason: '',
   }
+  if (isAutoApproveEnabled(AUTO_APPROVE_TYPES.SALES_CONTRACT_CHANGE)) {
+    const approved = approveContractChange(id, SYSTEM_AUTO_APPROVER)
+    if (!approved.ok) return approved
+    return {
+      ok: true,
+      autoApproved: true,
+      message: '变更单已自动审批通过并生效',
+      data: approved.data,
+      contract: approved.contract,
+    }
+  }
   return { ok: true, data: salesContractChangeState.changes[idx] }
 }
 
 export function approveContractChange(id, operator = 'admin') {
   const row = getContractChangeById(id)
   if (!row) return { ok: false, message: '变更单不存在' }
-  if (
-    row.status !== CONTRACT_CHANGE_STATUS.PENDING &&
-    row.status !== CONTRACT_CHANGE_STATUS.DRAFT
-  ) {
-    return { ok: false, message: '当前状态不可审核' }
+  if (row.status !== CONTRACT_CHANGE_STATUS.PENDING) {
+    return { ok: false, message: '请先提交审核后再审核生效' }
   }
   const contract = getSalesContractById(row.contractId)
   if (!contract || contract.status !== CONTRACT_STATUS.ACTIVE) {
@@ -269,6 +316,10 @@ export function approveContractChange(id, operator = 'admin') {
     approvedBy: operator,
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
   }
+  // 变更付款条款后重建回款计划（保留已补起算日/开票/方式）
+  import('@/store/salesPaymentStore')
+    .then((m) => m.ensurePaymentPlansForContract(res.data, { rebuild: true }))
+    .catch(() => {})
   return { ok: true, data: salesContractChangeState.changes[idx], contract: res.data }
 }
 
@@ -289,15 +340,32 @@ export function rejectContractChange(id, reason = '') {
   return { ok: true, data: salesContractChangeState.changes[idx] }
 }
 
+/** 待审撤回为草稿（对齐订单变更：先撤回再作废） */
+export function withdrawContractChange(id) {
+  const row = getContractChangeById(id)
+  if (!row) return { ok: false, message: '变更单不存在' }
+  if (row.status !== CONTRACT_CHANGE_STATUS.PENDING) {
+    return { ok: false, message: '仅待审变更单可撤回' }
+  }
+  const idx = salesContractChangeState.changes.findIndex((c) => c.id === id)
+  salesContractChangeState.changes[idx] = {
+    ...row,
+    status: CONTRACT_CHANGE_STATUS.DRAFT,
+    submittedAt: '',
+    updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),
+  }
+  return { ok: true, data: salesContractChangeState.changes[idx] }
+}
+
+/** 仅草稿/已驳回可作废；待审须先撤回 */
 export function cancelContractChange(id) {
   const row = getContractChangeById(id)
   if (!row) return { ok: false, message: '变更单不存在' }
   if (
     row.status !== CONTRACT_CHANGE_STATUS.DRAFT &&
-    row.status !== CONTRACT_CHANGE_STATUS.REJECTED &&
-    row.status !== CONTRACT_CHANGE_STATUS.PENDING
+    row.status !== CONTRACT_CHANGE_STATUS.REJECTED
   ) {
-    return { ok: false, message: '当前状态不可作废' }
+    return { ok: false, message: '待审变更单请先撤回后再作废' }
   }
   const idx = salesContractChangeState.changes.findIndex((c) => c.id === id)
   salesContractChangeState.changes[idx] = {

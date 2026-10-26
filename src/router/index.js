@@ -141,6 +141,12 @@ const routes = [
     meta: { title: '工单监管看板', standalone: true },
   },
   {
+    path: '/board/kit-supply/screen',
+    name: 'board-kit-supply-screen',
+    component: () => import('@/views/board/KitSupplyBoardView.vue'),
+    meta: { title: '齐套与供应看板', standalone: true },
+  },
+  {
     path: '/board/carousel/play/:schemeId',
     name: 'board-carousel-play',
     component: () => import('@/views/board/BoardCarouselPlayView.vue'),
@@ -374,6 +380,24 @@ const routes = [
         meta: { title: '销售订单详情' },
       },
       {
+        path: 'sales/order-changes',
+        name: 'sales-order-changes',
+        component: () => import('@/views/sales/SalesOrderChangeView.vue'),
+        meta: { title: '订单变更管理' },
+      },
+      {
+        path: 'sales/order-changes/new',
+        name: 'sales-order-changes-new',
+        component: () => import('@/views/sales/SalesOrderChangeCreateView.vue'),
+        meta: { title: '发起订单变更', listPath: '/sales/order-changes' },
+      },
+      {
+        path: 'sales/order-changes/:id/approve',
+        name: 'sales-order-change-approve',
+        component: () => import('@/views/sales/SalesOrderChangeApproveView.vue'),
+        meta: { title: '审核订单变更', listPath: '/sales/order-changes' },
+      },
+      {
         path: 'sales/sales-lines',
         name: 'sales-sales-lines',
         component: () => import('@/views/sales/SalesOrderLineListView.vue'),
@@ -414,6 +438,12 @@ const routes = [
         meta: { title: '合同管理' },
       },
       {
+        path: 'sales/contracts/:id/approve',
+        name: 'sales-contracts-approve',
+        component: () => import('@/views/sales/SalesContractApproveView.vue'),
+        meta: { title: '审核合同', listPath: '/sales/contracts' },
+      },
+      {
         path: 'sales/contracts/:id',
         name: 'sales-contract-detail',
         component: () => import('@/views/sales/SalesContractDetailView.vue'),
@@ -423,7 +453,31 @@ const routes = [
         path: 'sales/contract-changes',
         name: 'sales-contract-changes',
         component: () => import('@/views/sales/SalesContractChangeView.vue'),
-        meta: { title: '合同变更单' },
+        meta: { title: '合同变更管理' },
+      },
+      {
+        path: 'sales/contract-changes/new',
+        name: 'sales-contract-changes-new',
+        component: () => import('@/views/sales/SalesContractChangeCreateView.vue'),
+        meta: { title: '发起合同变更', listPath: '/sales/contract-changes' },
+      },
+      {
+        path: 'sales/contract-changes/:id/edit',
+        name: 'sales-contract-change-edit',
+        component: () => import('@/views/sales/SalesContractChangeEditView.vue'),
+        meta: { title: '编辑合同变更', listPath: '/sales/contract-changes' },
+      },
+      {
+        path: 'sales/contract-changes/:id/approve',
+        name: 'sales-contract-change-approve',
+        component: () => import('@/views/sales/SalesContractChangeApproveView.vue'),
+        meta: { title: '审核合同变更', listPath: '/sales/contract-changes' },
+      },
+      {
+        path: 'sales/contract-changes/:id',
+        name: 'sales-contract-change-detail',
+        component: () => import('@/views/sales/SalesContractChangeDetailView.vue'),
+        meta: { title: '变更单详情', listPath: '/sales/contract-changes' },
       },
       {
         path: 'sales/payments',
@@ -440,6 +494,12 @@ const routes = [
         name: 'planning-production-plan',
         component: () => import('@/views/planning/ProductionPlanView.vue'),
         meta: { title: '生产计划' },
+      },
+      {
+        path: 'planning/kit-supply',
+        name: 'planning-kit-supply',
+        component: () => import('@/views/planning/KitSupplyProgressView.vue'),
+        meta: { title: '齐套与供应进度' },
       },
       {
         path: 'planning/design-task',
@@ -1220,6 +1280,12 @@ const routes = [
         name: 'board-work-order-monitor',
         component: () => import('@/views/board/WorkOrderMonitorView.vue'),
         meta: { title: '工单监管看板' },
+      },
+      {
+        path: 'board/kit-supply',
+        name: 'board-kit-supply',
+        component: () => import('@/views/board/KitSupplyBoardView.vue'),
+        meta: { title: '齐套与供应看板' },
       },
       { path: 'wms/warehouse', ...emptyChild('wms-warehouse', '仓储管理') },
       { path: 'qms/trace', ...emptyChild('qms-trace', '质量追溯') },

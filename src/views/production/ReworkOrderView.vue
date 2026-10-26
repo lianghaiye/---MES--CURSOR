@@ -92,6 +92,9 @@
           <template v-else-if="column.key === 'status'">
             <a-tag :color="reworkOrderStatusColor(record.status)">{{ record.status }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'scheduleBatch'">
+            {{ formatScheduleBatchLabel(record) }}
+          </template>
           <template v-else-if="column.key === 'processes'">
             {{ (record.processes || []).map((p) => p.processName).join('、') || '—' }}
           </template>
@@ -145,6 +148,7 @@ import {
   reworkOrderStatusColor,
   isReworkOrderOpen,
   resolveReworkTaskStatus,
+  formatScheduleBatchLabel,
 } from '@/constants/reworkOrder'
 import { workCenterOptions } from '@/mock/workOrderOptions'
 import { listProcessReportsByReworkOrderId, processReportState } from '@/store/processReportStore'
@@ -173,6 +177,7 @@ const columns = [
   { title: '返工单号', key: 'reworkNo', width: 140 },
   { title: '状态', key: 'status', width: 90 },
   { title: '工单号', dataIndex: 'workOrderNo', width: 140 },
+  { title: '排产批次', key: 'scheduleBatch', width: 100 },
   { title: '加工中心', dataIndex: 'workCenter', width: 110, ellipsis: true },
   { title: '产品', dataIndex: 'productName', width: 140, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
