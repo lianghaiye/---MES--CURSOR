@@ -218,6 +218,11 @@ export const BLANK_SIZE_ASSIST_DESCRIPTION =
 export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
   '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
 
+export const ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION =
+  '开启：销售订单可使用折扣策略（无折扣 / 仅明细折扣 / 仅整单折扣）、行折扣与整单优惠。' +
+  '关闭：新建/编辑订单不展示上述折扣能力，按成交单价计价；合同仍只写入协议单价，不把协议折扣写进行折扣。' +
+  '默认开启。'
+
 /** 质检门控：按业务类型配置（强管控阻断 / 弱管控仅预警） */
 export const QC_GATE_POLICY_PARAM_OPTIONS = [
   { value: 'soft', label: '弱管控（仅预警）' },
@@ -387,6 +392,11 @@ export const FUNCTION_PARAM_CATEGORIES = [
     key: 'inventory',
     label: '库存与出库',
     description: '库存扣减时机、出库拣选与发货相关规则。',
+  },
+  {
+    key: 'sales',
+    label: '销售',
+    description: '销售订单计价、折扣相关配置。',
   },
   {
     key: 'production',
@@ -588,6 +598,12 @@ export const FUNCTION_PARAM_ROWS = [
     description: DUAL_UNIT_ISSUE_STRATEGY_DESCRIPTION,
   },
   {
+    key: 'enableSalesOrderDiscount',
+    category: 'sales',
+    scenario: '销售订单价格折扣',
+    description: ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION,
+  },
+  {
     key: 'enableBomLevelMts',
     category: 'production',
     scenario: '生产计划启用 BOM 级 MTS',
@@ -770,6 +786,7 @@ function loadFromStorage() {
           blankSizeAssistTools,
           blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
           enableBomLevelMts: parsed.enableBomLevelMts === true,
+          enableSalesOrderDiscount: parsed.enableSalesOrderDiscount !== false,
           qcDefaultGatePolicy: normalizeQcGatePolicyParam(parsed.qcDefaultGatePolicy),
           qcGatePolicyByBizScope: normalizeQcGatePolicyMap(parsed.qcGatePolicyByBizScope),
           displayParams: normalizeDisplayParams(parsed.displayParams),
@@ -813,6 +830,7 @@ export const functionParamState = reactive({
     blankSizeAssistTools: createDefaultBlankSizeAssistTools(),
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
     enableBomLevelMts: false,
+    enableSalesOrderDiscount: true,
     qcDefaultGatePolicy: 'soft',
     qcGatePolicyByBizScope: normalizeQcGatePolicyMap(),
     displayParams: createDefaultDisplayParams(),
@@ -1089,6 +1107,16 @@ export function setEnableBomWeightCalc(enabled) {
 /** 生产计划是否启用 BOM 级 MTS（子件可按库存跳过排产） */
 export function isBomLevelMtsEnabled() {
   return functionParamState.params.enableBomLevelMts === true
+}
+
+/** 销售订单是否启用价格折扣（策略 / 行折扣 / 整单优惠） */
+export function isSalesOrderDiscountEnabled() {
+  return functionParamState.params.enableSalesOrderDiscount !== false
+}
+
+export function setEnableSalesOrderDiscount(enabled) {
+  functionParamState.params.enableSalesOrderDiscount = Boolean(enabled)
+  return { ok: true }
 }
 
 export function setEnableBomLevelMts(enabled) {

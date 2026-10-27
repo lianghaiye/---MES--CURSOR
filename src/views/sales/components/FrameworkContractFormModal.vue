@@ -30,7 +30,17 @@
           </a-form-item>
         </a-col>
         <a-col :span="12">
-          <a-form-item label="默认折扣率(%)">
+          <a-form-item>
+            <template #label>
+              <span class="label-with-tip">
+                默认折扣率(%)
+                <a-tooltip
+                  title="价目未命中时：产品/物料主数据标准采购价 × 本折扣写入订单成交价；结算不再二次打折。"
+                >
+                  <QuestionCircleOutlined class="label-tip-icon" />
+                </a-tooltip>
+              </span>
+            </template>
             <a-input-number
               v-model:value="form.defaultDiscountPercent"
               :min="1"
@@ -79,7 +89,13 @@
         </a-col>
       </a-row>
 
-      <div class="price-list-title">产品协议折扣（可选）</div>
+      <div class="price-list-title">产品协议价目（可选）</div>
+      <a-alert
+        type="info"
+        show-icon
+        class="price-items-rule-alert"
+        message="① 有协议单价 → 销售订单直接用该未税单价作成交价，行折扣 100%，不倒算。② 无单价、仅有协议折扣或默认折扣 → 销售订单不带入。结算/开票按订单成交价。"
+      />
       <a-table
         :columns="priceColumns"
         :data-source="form.priceItems"
@@ -91,6 +107,16 @@
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'productCode'">
             <a-input v-model:value="record.productCode" size="small" />
+          </template>
+          <template v-else-if="column.key === 'agreementUnitPriceExTax'">
+            <a-input-number
+              v-model:value="record.agreementUnitPriceExTax"
+              size="small"
+              :min="0"
+              :precision="4"
+              style="width: 100%"
+              placeholder="未税"
+            />
           </template>
           <template v-else-if="column.key === 'agreementDiscountPercent'">
             <a-input-number
@@ -108,7 +134,7 @@
         </template>
       </a-table>
       <a-button type="dashed" block class="add-price-btn" @click="addPriceRow"
-        >+ 添加协议折扣</a-button
+        >+ 添加协议价目</a-button
       >
     </a-form>
 
@@ -123,6 +149,7 @@
 import { computed, reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import { getCustomerByName, getCustomerOptions } from '@/store/customerStore'
 import { addFrameworkContract, updateFrameworkContract } from '@/store/frameworkContractStore'
 import { settlementCycleOptions } from '@/constants/customerMaster'
@@ -146,7 +173,8 @@ const customerOpts = computed(() =>
 )
 
 const priceColumns = [
-  { title: '产品编码', key: 'productCode', width: 180 },
+  { title: '产品编码', key: 'productCode', width: 160 },
+  { title: '协议单价(未税)', key: 'agreementUnitPriceExTax', width: 130 },
   { title: '协议折扣(%)', key: 'agreementDiscountPercent', width: 120 },
   { title: '操作', key: 'action', width: 80 },
 ]
@@ -201,6 +229,10 @@ watch(
     form.remark = r?.remark || ''
     form.priceItems = (r?.priceItems || []).map((item) => ({
       ...item,
+      agreementUnitPriceExTax:
+        item.agreementUnitPriceExTax != null && item.agreementUnitPriceExTax !== ''
+          ? Number(item.agreementUnitPriceExTax)
+          : null,
       agreementDiscountPercent:
         item.agreementDiscountRate != null
           ? Number((normalizeDiscountRate(item.agreementDiscountRate) * 100).toFixed(2))
@@ -217,6 +249,7 @@ function addPriceRow() {
     id: `fci-${Date.now()}`,
     productCode: '',
     productId: '',
+    agreementUnitPriceExTax: null,
     agreementDiscountPercent: null,
   })
 }
@@ -251,6 +284,10 @@ function handleSave() {
         id: item.id,
         productCode: item.productCode.trim(),
         productId: item.productId || '',
+        agreementUnitPriceExTax:
+          item.agreementUnitPriceExTax != null && item.agreementUnitPriceExTax !== ''
+            ? Number(item.agreementUnitPriceExTax)
+            : undefined,
         agreementDiscountRate:
           item.agreementDiscountPercent != null
             ? normalizeDiscountRate(item.agreementDiscountPercent / 100, 1)
@@ -272,8 +309,34 @@ function handleSave() {
 
 <style scoped>
 .price-list-title {
-  margin: 8px 0;
+  margin: 8px 0 4px;
   font-weight: 500;
+}
+.price-items-rule-alert {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+
+  :deep(.ant-alert-icon) {
+    font-size: 12px;
+    margin-inline-end: 6px;
+  }
+
+  :deep(.ant-alert-message) {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: rgba(0, 0, 0, 0.65);
+  }
+}
+.label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.label-tip-icon {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  cursor: help;
 }
 .add-price-btn {
   margin-top: 8px;

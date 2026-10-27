@@ -81,7 +81,7 @@ export function createPurchaseSettle(partial = {}) {
  */
 export function seedPurchaseSettles() {
   return [
-    // 1. 月结 + 账期生成 + 草稿（规则「扫上月·过滤月结」典型结果）
+    // 1. 月结 + 账期生成 + 草稿（规则「扫上月·适用月结」典型结果）
     createPurchaseSettle({
       id: 'ps-demo-month-draft',
       settleNo: 'PS20261001001',
@@ -179,7 +179,7 @@ export function seedPurchaseSettles() {
       ],
     }),
 
-    // 3. 周结 + 账期 + 草稿（每周一规则扫上周，不会进「过滤月结」那条）
+    // 3. 周结 + 账期 + 草稿（每周一规则扫上周，不会进「适用月结」那条）
     createPurchaseSettle({
       id: 'ps-demo-week-draft',
       settleNo: 'PS20260929001',

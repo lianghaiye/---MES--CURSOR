@@ -269,7 +269,15 @@
                 </a-form-item>
               </a-col>
               <a-col v-if="isFramework" :span="6">
-                <a-form-item label="默认折扣(%)">
+                <a-form-item>
+                  <template #label>
+                    <span class="label-with-tip">
+                      默认折扣(%)
+                      <a-tooltip :title="defaultDiscountTip">
+                        <QuestionCircleOutlined class="label-tip-icon" />
+                      </a-tooltip>
+                    </span>
+                  </template>
                   <a-input-number
                     v-model:value="form.defaultDiscountPercent"
                     size="small"
@@ -363,7 +371,7 @@
 
         <div v-if="isFramework" class="section-block">
           <div class="section-title-row">
-            <span class="section-title">产品协议折扣</span>
+            <span class="section-title">产品协议价目</span>
             <a-space :size="8">
               <a-button type="primary" size="small" @click="openPriceProductPicker">
                 <PlusOutlined />
@@ -372,6 +380,12 @@
               <a-button size="small" @click="addPriceRow">+ 手工行</a-button>
             </a-space>
           </div>
+          <a-alert
+            type="info"
+            show-icon
+            class="price-items-rule-alert"
+            :message="priceItemsRuleTip"
+          />
           <a-table
             :columns="priceColumns"
             :data-source="form.priceItems"
@@ -379,7 +393,7 @@
             size="small"
             bordered
             :pagination="false"
-            :scroll="{ x: 1200 }"
+            :scroll="{ x: 1360 }"
           >
             <template #bodyCell="{ column, record, index }">
               <template v-if="column.key === 'index'">
@@ -408,6 +422,16 @@
                   :max="100"
                   :precision="2"
                   style="width: 100%"
+                />
+              </template>
+              <template v-else-if="column.key === 'agreementUnitPriceExTax'">
+                <a-input-number
+                  v-model:value="record.agreementUnitPriceExTax"
+                  size="small"
+                  :min="0"
+                  :precision="4"
+                  style="width: 100%"
+                  placeholder="未税"
                 />
               </template>
               <template v-else-if="column.key === 'agreementDiscountPercent'">
@@ -699,7 +723,7 @@
   <SelectBomMaterialModal
     v-if="isActive"
     v-model:open="priceProductPickerOpen"
-    title="添加协议折扣产品"
+    title="添加协议价目产品"
     picker-default-item-type="产品"
     @selected="onPriceProductsSelected"
   />
@@ -821,6 +845,7 @@ const priceColumns = [
   { title: '材质', key: 'material', width: 90 },
   { title: '单位', key: 'unit', width: 70 },
   { title: '税率(%)', key: 'taxRate', width: 90 },
+  { title: '协议单价(未税)', key: 'agreementUnitPriceExTax', width: 130 },
   { title: '协议折扣(%)', key: 'agreementDiscountPercent', width: 120 },
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
 ]
@@ -888,6 +913,16 @@ const categoryOpts = computed(() => contractCategoryOptions(form.cashDirection))
 const planBaseOpts = computed(() => paymentPlanBaseOptionsFor(form.cashDirection))
 const termStartOpts = computed(() => paymentTermStartOptionsFor(form.cashDirection))
 const termStartHints = computed(() => paymentTermStartHintsFor(form.cashDirection))
+const priceItemsRuleTip = computed(() =>
+  isExpense.value
+    ? '① 有「协议单价」→ 采购单直接用该未税单价作成交价。② 无单价、有「协议折扣」→ 产品/物料主数据标准采购价 × 协议折扣。③ 价目未命中 → 标准采购价 × 合同默认折扣。主数据无标准采购价时无法自动算价。结算按订单成交价，不再二次打折。'
+    : '① 有「协议单价」→ 销售订单直接用该未税单价作成交价，行折扣保持 100%，不按标准售价倒算折扣。② 无单价、仅有「协议折扣」或合同默认折扣 → 销售订单不带入。③ 主数据无标准售价且无协议单价时无法自动算价。结算/开票按订单成交价。',
+)
+const defaultDiscountTip = computed(() =>
+  isExpense.value
+    ? '价目未命中该物料时：用产品/物料主数据「标准采购价」× 本折扣，写入采购单成交价。结算按订单成交价，不会再套本折扣。'
+    : '销售订单不套用本默认折扣。价目需填写协议单价才会写入销售行成交价。',
+)
 const PAYMENT_TERM_DAYS_TIP = computed(
   () =>
     `账期起算日后的宽限天数。例如起算=开票日、天数=30，表示开票后 30 天内应付清对应${paymentNoun.value}。默认 30 天，可修改。`,
@@ -1119,6 +1154,10 @@ function createEmptyPriceItem(partial = {}) {
     material: partial.material || '',
     unit: partial.unit || '台',
     taxRate: partial.taxRate != null ? Number(partial.taxRate) : CONTRACT_DEFAULT_TAX_RATE,
+    agreementUnitPriceExTax:
+      partial.agreementUnitPriceExTax != null && partial.agreementUnitPriceExTax !== ''
+        ? Number(partial.agreementUnitPriceExTax)
+        : null,
     agreementDiscountPercent:
       partial.agreementDiscountPercent != null
         ? Number(partial.agreementDiscountPercent)
@@ -1167,8 +1206,8 @@ function onPriceProductsSelected(rows) {
     added += 1
   })
   priceProductPickerOpen.value = false
-  if (added) message.success(`已添加 ${added} 条协议折扣`)
-  else message.info('所选产品已在协议折扣中')
+  if (added) message.success(`已添加 ${added} 条协议价目`)
+  else message.info('所选产品已在协议价目中')
 }
 
 function createEmptyLine(partial = {}) {
@@ -1458,6 +1497,10 @@ function buildPayload() {
         material: item.material || '',
         unit: item.unit || '',
         taxRate: item.taxRate != null ? Number(item.taxRate) : CONTRACT_DEFAULT_TAX_RATE,
+        agreementUnitPriceExTax:
+          item.agreementUnitPriceExTax != null && item.agreementUnitPriceExTax !== ''
+            ? Number(item.agreementUnitPriceExTax)
+            : undefined,
         agreementDiscountRate:
           item.agreementDiscountPercent != null
             ? normalizeDiscountRate(item.agreementDiscountPercent / 100, 1)
@@ -1671,6 +1714,23 @@ function handleSave(submit) {
   font-size: 12px;
   font-weight: 400;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.price-items-rule-alert {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+
+  :deep(.ant-alert-icon) {
+    font-size: 12px;
+    margin-inline-end: 6px;
+  }
+
+  :deep(.ant-alert-message) {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: rgba(0, 0, 0, 0.65);
+  }
 }
 
 .payment-term-hints {

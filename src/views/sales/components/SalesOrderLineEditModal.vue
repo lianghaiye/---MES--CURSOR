@@ -233,7 +233,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col v-if="showLineDiscountFields" :span="8">
           <a-form-item label="行折扣(%)" required>
             <a-input-number
               v-model:value="draft.lineDiscountPercent"
@@ -247,7 +247,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="8">
+        <a-col v-if="showLineDiscountFields" :span="8">
           <a-form-item label="行优惠金额">
             <a-input
               :value="formatMoney(linePricingPreview.lineDiscountAmount)"
@@ -343,6 +343,7 @@ import {
   suggestDefaultFulfillmentPath,
   validateFulfillmentPathForApprove,
 } from '@/constants/salesOrderFulfillment'
+import { isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
 import {
   DISCOUNT_STRATEGIES,
   isLineDiscountDisabled,
@@ -425,8 +426,12 @@ const linkedCatalogBom = computed(() => {
 })
 
 const contractPriceLocked = computed(() => draft.priceSource === 'contract')
+const showLineDiscountFields = computed(() => isSalesOrderDiscountEnabled())
 const lineDiscountReadOnly = computed(
-  () => isLineDiscountDisabled(props.discountStrategy) || contractPriceLocked.value,
+  () =>
+    !showLineDiscountFields.value ||
+    isLineDiscountDisabled(props.discountStrategy) ||
+    contractPriceLocked.value,
 )
 
 const priceEditMode = ref('unitPriceInTax') // unitPriceExTax | unitPriceInTax | discount

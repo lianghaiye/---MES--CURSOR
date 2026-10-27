@@ -361,7 +361,7 @@ export const CONTRACT_CHANGE_FIELD_LABELS = {
   allowExceedQuota: '允许超额度',
   paymentPlanBase: '回款计划基数',
   defaultDiscountRate: '默认折扣',
-  priceItems: '产品协议折扣',
+  priceItems: '产品协议价目',
   lineItems: '合同明细',
   paymentNodes: '回款节点',
   serviceContent: '服务内容',

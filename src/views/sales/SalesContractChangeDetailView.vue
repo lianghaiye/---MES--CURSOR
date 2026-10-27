@@ -62,7 +62,7 @@
               <SalesContractPartyLegalSection :contract="displayContract" />
             </DetailSectionCard>
 
-            <DetailSectionCard v-if="isFramework" title="变更后 · 产品协议折扣">
+            <DetailSectionCard v-if="isFramework" title="变更后 · 产品协议价目">
               <a-table
                 :columns="priceColumns"
                 :data-source="afterSnapshot.priceItems || []"
@@ -70,7 +70,7 @@
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: 1000 }"
+                :scroll="{ x: 1140 }"
               >
                 <template #bodyCell="{ column, record: row, index }">
                   <template v-if="column.key === 'index'">
@@ -78,6 +78,13 @@
                   </template>
                   <template v-else-if="column.key === 'taxRate'">
                     {{ row.taxRate != null && row.taxRate !== '' ? Number(row.taxRate) : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'agreementUnitPriceExTax'">
+                    {{
+                      row.agreementUnitPriceExTax != null && row.agreementUnitPriceExTax !== ''
+                        ? Number(row.agreementUnitPriceExTax)
+                        : '—'
+                    }}
                   </template>
                   <template v-else-if="column.key === 'discount'">
                     {{
@@ -100,7 +107,7 @@
                   </template>
                 </template>
                 <template #emptyText>
-                  <a-empty :image="false" description="暂无协议折扣" />
+                  <a-empty :image="false" description="暂无协议价目" />
                 </template>
               </a-table>
               <div class="service-content-block">
@@ -329,6 +336,7 @@ const priceColumns = [
   { title: '材质', key: 'material', width: 90 },
   { title: '单位', key: 'unit', width: 70 },
   { title: '税率(%)', key: 'taxRate', width: 90 },
+  { title: '协议单价(未税)', key: 'agreementUnitPriceExTax', width: 130 },
   { title: '协议折扣', key: 'discount', width: 100 },
 ]
 

@@ -120,12 +120,12 @@
           </a-form-item>
         </a-col>
         <a-col :span="12">
-          <a-form-item label="结算周期过滤">
+          <a-form-item label="适用结算周期">
             <a-select
               v-model:value="form.settlementCycles"
               mode="multiple"
               allow-clear
-              placeholder="空=不限"
+              placeholder="空=不限（窗内有可结算数据的都扫）"
               :options="cycleOpts"
             />
           </a-form-item>

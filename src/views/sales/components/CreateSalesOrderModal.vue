@@ -236,7 +236,7 @@
             <DownOutlined :class="{ rotated: priceSummaryCollapsed }" class="collapse-icon" />
           </div>
           <div v-show="!priceSummaryCollapsed" class="price-summary-body">
-            <div class="summary-amounts-strip">
+            <div v-if="salesDiscountEnabled" class="summary-amounts-strip">
               <span class="amount-chip discount">
                 行优惠（合计）
                 <strong>-￥{{ formatMoney(orderPricing.lineDiscountTotal) }}</strong>
@@ -246,7 +246,12 @@
                 <strong>-￥{{ formatMoney(orderPricing.orderDiscountTotal) }}</strong>
               </span>
             </div>
-            <a-form layout="inline" size="small" class="discount-inline-form">
+            <a-form
+              v-if="salesDiscountEnabled"
+              layout="inline"
+              size="small"
+              class="discount-inline-form"
+            >
               <a-form-item label="折扣策略">
                 <a-radio-group
                   v-model:value="form.discountStrategy"
@@ -329,7 +334,7 @@
                 <template #content>
                   <a-checkbox-group v-model:value="visibleColumnKeys" class="column-settings">
                     <a-row>
-                      <a-col v-for="col in columnDefs" :key="col.key" :span="12">
+                      <a-col v-for="col in settingColumnDefs" :key="col.key" :span="12">
                         <a-checkbox :value="col.key" :disabled="fixedColumnKeys.includes(col.key)">
                           {{ col.title }}
                         </a-checkbox>
@@ -773,11 +778,122 @@
       v-model:open="lineEditOpen"
       :line="lineEditTarget"
       :tax-mode-excluding="taxModeExcluding"
-      :discount-strategy="form.discountStrategy"
+      :discount-strategy="salesDiscountEnabled ? form.discountStrategy : DISCOUNT_STRATEGIES.NONE"
       :customer-name="form.customerName"
       :contract-no="form.contractNo"
       @saved="onLineEditSaved"
     />
+
+    <a-modal
+      v-model:open="contractLinePickOpen"
+      title="从标准合同带入明细"
+      width="min(1200px, 94vw)"
+      :mask-closable="false"
+      destroy-on-close
+      class="contract-line-pick-modal"
+      @cancel="skipImportContractLines"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        class="contract-pick-alert"
+        :message="contractPickAlertMessage"
+      />
+      <div class="contract-picker-body">
+        <div class="contract-table-panel">
+          <a-table
+            size="small"
+            bordered
+            row-key="pickKey"
+            :columns="contractPickColumns"
+            :data-source="contractPickPagedRows"
+            :pagination="false"
+            :row-selection="contractPickRowSelection"
+            :scroll="{ x: 720, y: 360 }"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'unitPriceExTax'">
+                {{ formatQty(record.unitPriceExTax) }}
+              </template>
+              <template v-else-if="column.key === 'qty'">
+                {{ formatQty(record.qty) }}
+              </template>
+            </template>
+          </a-table>
+          <div class="contract-table-pager">
+            <a-pagination
+              v-model:current="contractPickPage.current"
+              v-model:page-size="contractPickPage.pageSize"
+              size="small"
+              :total="contractPickRows.length"
+              show-size-changer
+              :page-size-options="['10', '20', '50']"
+              :show-total="(t) => `共 ${t} 条`"
+            />
+          </div>
+        </div>
+        <div class="contract-selected-panel">
+          <div class="contract-selected-head">
+            <span class="contract-selected-title"
+              >已选 {{ contractPickSelectedRows.length }} 项</span
+            >
+            <a-button
+              v-if="contractPickSelectedRows.length"
+              type="link"
+              size="small"
+              class="contract-clear-btn"
+              @click="clearContractPickSelection"
+            >
+              清空
+            </a-button>
+          </div>
+          <div v-if="contractPickSelectedRows.length" class="contract-selected-list">
+            <div
+              v-for="item in contractPickSelectedRows"
+              :key="item.pickKey"
+              class="contract-selected-item"
+            >
+              <div class="contract-selected-main">
+                <span class="contract-selected-code">{{ item.productCode || '—' }}</span>
+                <span class="contract-selected-name" :title="item.productName">{{
+                  item.productName || '—'
+                }}</span>
+                <span class="contract-selected-meta">
+                  {{ formatQty(item.qty) }} {{ item.unit || '' }} · 未税
+                  {{ formatQty(item.unitPriceExTax) }}
+                </span>
+              </div>
+              <a-button
+                type="text"
+                size="small"
+                class="contract-remove-btn"
+                @click="removeContractPickRow(item.pickKey)"
+              >
+                <CloseOutlined />
+              </a-button>
+            </div>
+          </div>
+          <a-empty
+            v-else
+            :image="false"
+            description="请从左侧选择"
+            class="contract-selected-empty"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <a-button @click="skipImportContractLines">取消</a-button>
+        <a-button
+          type="primary"
+          :disabled="!contractPickSelectedRows.length"
+          @click="confirmContractLinePick"
+        >
+          带入所选{{
+            contractPickSelectedRows.length ? ` (${contractPickSelectedRows.length})` : ''
+          }}
+        </a-button>
+      </template>
+    </a-modal>
 
     <template #footer>
       <a-button size="small" @click="handleCancel">取消</a-button>
@@ -796,8 +912,9 @@ import {
   UpOutlined,
   AppstoreOutlined,
   UploadOutlined,
+  CloseOutlined,
 } from '@ant-design/icons-vue'
-import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   urgencyOptions,
   contractTypeOptions,
@@ -821,7 +938,11 @@ import {
   salesOrderState,
   updateSalesOrder,
 } from '@/store/salesOrderStore'
-import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import {
+  functionParamState,
+  isSalesOrderDiscountEnabled,
+  isShipAttachmentDecidedAtOrder,
+} from '@/store/functionParamStore'
 import SalesOrderShipAccessorySection from './SalesOrderShipAccessorySection.vue'
 import { summarizeShipAccessoryGaps } from '@/utils/salesOrderShipAccessories'
 import { ensureStockTransferDemoMocksForOrder } from '@/store/salesStockAllocationStore'
@@ -837,6 +958,7 @@ import { resolveSalesLinePrice } from '@/utils/customerPrice'
 import {
   DISCOUNT_STRATEGIES,
   DISCOUNT_STRATEGY_LABELS,
+  filterColumnsBySalesOrderDiscount,
   ensureLinePricingFields,
   normalizeDiscountRate,
   recalcSalesLinePricing,
@@ -903,6 +1025,42 @@ const variantConfigTargetLine = ref(null)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
 const fileList = ref([])
+const contractLinePickOpen = ref(false)
+const contractPickContract = ref(null)
+const contractPickRows = ref([])
+const contractPickKeys = ref([])
+const contractPickSelectedRows = ref([])
+const contractPickPage = reactive({ current: 1, pageSize: 10 })
+const contractPickColumns = [
+  { title: '物料编码', dataIndex: 'productCode', width: 130, ellipsis: true },
+  { title: '名称', dataIndex: 'productName', width: 160, ellipsis: true },
+  { title: '规格', dataIndex: 'specModel', width: 120, ellipsis: true },
+  { title: '数量', key: 'qty', dataIndex: 'qty', width: 88, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 64 },
+  {
+    title: '未税单价',
+    key: 'unitPriceExTax',
+    dataIndex: 'unitPriceExTax',
+    width: 100,
+    align: 'right',
+  },
+]
+const contractPickPagedRows = computed(() => {
+  const start = (contractPickPage.current - 1) * contractPickPage.pageSize
+  return contractPickRows.value.slice(start, start + contractPickPage.pageSize)
+})
+const contractPickRowSelection = computed(() => ({
+  selectedRowKeys: contractPickKeys.value,
+  onChange: onContractPickKeysChange,
+  preserveSelectedRowKeys: true,
+}))
+const contractPickAlertMessage = computed(() => {
+  const no = contractPickContract.value?.contractNo || ''
+  const existing = hasMeaningfulSalesLines()
+  return existing
+    ? `合同 ${no} · 左侧勾选明细，右侧为已选（默认全选）。带入所选将覆盖当前销售明细，取消则保留。`
+    : `合同 ${no} · 左侧勾选明细，右侧为已选（默认全选）`
+})
 
 const LONG_TEXT_FIELD_LABELS = {
   techParams: '技术参数',
@@ -1033,8 +1191,17 @@ function onShipAccessoriesChange(list) {
   form.shipAccessories = Array.isArray(list) ? list : form.shipAccessories || []
 }
 
+const salesDiscountEnabled = computed(() => {
+  void functionParamState.params.enableSalesOrderDiscount
+  return isSalesOrderDiscountEnabled()
+})
+
+const settingColumnDefs = computed(() =>
+  filterColumnsBySalesOrderDiscount(columnDefs, salesDiscountEnabled.value),
+)
+
 const displayColumns = computed(() =>
-  columnDefs
+  settingColumnDefs.value
     .filter((c) => visibleColumnKeys.value.includes(c.key))
     .map((c) => ({
       title: c.title,
@@ -1180,65 +1347,117 @@ function mapContractLineToSalesLine(contractLine, contract) {
 }
 
 function applyFrameworkContractPricing(contract) {
-  if (form.discountStrategy === DISCOUNT_STRATEGIES.NONE) {
-    form.discountStrategy = DISCOUNT_STRATEGIES.LINE
-  }
   repriceLinesForCustomer()
   const hitCount = (form.lineItems || []).filter((l) => l.priceSource === 'contract').length
   if (form.lineItems.length) {
     message.success(
       hitCount
-        ? `已按框架合同「${contract.contractNo}」套用协议折扣（命中 ${hitCount} 行；未命中产品使用默认折扣，可继续添加合同外产品）`
-        : `已关联框架合同「${contract.contractNo}」：添加产品后将自动套用协议折扣/默认折扣，允许添加合同外产品`,
+        ? `已按框架合同「${contract.contractNo}」写入协议单价（命中 ${hitCount} 行；仅协议折扣的行不改价）`
+        : `已关联框架合同「${contract.contractNo}」：现有行无协议单价，添加产品后仅在价目有协议单价时写入成交价`,
     )
   } else {
     message.info(
-      `已关联框架合同「${contract.contractNo}」：添加产品后自动带出协议折扣；未在协议清单中的产品使用默认折扣，允许添加`,
+      `已关联框架合同「${contract.contractNo}」：添加产品后仅带入协议单价，不带入协议折扣`,
     )
   }
 }
 
-function applyStandardContractLines(contract) {
-  const contractLines = (contract.lineItems || []).filter(
-    (l) => l.productCode?.trim() || l.productName?.trim(),
+function hasMeaningfulSalesLines() {
+  return (form.lineItems || []).some(
+    (line) => String(line.productCode || '').trim() || String(line.productName || '').trim(),
   )
-  if (!contractLines.length) {
+}
+
+function listContractLineRows(contract) {
+  return (contract?.lineItems || [])
+    .filter((l) => String(l.productCode || '').trim() || String(l.productName || '').trim())
+    .map((l, idx) => ({
+      ...l,
+      pickKey: l.id || `${l.productCode || 'row'}-${idx}`,
+      productCode: l.productCode || '',
+      productName: l.productName || '',
+      qty: Number(l.qty ?? l.salesQty) || 0,
+      unitPriceExTax: Number(l.unitPriceExTax) || 0,
+    }))
+}
+
+function syncContractPickSelectedFromKeys(keys) {
+  const list = Array.isArray(keys) ? keys : []
+  const map = new Map(contractPickRows.value.map((r) => [r.pickKey, r]))
+  contractPickKeys.value = list
+  contractPickSelectedRows.value = list.map((key) => map.get(key)).filter(Boolean)
+}
+
+function onContractPickKeysChange(keys) {
+  syncContractPickSelectedFromKeys(keys)
+}
+
+function clearContractPickSelection() {
+  contractPickKeys.value = []
+  contractPickSelectedRows.value = []
+}
+
+function removeContractPickRow(pickKey) {
+  syncContractPickSelectedFromKeys(contractPickKeys.value.filter((k) => k !== pickKey))
+}
+
+function bindContractHeader(contract) {
+  if (contract.contractType && form.contractType !== '临时合同') {
+    form.contractType = contract.contractType
+  }
+  if (!form.customerName && contract.customerName) {
+    form.customerName = contract.customerName
+  }
+}
+
+function skipImportContractLines() {
+  contractLinePickOpen.value = false
+  repriceLinesForCustomer()
+}
+
+function openStandardContractLinePicker(contract) {
+  const rows = listContractLineRows(contract)
+  if (!rows.length) {
     message.info(`标准合同「${contract.contractNo}」暂无明细可带出`)
     repriceLinesForCustomer()
     return
   }
+  contractPickContract.value = contract
+  contractPickRows.value = rows
+  contractPickPage.current = 1
+  contractPickPage.pageSize = 10
+  syncContractPickSelectedFromKeys(rows.map((r) => r.pickKey))
+  contractLinePickOpen.value = true
+}
 
-  const doApply = () => {
-    // 订单计价口径跟随合同：含税合同带出后按含税反算不含税
-    taxModeExcluding.value = contract.taxInclusive === false
-    form.lineItems = contractLines.map((l) => mapContractLineToSalesLine(l, contract))
-    if (form.discountStrategy === DISCOUNT_STRATEGIES.NONE) {
-      form.discountStrategy = DISCOUNT_STRATEGIES.LINE
-    }
-    if (!form.customerName && contract.customerName) {
-      form.customerName = contract.customerName
-    }
-    if (contract.serviceContent && !form.remark) {
-      form.remark = contract.serviceContent
-    }
-    recalcAll()
-    message.success(
-      `已从标准合同「${contract.contractNo}」带出 ${contractLines.length} 条销售明细` +
-        (contract.taxInclusive !== false ? '（已按含税价反算不含税）' : ''),
-    )
-  }
-
-  if (form.lineItems.length) {
-    Modal.confirm({
-      title: '带出合同明细',
-      content: `当前已有 ${form.lineItems.length} 条销售明细，是否用标准合同「${contract.contractNo}」的明细覆盖？`,
-      okText: '覆盖带出',
-      cancelText: '取消',
-      onOk: doApply,
-    })
+function confirmContractLinePick() {
+  const contract = contractPickContract.value
+  if (!contract) {
+    contractLinePickOpen.value = false
     return
   }
-  doApply()
+  const selected = contractPickSelectedRows.value
+  if (!selected.length) {
+    message.warning('请至少选择一行合同明细')
+    return
+  }
+  taxModeExcluding.value = contract.taxInclusive === false
+  form.lineItems = selected.map((row) => mapContractLineToSalesLine(row, contract))
+  if (form.discountStrategy === DISCOUNT_STRATEGIES.NONE) {
+    form.discountStrategy = DISCOUNT_STRATEGIES.LINE
+  }
+  if (!form.customerName && contract.customerName) {
+    form.customerName = contract.customerName
+  }
+  if (contract.serviceContent && !form.remark) {
+    form.remark = contract.serviceContent
+  }
+  recalcAll()
+  contractLinePickOpen.value = false
+  message.success(
+    `已从标准合同「${contract.contractNo}」带入 ${selected.length} 条销售明细` +
+      (contract.taxInclusive !== false ? '（已按含税价反算不含税）' : ''),
+  )
 }
 
 function onContractNoChange(contractNo, contractFromSelect) {
@@ -1253,22 +1472,16 @@ function onContractNoChange(contractNo, contractFromSelect) {
     return
   }
   if (!contract) {
-    // 手填编号、台账中无对应合同：仅保留编号，不强制带明细
     message.info('未在合同台账中找到该编号，已按输入编号保存（不自动带出明细）')
     return
   }
-  if (contract.contractType && form.contractType !== '临时合同') {
-    form.contractType = contract.contractType
-  }
-  if (!form.customerName && contract.customerName) {
-    form.customerName = contract.customerName
-  }
+  bindContractHeader(contract)
   if (contract.contractType === '框架合同') {
     applyFrameworkContractPricing(contract)
     return
   }
   if (contract.contractType === '标准合同') {
-    applyStandardContractLines(contract)
+    openStandardContractLinePicker(contract)
     return
   }
   repriceLinesForCustomer()
@@ -1363,13 +1576,16 @@ function isPreferStockMode(record) {
 const orderAmount = computed(() => orderPricing.value.orderAmount)
 
 const customerDiscountHint = computed(() => {
+  if (!salesDiscountEnabled.value) return ''
   if (isLineDiscountDisabled(form.discountStrategy)) return ''
   const customer = getCustomerByName(form.customerName)
   if (!customer?.defaultDiscountRate || customer.defaultDiscountRate >= 1) return ''
   return `已应用客户默认折扣 ${formatDiscountRatePercent(customer.defaultDiscountRate)}（新加行自动带出，可改）`
 })
 
-const showLineDiscount = computed(() => !isLineDiscountDisabled(form.discountStrategy))
+const showLineDiscount = computed(
+  () => salesDiscountEnabled.value && !isLineDiscountDisabled(form.discountStrategy),
+)
 const orderDiscountFieldsDisabled = computed(() => isOrderDiscountDisabled(form.discountStrategy))
 
 const contactOpts = computed(() => {
@@ -1384,6 +1600,15 @@ watch(
     repriceLinesForCustomer()
   },
 )
+
+watch(salesDiscountEnabled, (enabled) => {
+  if (enabled || !isActive.value) return
+  form.discountStrategy = DISCOUNT_STRATEGIES.NONE
+  form.orderDiscountPercent = 100
+  form.orderDiscountRate = 1
+  form.orderDiscountAmount = 0
+  syncOrderDiscountRate()
+})
 
 watch(
   () => [isActive.value, props.editRecord?.id],
@@ -1968,6 +2193,12 @@ function formatMoney(val) {
 }
 
 function handleSave() {
+  if (!salesDiscountEnabled.value) {
+    form.discountStrategy = DISCOUNT_STRATEGIES.NONE
+    form.orderDiscountPercent = 100
+    form.orderDiscountRate = 1
+    form.orderDiscountAmount = 0
+  }
   if (!form.customerName) {
     message.warning('请选择客户名称')
     return
@@ -2544,5 +2775,132 @@ function persistOrder() {
   &:hover {
     color: #4096ff;
   }
+}
+
+.contract-pick-alert {
+  margin-bottom: 12px;
+}
+
+.contract-picker-body {
+  display: flex;
+  gap: 12px;
+  height: 480px;
+  max-height: calc(80vh - 200px);
+  min-height: 400px;
+}
+
+.contract-table-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.contract-table-pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.contract-selected-panel {
+  width: 28%;
+  min-width: 220px;
+  max-width: 300px;
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.contract-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.contract-selected-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.contract-clear-btn {
+  padding: 0;
+  height: auto;
+}
+
+.contract-selected-list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.contract-selected-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.contract-selected-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contract-selected-code {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.contract-selected-name,
+.contract-selected-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-remove-btn {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+
+  &:hover {
+    color: #ff4d4f;
+  }
+}
+
+.contract-selected-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
 }
 </style>

@@ -420,7 +420,12 @@ import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
 import { useListExport } from '@/composables/useListExport'
 import { salesOrderExportFields } from '@/utils/exportFields/salesOrderExport'
-import { DISCOUNT_STRATEGY_LABELS, calcOrderAmounts } from '@/utils/salesOrderPricing'
+import {
+  DISCOUNT_STRATEGY_LABELS,
+  calcOrderAmounts,
+  filterColumnsBySalesOrderDiscount,
+} from '@/utils/salesOrderPricing'
+import { functionParamState, isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import {
@@ -574,8 +579,24 @@ const baseColumns = [
   { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-list-v3', baseColumns, { minScrollX: 3300 })
+const {
+  columnSettings,
+  columnDrawerOpen,
+  displayColumns: rawDisplayColumns,
+  tableScrollX: rawTableScrollX,
+  defaultColumnSettings,
+} = useTableColumnSettings('sales-order-list-v3', baseColumns, { minScrollX: 3300 })
+
+const displayColumns = computed(() => {
+  void functionParamState.params.enableSalesOrderDiscount
+  return filterColumnsBySalesOrderDiscount(rawDisplayColumns.value, isSalesOrderDiscountEnabled())
+})
+const tableScrollX = computed(() =>
+  Math.max(
+    rawTableScrollX.value || 0,
+    displayColumns.value.reduce((sum, col) => sum + (Number(col.width) || 0), 0),
+  ),
+)
 
 const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
   useListExport({

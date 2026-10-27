@@ -31,8 +31,14 @@ export function getFrameworkContractByNo(contractNo) {
   return row
 }
 
-export function resolveFrameworkContractPrice(contract, productId, productCode, baseListPrice = 0) {
-  return resolveContractPrice(contract, productId, productCode, baseListPrice)
+export function resolveFrameworkContractPrice(
+  contract,
+  productId,
+  productCode,
+  baseListPrice = 0,
+  options = {},
+) {
+  return resolveContractPrice(contract, productId, productCode, baseListPrice, options)
 }
 
 export function addFrameworkContract(payload) {

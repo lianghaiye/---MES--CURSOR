@@ -127,6 +127,14 @@
     />
 
     <a-switch
+      v-else-if="record.key === 'enableSalesOrderDiscount'"
+      :checked="enableSalesOrderDiscount"
+      checked-children="开"
+      un-checked-children="关"
+      @change="onEnableSalesOrderDiscountChange"
+    />
+
+    <a-switch
       v-else-if="record.key === 'transferRequireInboundConfirm'"
       :checked="transferRequireInboundConfirm"
       checked-children="需要"
@@ -230,6 +238,8 @@ import {
   setBlankSizeAssistTools,
   isBomLevelMtsEnabled,
   setEnableBomLevelMts,
+  isSalesOrderDiscountEnabled,
+  setEnableSalesOrderDiscount,
   isTransferRequireInboundConfirm,
   setTransferRequireInboundConfirm,
   isStocktakeAutoPostOnApprove,
@@ -251,6 +261,7 @@ const salesOutboundIssueRule = computed(() => getSalesOutboundIssueRule())
 const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
+const enableSalesOrderDiscount = computed(() => isSalesOrderDiscountEnabled())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
 const stocktakeAutoPostOnApprove = computed(() => isStocktakeAutoPostOnApprove())
 
@@ -323,6 +334,12 @@ function onEnableBomLevelMtsChange(checked) {
   toastSave(
     setEnableBomLevelMts(checked),
     checked ? '已开启生产计划 BOM 级 MTS' : '已关闭生产计划 BOM 级 MTS',
+  )
+}
+function onEnableSalesOrderDiscountChange(checked) {
+  toastSave(
+    setEnableSalesOrderDiscount(checked),
+    checked ? '已开启销售订单价格折扣' : '已关闭销售订单价格折扣',
   )
 }
 function onTransferRequireInboundConfirmChange(checked) {

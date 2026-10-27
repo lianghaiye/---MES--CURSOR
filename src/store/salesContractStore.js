@@ -856,8 +856,20 @@ export function getActiveSalesContractOptions(customerName = '', contractType = 
     }))
 }
 
-/** 框架合同价解析（兼容原 resolveFrameworkContractPrice） */
-export function resolveContractPrice(contract, productId, productCode, baseListPrice = 0) {
+/**
+ * 合同价解析（兼容原 resolveFrameworkContractPrice）。
+ * @param {{ applyAgreementDiscount?: boolean }} [options]
+ * applyAgreementDiscount 默认 true（采购）：无单价时套协议折扣/默认折扣，有单价时倒算行折扣。
+ * 销售订单传 false：只写入协议单价，不倒算、不带入协议折扣。
+ */
+export function resolveContractPrice(
+  contract,
+  productId,
+  productCode,
+  baseListPrice = 0,
+  options = {},
+) {
+  const applyAgreementDiscount = options.applyAgreementDiscount !== false
   if (!contract) {
     return {
       listUnitPriceExTax: baseListPrice,
@@ -882,12 +894,27 @@ export function resolveContractPrice(contract, productId, productCode, baseListP
 
   if (hit?.agreementUnitPriceExTax != null && hit.agreementUnitPriceExTax !== '') {
     const agreementPrice = Number(hit.agreementUnitPriceExTax) || 0
+    if (!applyAgreementDiscount) {
+      return {
+        listUnitPriceExTax: agreementPrice,
+        lineDiscountRate: 1,
+        priceSource: 'contract',
+      }
+    }
     const baseList = baseListPrice > 0 ? baseListPrice : agreementPrice
     const rate = baseList > 0 ? agreementPrice / baseList : 1
     return {
       listUnitPriceExTax: baseList,
       lineDiscountRate: normalizeDiscountRate(rate, 1),
       priceSource: 'contract',
+    }
+  }
+
+  if (!applyAgreementDiscount) {
+    return {
+      listUnitPriceExTax: baseListPrice,
+      lineDiscountRate: 1,
+      priceSource: 'product',
     }
   }
 

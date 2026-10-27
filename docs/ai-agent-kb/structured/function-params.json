@@ -146,6 +146,13 @@
       ]
     },
     {
+      "key": "enableSalesOrderDiscount",
+      "label": "销售订单价格折扣",
+      "category": "sales",
+      "type": "boolean",
+      "default": true
+    },
+    {
       "key": "enableBomLevelMts",
       "label": "BOM级MTS",
       "type": "boolean",

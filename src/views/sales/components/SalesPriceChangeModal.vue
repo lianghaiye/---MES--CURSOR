@@ -559,7 +559,13 @@ export default { name: 'SalesPriceChangeModal' }
 import { computed, defineComponent, h, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { isLineDiscountDisabled, normalizeDiscountRate, round2 } from '@/utils/salesOrderPricing'
+import {
+  filterColumnsBySalesOrderDiscount,
+  isLineDiscountDisabled,
+  normalizeDiscountRate,
+  round2,
+} from '@/utils/salesOrderPricing'
+import { functionParamState, isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
 import { inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
   ORDER_CHANGE_HEADER_KEYS,
@@ -707,7 +713,10 @@ const taxModeHint = computed(() =>
 )
 
 const canEditDiscount = computed(
-  () => !isReview.value && !isLineDiscountDisabled(activeOrder.value?.discountStrategy),
+  () =>
+    isSalesOrderDiscountEnabled() &&
+    !isReview.value &&
+    !isLineDiscountDisabled(activeOrder.value?.discountStrategy),
 )
 
 const form = reactive({
@@ -844,13 +853,17 @@ const allColumns = [
 const showExTaxColumns = computed(() => columnDisplayMode.value !== 'inTax')
 const showInTaxColumns = computed(() => columnDisplayMode.value !== 'exTax')
 
-const visibleColumns = computed(() =>
-  allColumns.filter((col) => {
-    if (!showExTaxColumns.value && exTaxColumnKeys.has(col.key)) return false
-    if (!showInTaxColumns.value && inTaxColumnKeys.has(col.key)) return false
-    return true
-  }),
-)
+const visibleColumns = computed(() => {
+  void functionParamState.params.enableSalesOrderDiscount
+  return filterColumnsBySalesOrderDiscount(
+    allColumns.filter((col) => {
+      if (!showExTaxColumns.value && exTaxColumnKeys.has(col.key)) return false
+      if (!showInTaxColumns.value && inTaxColumnKeys.has(col.key)) return false
+      return true
+    }),
+    isSalesOrderDiscountEnabled(),
+  )
+})
 
 const tableScrollX = computed(() =>
   visibleColumns.value.reduce((sum, col) => sum + (Number(col.width) || 100), 0),

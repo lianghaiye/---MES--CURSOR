@@ -116,7 +116,7 @@
             </DetailSectionCard>
 
             <DetailSectionCard title="价格汇总">
-              <template #extra>
+              <template v-if="salesDiscountEnabled" #extra>
                 <div class="discount-strategy-row">
                   <span class="strategy-label">折扣策略</span>
                   <a-tag bordered :color="discountStrategyTagColor" class="discount-strategy-tag">
@@ -126,7 +126,7 @@
               </template>
 
               <a-row :gutter="[16, 12]" class="price-summary-grid">
-                <a-col :span="8">
+                <a-col v-if="salesDiscountEnabled" :span="8">
                   <div class="price-summary-item">
                     <div class="price-label">
                       行优惠（合计）
@@ -139,7 +139,7 @@
                     </div>
                   </div>
                 </a-col>
-                <a-col :span="8">
+                <a-col v-if="salesDiscountEnabled" :span="8">
                   <div class="price-summary-item">
                     <div class="price-label">
                       整单优惠合计
@@ -152,7 +152,7 @@
                     </div>
                   </div>
                 </a-col>
-                <a-col :span="8">
+                <a-col v-if="salesDiscountEnabled" :span="8">
                   <div class="price-summary-item">
                     <div class="price-label">优惠总额</div>
                     <div class="price-value discount">
@@ -162,7 +162,7 @@
                 </a-col>
               </a-row>
 
-              <a-divider class="price-summary-divider" />
+              <a-divider v-if="salesDiscountEnabled" class="price-summary-divider" />
 
               <a-row :gutter="[16, 12]" class="price-summary-grid">
                 <a-col :span="6">
@@ -1085,6 +1085,7 @@ import { CONTRACT_TYPE } from '@/constants/salesContract'
 import { findCreatePageByListPath } from '@/config/createPages'
 import {
   functionParamState,
+  isSalesOrderDiscountEnabled,
   isShipAttachmentDecidedAtOrder,
   isShipAttachmentFeatureEnabled,
 } from '@/store/functionParamStore'
@@ -1160,6 +1161,7 @@ import {
   calcOrderAmounts,
   DISCOUNT_STRATEGY_LABELS,
   DISCOUNT_STRATEGIES,
+  filterColumnsBySalesOrderDiscount,
 } from '@/utils/salesOrderPricing'
 import { QuestionCircleOutlined } from '@ant-design/icons-vue'
 import { buildSalesOrderEbomRows } from '@/utils/salesOrderBomRows'
@@ -1345,12 +1347,19 @@ const ebomTableScrollX = computed(() =>
   ebomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
 )
 
+const salesDiscountEnabled = computed(() => {
+  void functionParamState.params.enableSalesOrderDiscount
+  return isSalesOrderDiscountEnabled()
+})
+
 const lineColumns = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
+  void functionParamState.params.enableSalesOrderDiscount
+  let cols = salesOrderDetailLineColumns
   if (!isShipAttachmentFeatureEnabled()) {
-    return salesOrderDetailLineColumns.filter((col) => col.key !== 'shipAccessories')
+    cols = cols.filter((col) => col.key !== 'shipAccessories')
   }
-  return salesOrderDetailLineColumns
+  return filterColumnsBySalesOrderDiscount(cols, salesDiscountEnabled.value)
 })
 
 const lineTableScrollX = computed(() =>

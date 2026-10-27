@@ -23,6 +23,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
 import { DISCOUNT_STRATEGY_LABELS } from '@/utils/salesOrderPricing'
 
 const props = defineProps({
@@ -52,7 +53,7 @@ const metaItems = computed(() => {
 
 const fields = computed(() => {
   const o = props.order
-  return [
+  const list = [
     { key: 'orderNo', label: '销售单号' },
     { key: 'urgency', label: '紧急度' },
     { key: 'contractType', label: '合同类型' },
@@ -101,6 +102,14 @@ const fields = computed(() => {
     },
     { key: 'remark', label: '备注', fullRow: true },
   ]
+  if (isSalesOrderDiscountEnabled()) return list
+  const hide = new Set([
+    'discountStrategy',
+    'totalDiscountAmount',
+    'lineDiscountTotal',
+    'orderDiscountTotal',
+  ])
+  return list.filter((field) => !hide.has(field.key))
 })
 </script>
 

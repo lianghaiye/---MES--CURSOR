@@ -60,6 +60,27 @@ export const DISCOUNT_STRATEGIES = {
   STACK: 'stack',
 }
 
+/** 关闭「销售订单价格折扣」后应隐藏的列/字段 key */
+export const SALES_ORDER_DISCOUNT_FIELD_KEYS = [
+  'discountStrategy',
+  'totalDiscountAmount',
+  'lineDiscountTotal',
+  'orderDiscountTotal',
+  'lineDiscountRate',
+  'lineDiscountPercent',
+  'lineDiscountAmount',
+  'oldLineDiscountRate',
+  'oldLineDiscountAmount',
+  'newLineDiscountRate',
+  'newLineDiscountAmount',
+]
+
+export function filterColumnsBySalesOrderDiscount(columns, enabled) {
+  if (enabled !== false) return columns
+  const hide = new Set(SALES_ORDER_DISCOUNT_FIELD_KEYS)
+  return (columns || []).filter((col) => !hide.has(col.key) && !hide.has(col.dataIndex))
+}
+
 export const DISCOUNT_STRATEGY_LABELS = {
   [DISCOUNT_STRATEGIES.NONE]: '无折扣',
   [DISCOUNT_STRATEGIES.LINE]: '仅明细折扣',

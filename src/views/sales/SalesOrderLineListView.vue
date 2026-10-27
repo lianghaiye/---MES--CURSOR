@@ -318,6 +318,8 @@ import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { useTabs } from '@/composables/useTabs'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import { functionParamState, isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
+import { filterColumnsBySalesOrderDiscount } from '@/utils/salesOrderPricing'
 import { useListExport } from '@/composables/useListExport'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -535,10 +537,26 @@ const baseColumns = [
   { title: '创建人', key: 'creator', dataIndex: 'creator', width: 90 },
 ]
 
-const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('sales-order-line-list-v5', baseColumns, {
-    minScrollX: 3930,
-  })
+const {
+  columnSettings,
+  columnDrawerOpen,
+  displayColumns: rawDisplayColumns,
+  tableScrollX: rawTableScrollX,
+  defaultColumnSettings,
+} = useTableColumnSettings('sales-order-line-list-v5', baseColumns, {
+  minScrollX: 3930,
+})
+
+const displayColumns = computed(() => {
+  void functionParamState.params.enableSalesOrderDiscount
+  return filterColumnsBySalesOrderDiscount(rawDisplayColumns.value, isSalesOrderDiscountEnabled())
+})
+const tableScrollX = computed(() =>
+  Math.max(
+    rawTableScrollX.value || 0,
+    displayColumns.value.reduce((sum, col) => sum + (Number(col.width) || 0), 0),
+  ),
+)
 
 const allLineRows = computed(() => flattenSalesOrderLines(salesOrderState.orders))
 

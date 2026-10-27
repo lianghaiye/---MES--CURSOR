@@ -185,7 +185,12 @@ import {
   buildSalesOrderApprovalTimeline,
 } from '@/utils/salesApprovalDisplay'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
-import { functionParamState, isShipAttachmentFeatureEnabled } from '@/store/functionParamStore'
+import {
+  functionParamState,
+  isSalesOrderDiscountEnabled,
+  isShipAttachmentFeatureEnabled,
+} from '@/store/functionParamStore'
+import { filterColumnsBySalesOrderDiscount } from '@/utils/salesOrderPricing'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
@@ -241,11 +246,15 @@ const APPROVE_HIDDEN_LINE_KEYS = new Set(['industrialLabelStatus', 'industrialLa
 
 const lineColumns = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
-  return salesOrderDetailLineColumns.filter((col) => {
-    if (APPROVE_HIDDEN_LINE_KEYS.has(col.key)) return false
-    if (col.key === 'shipAccessories' && !isShipAttachmentFeatureEnabled()) return false
-    return true
-  })
+  void functionParamState.params.enableSalesOrderDiscount
+  return filterColumnsBySalesOrderDiscount(
+    salesOrderDetailLineColumns.filter((col) => {
+      if (APPROVE_HIDDEN_LINE_KEYS.has(col.key)) return false
+      if (col.key === 'shipAccessories' && !isShipAttachmentFeatureEnabled()) return false
+      return true
+    }),
+    isSalesOrderDiscountEnabled(),
+  )
 })
 
 const lineTableScrollX = computed(() =>

@@ -66,6 +66,7 @@ export function resolveSalesLinePrice({
     productId,
     productCode,
     customerPrice.listUnitPriceExTax,
+    { applyAgreementDiscount: false },
   )
   if (contractPrice.priceSource === 'contract') return contractPrice
   if (customerPrice.priceSource === 'customer_agreement') return customerPrice

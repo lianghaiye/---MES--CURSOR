@@ -3,6 +3,7 @@
  */
 
 import { DISCOUNT_STRATEGY_LABELS } from '@/utils/salesOrderPricing'
+import { isSalesOrderDiscountEnabled } from '@/store/functionParamStore'
 
 const STORAGE_PREFIX = 'sales-order-print-preview:'
 
@@ -63,6 +64,7 @@ export function buildSalesOrderPrintPayload(order, options = {}) {
     remark: formatPrintFieldValue(line.supplementDesc || line.remark || line.lineRemark),
   }))
 
+  const showDiscount = isSalesOrderDiscountEnabled()
   const basicFields = [
     { label: '客户名称', value: order.customerName },
     { label: '业务员', value: order.salesperson },
@@ -74,10 +76,14 @@ export function buildSalesOrderPrintPayload(order, options = {}) {
     { label: '结算币种', value: order.settlementCurrency },
     { label: '结算类型', value: order.settlementType },
     { label: '交货方式', value: order.deliveryMethod },
-    {
-      label: '折扣策略',
-      value: DISCOUNT_STRATEGY_LABELS[order.discountStrategy] || '无折扣',
-    },
+    ...(showDiscount
+      ? [
+          {
+            label: '折扣策略',
+            value: DISCOUNT_STRATEGY_LABELS[order.discountStrategy] || '无折扣',
+          },
+        ]
+      : []),
     { label: '联系人', value: order.contactPerson },
     { label: '联系电话', value: order.contactPhone },
     { label: '创建人', value: order.creator },
