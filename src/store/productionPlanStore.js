@@ -296,6 +296,114 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
   return plan
 }
 
+/**
+ * 随货配件自制/组装缺口 → 生产计划工作项（待下达；不直建工单）
+ * @param {object} salesOrder
+ * @param {Array<object>} accessoryRows 已按履约数量筛好的配件行（含 qty/planQty）
+ * @returns {{ plan: object|null, workItems: object[], created: boolean, appended: boolean }}
+ */
+export function appendOrCreateProductionPlanForShipAccessories(salesOrder, accessoryRows = []) {
+  const rows = (accessoryRows || []).filter((r) => (Number(r.planQty) || Number(r.qty) || 0) > 0)
+  if (!rows.length || !salesOrder?.orderNo) {
+    return { plan: null, workItems: [], created: false, appended: false }
+  }
+
+  const deliveryDate = resolveDeliveryDate(salesOrder.lineItems, salesOrder.documentDate)
+  const newWorkItems = rows.map((row, index) => {
+    const planQty = Math.max(0, Number(row.planQty ?? row.qty) || 0)
+    const supplyForm = String(row.supplyForm || '自制件')
+    const topLevelSupplyType = /组装/.test(supplyForm) ? '组装' : '自制件'
+    const stockQty = Math.max(0, Number(row.availableStock) || 0)
+    return enrichWorkItem(
+      {
+        id: `wi-acc-${row.id || row.materialCode || index}-${Date.now()}-${index}`,
+        salesLineId: row.salesLineId || '',
+        shipAccessoryLineId: row.id || '',
+        fromShipAccessory: true,
+        status: '待下达',
+        expanded: index === 0,
+        salesQty: planQty,
+        orderQty: planQty,
+        planQty,
+        stockQty,
+        productName: row.materialName || row.materialCode || '',
+        productCode: row.materialCode || row.itemCode || '',
+        productId: row.productId || '',
+        productAttr: '随货配件',
+        productType: '随货配件',
+        model: row.specModel || '',
+        spec: row.specModel || '',
+        unit: row.unit || '件',
+        deliveryDate: row.deliveryDate || deliveryDate,
+        topLevelSupplyType,
+        bomId: '',
+        bomName: '',
+        bomVersion: '',
+        ebomSnapshot: { materials: [] },
+        materials: [],
+        matchingRequirements: `随货配件缺口转生产（供应型态：${supplyForm}）`,
+        remark: `随货配件缺口转生产（供应型态：${supplyForm}）`,
+      },
+      null,
+      index,
+      true,
+    )
+  })
+
+  const existing = findPlanBySalesOrderNo(salesOrder.orderNo)
+  if (existing) {
+    const known = new Set(
+      (existing.workItems || []).map((w) => String(w.shipAccessoryLineId || '')).filter(Boolean),
+    )
+    const toAdd = newWorkItems.filter((w) => {
+      const key = String(w.shipAccessoryLineId || '')
+      return !key || !known.has(key)
+    })
+    if (!toAdd.length) {
+      return { plan: existing, workItems: [], created: false, appended: false }
+    }
+    existing.workItems = [...(existing.workItems || []), ...toAdd]
+    const addQty = toAdd.reduce((s, w) => s + (Number(w.planQty) || 0), 0)
+    existing.productQty = (Number(existing.productQty) || 0) + addQty
+    if (!String(existing.remark || '').includes('随货配件')) {
+      existing.remark = existing.remark
+        ? `${existing.remark}；含随货配件自制/组装`
+        : '含随货配件自制/组装'
+    }
+    if (!Array.isArray(existing.tags)) existing.tags = []
+    if (!existing.tags.includes('待下达')) existing.tags.push('待下达')
+    return { plan: existing, workItems: toAdd, created: false, appended: true }
+  }
+
+  const totalQty = newWorkItems.reduce((s, w) => s + (Number(w.planQty) || 0), 0)
+  const daysToDelivery = Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day'))
+  const plan = {
+    id: `pp-${Date.now()}`,
+    planSource: PLAN_SOURCE.SALES_ORDER,
+    salesOrderNo: salesOrder.orderNo,
+    orderNo: salesOrder.orderNo,
+    customerName: salesOrder.customerName,
+    productQty: totalQty,
+    salesperson: salesOrder.salesperson || '',
+    urgency: mapUrgencyToPlan(salesOrder.urgency),
+    orderStatus: '待下达',
+    orderDate: salesOrder.documentDate || dayjs().format('YYYY-MM-DD'),
+    deliveryDate,
+    region: salesOrder.region || '',
+    settlementType: salesOrder.settlementType || '',
+    deliveryMethod: salesOrder.deliveryMethod || '',
+    remark: `由销售订单 ${salesOrder.orderNo} 随货配件自制/组装缺口生成`,
+    tags: ['待下达'],
+    daysToDelivery,
+    planAssemblyDate: '',
+    planCompleteDate: deliveryDate,
+    deductInventory: true,
+    workItems: newWorkItems,
+  }
+  addProductionPlan(plan)
+  return { plan, workItems: newWorkItems, created: true, appended: false }
+}
+
 let replenishPlanSeq = 1
 
 function nextReplenishPlanNo() {

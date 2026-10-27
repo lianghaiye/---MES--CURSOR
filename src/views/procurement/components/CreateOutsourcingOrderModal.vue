@@ -80,6 +80,19 @@
               </a-form-item>
             </a-col>
             <a-col :span="6">
+              <a-form-item label="合同编号">
+                <ContractSelect
+                  v-model="form.contractNo"
+                  size="small"
+                  cash-direction="支出"
+                  contract-category="外协"
+                  :preferred-supplier-name="form.supplier || ''"
+                  placeholder="搜索选择外协合同，也可直接输入编号"
+                  @change="onContractChange"
+                />
+              </a-form-item>
+            </a-col>
+            <a-col :span="6">
               <a-form-item label="计划日期" required>
                 <a-range-picker
                   v-model:value="form.planDateRange"
@@ -483,6 +496,7 @@ import {
   canEditOutsourcingOrder,
 } from '@/store/outsourcingOrderStore'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import ContractSelect from '@/views/sales/components/ContractSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import ProcessConfigSearchSelect from './ProcessConfigSearchSelect.vue'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
@@ -547,6 +561,7 @@ const form = reactive({
   orderNo: '',
   workOrderName: '',
   salesOrderNo: '',
+  contractNo: '',
   salesOrderId: '',
   source: '新增',
   sourceOrderNo: '',
@@ -684,6 +699,7 @@ function resetForm() {
   form.orderNo = ''
   form.workOrderName = ''
   form.salesOrderNo = ''
+  form.contractNo = ''
   form.salesOrderId = ''
   form.source = '新增'
   form.sourceOrderNo = ''
@@ -714,6 +730,7 @@ function loadEditForm(record) {
   form.orderNo = record.orderNo || ''
   form.workOrderName = record.workOrderName || ''
   form.salesOrderNo = record.salesOrderNo || ''
+  form.contractNo = record.contractNo || ''
   form.salesOrderId = record.salesOrderId || ''
   form.source = record.source || '新增'
   form.sourceOrderNo = record.sourceOrderNo || record.sourceWorkOrderNo || ''
@@ -1029,6 +1046,7 @@ function buildPayload() {
     orderNo: String(form.orderNo || '').trim(),
     workOrderName: form.workOrderName || '',
     salesOrderNo: form.salesOrderNo || '',
+    contractNo: form.contractNo || '',
     salesOrderId: form.salesOrderId || '',
     source: form.source || '新增',
     sourceOrderNo: form.sourceOrderNo || '',
@@ -1052,6 +1070,12 @@ function buildPayload() {
     shipWarehouse: form.shipWarehouse || '',
     remark: form.remark || '',
     lineItems: form.lineItems.map((l) => ({ ...l })),
+  }
+}
+
+function onContractChange(_no, contract) {
+  if (contract?.supplierName && !form.supplier) {
+    form.supplier = contract.supplierName
   }
 }
 

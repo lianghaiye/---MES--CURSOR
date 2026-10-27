@@ -3,6 +3,7 @@
     page-mode
     :list-path="listPath"
     :default-type="defaultType"
+    :default-cash-direction="defaultCashDirection"
     :seed-record="seedRecord"
   />
 </template>
@@ -11,14 +12,14 @@
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { CONTRACT_TYPE } from '@/constants/salesContract'
+import { CONTRACT_CASH_DIRECTION, CONTRACT_TYPE } from '@/constants/salesContract'
 import { buildContractDraftFromSalesOrder } from '@/store/salesContractStore'
 import { getSalesOrderById } from '@/utils/salesOrderDetail'
 import SalesContractFormModal from './components/SalesContractFormModal.vue'
 
 defineOptions({ name: 'SalesContractCreateView' })
 
-const listPath = '/sales/contracts'
+const listPath = '/contracts'
 const route = useRoute()
 
 const fromOrderId = computed(() => String(route.query.fromOrderId || '').trim())
@@ -30,6 +31,14 @@ const seedDraftResult = computed(() => {
 })
 
 const seedRecord = computed(() => (seedDraftResult.value?.ok ? seedDraftResult.value.data : null))
+
+const defaultCashDirection = computed(() => {
+  const d = String(route.query.direction || '')
+  if (d === CONTRACT_CASH_DIRECTION.EXPENSE || d === 'expense') {
+    return CONTRACT_CASH_DIRECTION.EXPENSE
+  }
+  return CONTRACT_CASH_DIRECTION.INCOME
+})
 
 const defaultType = computed(() => {
   if (seedRecord.value?.contractType) return seedRecord.value.contractType

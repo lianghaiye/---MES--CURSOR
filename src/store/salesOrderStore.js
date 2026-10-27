@@ -745,7 +745,7 @@ export function approveSalesOrder(id, opinion = '') {
     purchaseReqNo = requisition.reqNo
   }
 
-  // 审核通过时：随货配件自制/外协缺口自动转工单；外购已合并进上方采购申请
+  // 审核通过时：随货配件自制/组装→生产计划，外协→外协订单；外购已合并进上方采购申请
   let shipAccessoryFulfillHint = ''
   if (Array.isArray(order.shipAccessories) && order.shipAccessories.length) {
     const accRes = fulfillShipAccessoryGapsBySupply(order, order.shipAccessories, {

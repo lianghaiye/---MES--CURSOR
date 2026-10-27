@@ -31,12 +31,16 @@
     :selected="modelValue"
     :lock-contract-type="lockContractType"
     :preferred-customer-name="preferredCustomerName"
+    :preferred-supplier-name="preferredSupplierName"
+    :cash-direction="cashDirection"
+    :contract-category="contractCategory"
     @confirm="onPickedFromModal"
   />
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
+import { CONTRACT_CASH_DIRECTION } from '@/constants/salesContract'
 import { getActiveSalesContractOptions, getSalesContractByNo } from '@/store/salesContractStore'
 import SelectContractModal from './SelectContractModal.vue'
 
@@ -50,6 +54,9 @@ const props = defineProps({
   /** 锁定合同类型过滤建议项 */
   lockContractType: { type: String, default: '' },
   preferredCustomerName: { type: String, default: '' },
+  preferredSupplierName: { type: String, default: '' },
+  cashDirection: { type: String, default: CONTRACT_CASH_DIRECTION.INCOME },
+  contractCategory: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'change'])
@@ -63,9 +70,18 @@ const allOptions = computed(() => {
       ? props.lockContractType
       : ''
   // 建议项：先按客户过滤；无命中时仍展示同类型生效合同，便于存量编号对照
-  const byCustomer = getActiveSalesContractOptions(props.preferredCustomerName || '', type)
-  if (byCustomer.length || !props.preferredCustomerName) return byCustomer
-  return getActiveSalesContractOptions('', type)
+  const extra = {
+    cashDirection: props.cashDirection || CONTRACT_CASH_DIRECTION.INCOME,
+    supplierName: props.preferredSupplierName || '',
+    contractCategory: props.contractCategory || '',
+  }
+  const byParty = getActiveSalesContractOptions(props.preferredCustomerName || '', type, extra)
+  const hasParty =
+    extra.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+      ? Boolean(props.preferredSupplierName)
+      : Boolean(props.preferredCustomerName)
+  if (byParty.length || !hasParty) return byParty
+  return getActiveSalesContractOptions('', type, { ...extra, supplierName: '' })
 })
 
 const displayOptions = computed(() => {

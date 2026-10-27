@@ -20,7 +20,7 @@
             <a-descriptions-item label="合同名称">{{
               record.contractName || '—'
             }}</a-descriptions-item>
-            <a-descriptions-item label="客户">{{ record.customerName }}</a-descriptions-item>
+            <a-descriptions-item :label="partyLabel">{{ partyName }}</a-descriptions-item>
             <a-descriptions-item label="有效期">
               {{ record.validFrom || '—' }} ~ {{ record.validTo || '—' }}
             </a-descriptions-item>
@@ -115,7 +115,7 @@
         </div>
 
         <div class="section-card">
-          <div class="section-title">回款节点</div>
+          <div class="section-title">{{ paymentNoun }}节点</div>
           <a-table
             :columns="nodeColumns"
             :data-source="record.paymentNodes || []"
@@ -201,7 +201,14 @@ import {
   getSalesContractById,
   rejectSalesContract,
 } from '@/store/salesContractStore'
-import { CONTRACT_TYPE, contractStatusColor } from '@/constants/salesContract'
+import {
+  CONTRACT_TYPE,
+  contractPartyFieldLabel,
+  contractPaymentNoun,
+  contractStatusColor,
+  getContractPartyName,
+  resolveContractCashDirection,
+} from '@/constants/salesContract'
 import {
   approvalResultColor,
   approvalTimelineColor,
@@ -211,11 +218,18 @@ import {
 const route = useRoute()
 const router = useRouter()
 const opinion = ref('')
-const listPath = '/sales/contracts'
+const listPath = '/contracts'
 
 const record = computed(() => getSalesContractById(route.params.id))
 const canApprove = computed(() => record.value && canApproveSalesContract(record.value))
 const isFramework = computed(() => record.value?.contractType === CONTRACT_TYPE.FRAMEWORK)
+const partyLabel = computed(() =>
+  contractPartyFieldLabel(resolveContractCashDirection(record.value || {})),
+)
+const partyName = computed(() => getContractPartyName(record.value || {}) || '—')
+const paymentNoun = computed(() =>
+  contractPaymentNoun(resolveContractCashDirection(record.value || {})),
+)
 const historyRecords = computed(() => buildSalesOrderApprovalTimeline(record.value))
 
 const priceColumns = [

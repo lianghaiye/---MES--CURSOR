@@ -10,6 +10,8 @@
               <a-tag :color="contractSignStatusColor(record.signStatus)">{{
                 record.signStatus || '未签署'
               }}</a-tag>
+              <a-tag>{{ record.cashDirection || '收入' }}</a-tag>
+              <a-tag v-if="record.contractCategory">{{ record.contractCategory }}</a-tag>
               <a-tag>{{ record.contractType }}</a-tag>
             </div>
             <a-space :size="8">
@@ -86,7 +88,7 @@
             >
               <a-tab-pane key="overview" tab="概览" />
               <a-tab-pane key="linked-orders" :tab="`关联订单 (${linkedOrders.length})`" />
-              <a-tab-pane key="payments" :tab="`回款计划 (${paymentPlan.length})`" />
+              <a-tab-pane key="payments" :tab="`${paymentNoun}计划 (${paymentPlan.length})`" />
               <a-tab-pane key="changes" :tab="`变更记录 (${changeList.length})`" />
               <a-tab-pane key="attachments" :tab="`附件 (${(record.attachments || []).length})`" />
               <a-tab-pane key="approval" tab="审批信息" />
@@ -106,7 +108,7 @@
               </div>
             </DetailSectionCard>
 
-            <DetailSectionCard title="客户资质与开票信息">
+            <DetailSectionCard title="相对方法人与开票信息">
               <SalesContractPartyLegalSection :contract="record" />
             </DetailSectionCard>
 
@@ -203,7 +205,7 @@
               </div>
             </DetailSectionCard>
 
-            <DetailSectionCard title="回款节点">
+            <DetailSectionCard :title="`${paymentNoun}节点`">
               <a-table
                 :columns="nodeColumns"
                 :data-source="record.paymentNodes || []"
@@ -227,14 +229,14 @@
                   <!-- termStartType 用 dataIndex 直出 -->
                 </template>
                 <template #emptyText>
-                  <a-empty :image="false" description="暂无回款节点" />
+                  <a-empty :image="false" :description="`暂无${paymentNoun}节点`" />
                 </template>
               </a-table>
             </DetailSectionCard>
           </template>
 
           <template v-else-if="activeTab === 'linked-orders'">
-            <DetailSectionCard title="关联销售订单">
+            <DetailSectionCard :title="linkedOrdersTitle">
               <template #extra>
                 <span class="quota-inline">
                   已执行金额 {{ quota.executedAmount
@@ -260,6 +262,9 @@
                       row.progressStatus || '—'
                     }}</a-tag>
                   </template>
+                  <template v-else-if="column.key === 'docKind'">
+                    {{ row._docKind === 'wx' ? '外协' : '采购' }}
+                  </template>
                   <template v-else-if="column.key === 'orderNo'">
                     <a class="link-code" @click="goOrder(row)">{{ row.orderNo }}</a>
                   </template>
@@ -284,10 +289,18 @@
                     {{ row.deliveryMethod || '—' }}
                   </template>
                   <template v-else-if="column.key === 'amountInTax'">
-                    {{ formatMoney(resolveOrderAmounts(row).amountInTax) }}
+                    {{
+                      formatMoney(
+                        isExpense ? row.amountInTax : resolveOrderAmounts(row).amountInTax,
+                      )
+                    }}
                   </template>
                   <template v-else-if="column.key === 'amountExTax'">
-                    {{ formatMoney(resolveOrderAmounts(row).amountExTax) }}
+                    {{
+                      formatMoney(
+                        isExpense ? row.amountExTax : resolveOrderAmounts(row).amountExTax,
+                      )
+                    }}
                   </template>
                   <template v-else-if="column.key === 'region'">
                     {{ row.region || '—' }}
@@ -352,7 +365,7 @@
           </template>
 
           <template v-else-if="activeTab === 'payments'">
-            <DetailSectionCard title="回款计划">
+            <DetailSectionCard :title="`${paymentNoun}计划`">
               <template #extra>
                 <a-space :size="8">
                   <span v-if="isFramework" class="quota-inline">
@@ -401,13 +414,13 @@
                   <template v-else-if="column.key === 'actions'">
                     <a-space v-if="canMaintainPayment && (Number(row.unpaid) || 0) > 0" :size="8">
                       <a @click="openMaintainNode(row, 'startDate')">维护起算日</a>
-                      <a @click="openMaintainNode(row, 'register')">登记回款</a>
+                      <a @click="openMaintainNode(row, 'register')">登记{{ paymentNoun }}</a>
                     </a-space>
                     <span v-else class="muted">—</span>
                   </template>
                 </template>
                 <template #emptyText>
-                  <a-empty :image="false" description="暂无回款节点" />
+                  <a-empty :image="false" :description="`暂无${paymentNoun}节点`" />
                 </template>
               </a-table>
             </DetailSectionCard>
@@ -417,6 +430,7 @@
               :summary="paymentSummary"
               :node="maintainNode"
               :mode="maintainMode"
+              :cash-direction="record.cashDirection"
               @saved="onPaymentMaintained"
             />
           </template>
@@ -521,6 +535,8 @@ import {
   completeSalesContract,
   getContractQuotaSummary,
   getOrdersLinkedToContract,
+  getOutsourcingOrdersLinkedToContract,
+  getPurchaseOrdersLinkedToContract,
   getSalesContractById,
   submitSalesContract,
   terminateSalesContract,
@@ -544,6 +560,8 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import {
   CONTRACT_STATUS,
   CONTRACT_TYPE,
+  contractPaymentNoun,
+  isExpenseContract,
   contractChangeStatusColor,
   contractSignStatusColor,
   contractStatusColor,
@@ -576,6 +594,9 @@ const record = computed(() => {
 })
 
 const isFramework = computed(() => record.value?.contractType === CONTRACT_TYPE.FRAMEWORK)
+const isExpense = computed(() => isExpenseContract(record.value || {}))
+const paymentNoun = computed(() => contractPaymentNoun(record.value?.cashDirection))
+const linkedOrdersTitle = computed(() => (isExpense.value ? '关联采购/外协订单' : '关联销售订单'))
 const quota = computed(() => getContractQuotaSummary(record.value || {}))
 const paymentPlan = computed(() => {
   void salesPaymentState.payments
@@ -594,7 +615,27 @@ const canMaintainPayment = computed(
     record.value?.status === CONTRACT_STATUS.ACTIVE ||
     record.value?.status === CONTRACT_STATUS.COMPLETED,
 )
-const linkedOrders = computed(() => getOrdersLinkedToContract(record.value?.contractNo))
+const linkedOrders = computed(() => {
+  const no = record.value?.contractNo
+  if (!no) return []
+  if (isExpense.value) {
+    return [
+      ...getPurchaseOrdersLinkedToContract(no).map((o) => ({
+        ...o,
+        _docKind: 'po',
+        progressStatus: o.status,
+        totalIssuedQty: 0,
+      })),
+      ...getOutsourcingOrdersLinkedToContract(no).map((o) => ({
+        ...o,
+        _docKind: 'wx',
+        progressStatus: o.status,
+        totalIssuedQty: 0,
+      })),
+    ]
+  }
+  return getOrdersLinkedToContract(no)
+})
 const changeList = computed(() => {
   void salesContractChangeState.changes
   void tick.value
@@ -620,7 +661,7 @@ const nodeColumns = [
   { title: '比例', key: 'ratio', width: 90 },
   { title: '金额', key: 'amount', width: 100 },
   { title: '账期起算', dataIndex: 'termStartType', width: 110 },
-  { title: '计划回款时间', key: 'planDate', width: 120 },
+  { title: '计划日期', key: 'planDate', width: 120 },
 ]
 
 const lineColumns = computed(() => {
@@ -659,13 +700,13 @@ const planColumns = [
   { title: '开票金额', key: 'invoiceAmount', width: 100 },
   { title: '已回', dataIndex: 'paid', width: 90 },
   { title: '未回', dataIndex: 'unpaid', width: 90 },
-  { title: '回款方式', key: 'paymentMethod', width: 90 },
+  { title: '收付款方式', key: 'paymentMethod', width: 90 },
   { title: '发票号码', key: 'invoiceNo', width: 120, ellipsis: true },
   { title: '逾期', key: 'overdue', width: 70 },
   { title: '操作', key: 'actions', width: 160, fixed: 'right' },
 ]
 
-const linkedOrderColumns = [
+const salesLinkedOrderColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'progressStatus', width: 90, fixed: 'left' },
   { title: '销售单号', key: 'orderNo', width: 140, fixed: 'left' },
@@ -686,6 +727,23 @@ const linkedOrderColumns = [
   { title: '最近更新时间', key: 'updatedAt', width: 140 },
 ]
 
+const expenseLinkedOrderColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+  { title: '单据', key: 'docKind', width: 80 },
+  { title: '状态', key: 'progressStatus', width: 90, fixed: 'left' },
+  { title: '单号', key: 'orderNo', width: 150, fixed: 'left' },
+  { title: '供应商', dataIndex: 'supplier', width: 160, ellipsis: true },
+  { title: '数量', key: 'totalQty', width: 90, align: 'right' },
+  { title: '含税金额', key: 'amountInTax', width: 120, align: 'right' },
+  { title: '不含税金额', key: 'amountExTax', width: 120, align: 'right' },
+  { title: '创建人', key: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 140 },
+]
+
+const linkedOrderColumns = computed(() =>
+  isExpense.value ? expenseLinkedOrderColumns : salesLinkedOrderColumns,
+)
+
 const changeColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '状态', key: 'status', width: 90 },
@@ -702,7 +760,14 @@ const linkedOrderSummary = computed(() => {
   const list = linkedOrders.value || []
   return list.reduce(
     (acc, row) => {
-      const amounts = resolveOrderAmounts(row)
+      const amounts = isExpense.value
+        ? {
+            lineAmountInTax: Number(row.amountInTax) || 0,
+            lineAmountExTax: Number(row.amountExTax) || 0,
+            amountInTax: Number(row.amountInTax) || 0,
+            amountExTax: Number(row.amountExTax) || 0,
+          }
+        : resolveOrderAmounts(row)
       acc.totalQty += Number(row.totalQty ?? orderQtyNum(row)) || 0
       acc.totalIssuedQty += Number(row.totalIssuedQty) || 0
       acc.lineAmountInTax += Number(amounts.lineAmountInTax) || 0
@@ -793,7 +858,7 @@ watch(
 )
 
 function goBack() {
-  router.push('/sales/contracts')
+  router.push('/contracts')
 }
 
 function openEdit() {
@@ -801,6 +866,18 @@ function openEdit() {
 }
 
 function goOrder(row) {
+  if (row._docKind === 'po') {
+    const path = `/procurement/purchase-orders/${row.id}`
+    openTab(path, `采购订单 ${row.orderNo || ''}`.trim())
+    router.push(path)
+    return
+  }
+  if (row._docKind === 'wx') {
+    const path = `/procurement/outsourcing-orders/${row.id}`
+    openTab(path, `外协订单 ${row.orderNo || ''}`.trim())
+    router.push(path)
+    return
+  }
   const path = `/sales/orders/${row.id}`
   openTab(path, `销售订单 ${row.orderNo || ''}`.trim())
   router.push(path)
@@ -840,7 +917,7 @@ function handleWithdraw() {
 }
 
 function openApprove() {
-  const path = `/sales/contracts/${record.value.id}/approve`
+  const path = `/contracts/${record.value.id}/approve`
   openTab(path, `审核合同 ${record.value.contractNo || ''}`.trim())
   router.push({ name: 'sales-contracts-approve', params: { id: record.value.id } })
 }
@@ -866,7 +943,7 @@ function handleComplete() {
   const unpaid = Number(paymentSummary.value?.unpaidTotal) || 0
   const tip =
     unpaid > 0
-      ? `确认将合同「${record.value.contractNo}」标记为已完成？仍有待回款，完成后仍可继续登记回款。`
+      ? `确认将合同「${record.value.contractNo}」标记为已完成？仍有待${paymentNoun.value}，完成后仍可继续登记${paymentNoun.value}。`
       : `确认将合同「${record.value.contractNo}」标记为已完成？`
   Modal.confirm({
     title: '完成合同',
@@ -906,7 +983,7 @@ function handleCreateChange() {
     return
   }
   openCreateTab(router, openTab, {
-    path: '/sales/contract-changes/new',
+    path: '/contracts/changes/new',
     title: '发起合同变更',
     query: { contractId: record.value.id },
   })
@@ -914,10 +991,10 @@ function handleCreateChange() {
 
 function goChangeDetail(row) {
   if (!row?.id) {
-    router.push('/sales/contract-changes')
+    router.push('/contracts/changes')
     return
   }
-  const path = `/sales/contract-changes/${row.id}`
+  const path = `/contracts/changes/${row.id}`
   openTab(path, `变更单 ${row.changeNo || ''}`.trim())
   router.push(path)
 }

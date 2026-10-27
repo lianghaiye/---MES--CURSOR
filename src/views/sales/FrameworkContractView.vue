@@ -82,7 +82,7 @@ function formatDiscount(rate) {
 }
 
 function openCreate() {
-  const page = findCreatePageByListPath('/sales/contracts')
+  const page = findCreatePageByListPath('/contracts')
   if (!page) return
   openCreateTab(router, openTab, {
     path: page.newPath,

@@ -23,7 +23,14 @@
 
 <script setup>
 import { computed } from 'vue'
-import { CONTRACT_STATUS, CONTRACT_TYPE } from '@/constants/salesContract'
+import {
+  CONTRACT_STATUS,
+  CONTRACT_TYPE,
+  contractPartyFieldLabel,
+  contractPaymentNoun,
+  getContractPartyName,
+  resolveContractCashDirection,
+} from '@/constants/salesContract'
 
 const props = defineProps({
   contract: { type: Object, required: true },
@@ -45,6 +52,8 @@ const metaItems = computed(() => {
     { key: 'status', label: '状态', value: display(c.status) },
     { key: 'signStatus', label: '签署', value: display(c.signStatus || '未签署') },
     { key: 'contractType', label: '类型', value: display(c.contractType) },
+    { key: 'cashDirection', label: '收支方向', value: display(resolveContractCashDirection(c)) },
+    { key: 'contractCategory', label: '类别', value: display(c.contractCategory) },
     { key: 'approvedBy', label: '审核人', value: display(c.approvedBy) },
     { key: 'approvedAt', label: '审核时间', value: display(c.approvedAt) },
     { key: 'createdAt', label: '创建时间', value: display(c.createdAt) },
@@ -58,7 +67,11 @@ const fields = computed(() => {
   const list = [
     { key: 'contractNo', label: '合同编号' },
     { key: 'contractName', label: '合同名称' },
-    { key: 'customerName', label: '客户名称' },
+    {
+      key: 'partyName',
+      label: `${contractPartyFieldLabel(resolveContractCashDirection(c))}名称`,
+      format: () => display(getContractPartyName(c)),
+    },
     { key: 'salesperson', label: '业务员' },
     { key: 'signer', label: '签署人' },
     {
@@ -90,7 +103,7 @@ const fields = computed(() => {
     },
     {
       key: 'paymentPlanBase',
-      label: '回款计划基数',
+      label: `${contractPaymentNoun(resolveContractCashDirection(c))}计划基数`,
       format: () => (c.contractType === '框架合同' ? c.paymentPlanBase || '销售订单金额' : '—'),
     },
     {

@@ -73,6 +73,7 @@ const fields = computed(() => [
   },
   { key: 'workOrderName', label: '工单名称' },
   { key: 'salesOrderNo', label: '销售单号', slot: 'salesOrderNo' },
+  { key: 'contractNo', label: '合同编号' },
   {
     key: 'source',
     label: '来源',

@@ -75,6 +75,7 @@ function normalizeOrder(row) {
   if (!o.planEndDate && o.planDate) o.planEndDate = o.planDate
   if (!o.planStartDate && o.planEndDate) o.planStartDate = o.planEndDate
   if (!o.planDate && o.planEndDate) o.planDate = o.planEndDate
+  if (!o.contractNo) o.contractNo = ''
   if (!o.creator) o.creator = 'admin1'
   if (!o.updater) o.updater = o.creator
   if (!o.updatedAt) o.updatedAt = o.createdAt || nowText()

@@ -37,6 +37,29 @@
           </a-radio-group>
         </div>
 
+        <div v-if="isProcessInspectScope" class="form-row form-row-last objects-item-row">
+          <label class="form-label">关联工序</label>
+          <div class="item-objects-wrap">
+            <a-select
+              v-model:value="processLinkCodes"
+              mode="multiple"
+              allow-clear
+              show-search
+              :filter-option="false"
+              placeholder="输入编码/名称搜索"
+              style="flex: 1; min-width: 0"
+              :options="processSearchOptions"
+              :max-tag-count="4"
+              @search="onProcessSearch"
+            />
+            <a-button type="link" @click="processPickerOpen = true">选择更多</a-button>
+          </div>
+        </div>
+        <div v-if="isProcessInspectScope" class="field-hint process-link-hint">
+          关联后：仅这些工序在命中单产品/类别/全局时使用本模板。不关联：所有开了过程检的工序按
+          单产品 &gt; 类别 &gt; 全局 &gt; 系统通用 匹配。
+        </div>
+
         <div
           v-if="form.scopeType === QC_TEMPLATE_SCOPE_TYPE.CATEGORY"
           class="form-row form-row-last"
@@ -87,6 +110,14 @@
         :spu-can-sell-only="false"
         :initial-selected-ids="itemPickerInitialIds"
         @selected="onItemsPicked"
+      />
+
+      <ProcessSelectModal
+        v-model:open="processPickerOpen"
+        :multiple="true"
+        allow-empty
+        :initial-selected-codes="processLinkCodes"
+        @confirm="onProcessesPicked"
       />
 
       <QcTemplateConflictModal
@@ -370,6 +401,11 @@ import {
 import { productCategoryState } from '@/store/productCategoryStore' // 类别树取自 store
 import { materialCategoryState } from '@/store/materialCategoryStore'
 import { addQcTemplate, getQcTemplateById, updateQcTemplate } from '@/store/qcTemplateStore'
+import { processConfigState, getProcessByCode, getProcessByName } from '@/store/processConfigStore'
+import {
+  isProcessInspectBizScope,
+  normalizeTemplateProcessLinks,
+} from '@/utils/qcTemplateProcessLink'
 import { QC_TASK_RESULT } from '@/constants/qcTaskResult'
 import {
   DEFAULT_CONCLUSION_OPTION_ITEMS,
@@ -391,6 +427,12 @@ import {
 } from '@/utils/qcConclusionField'
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
+import ProcessSelectModal from '@/views/production/components/ProcessSelectModal.vue'
+import {
+  PROCESS_CONFIG_DROPDOWN_QUICK_LIMIT,
+  buildProcessConfigDisplayOptions,
+  getProcessConfigOptionsByCode,
+} from '@/utils/processConfigPicker'
 import QcTemplateConflictModal from './QcTemplateConflictModal.vue'
 import QcFieldLibraryPickModal from './QcFieldLibraryPickModal.vue'
 import QcFieldEditorForm from './QcFieldEditorForm.vue'
@@ -444,6 +486,8 @@ const editingId = ref('')
 const templateStatus = ref('停用')
 const itemPickerOpen = ref(false)
 const itemSearchKeyword = ref('')
+const processPickerOpen = ref(false)
+const processSearchKeyword = ref('')
 /** 页面模式：跨「新增检验项」往返时用草稿恢复表单 */
 const TEMPLATE_DRAFT_PATH = '/quality/qc-template/new'
 const formBootstrapped = ref(false)
@@ -484,10 +528,69 @@ const form = reactive({
   bizScope: '成品检',
   scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
   objects: [],
+  processLinks: [],
   fields: [],
   sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.MANUAL,
   sheetConclusionOptionItems: DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => ({ ...o })),
 })
+
+const isProcessInspectScope = computed(() => isProcessInspectBizScope(form.bizScope))
+
+const processLinkCodes = computed({
+  get() {
+    return (form.processLinks || []).map((row) => row.code).filter(Boolean)
+  },
+  set(codes) {
+    const selected = Array.isArray(codes) ? codes : []
+    form.processLinks = selected.map((code) => {
+      const proc = getProcessByCode(code)
+      return { code, name: proc?.name || code }
+    })
+  },
+})
+
+const processSearchOptions = computed(() =>
+  buildProcessConfigDisplayOptions({
+    options: getProcessConfigOptionsByCode(processConfigState.processes),
+    keyword: processSearchKeyword.value,
+    selectedValues: processLinkCodes.value,
+    quickLimit: PROCESS_CONFIG_DROPDOWN_QUICK_LIMIT,
+  }),
+)
+
+function onProcessSearch(kw) {
+  processSearchKeyword.value = kw || ''
+}
+
+function onProcessesPicked(rows) {
+  const list = Array.isArray(rows) ? rows : rows ? [rows] : []
+  form.processLinks = list
+    .map((p) => ({
+      code: String(p?.code || '').trim(),
+      name: String(p?.name || '').trim(),
+    }))
+    .filter((row) => row.code || row.name)
+}
+
+function resolveProcessLinks(record) {
+  const links = normalizeTemplateProcessLinks(record || {})
+  return links.map((row) => {
+    const byCode = row.code ? getProcessByCode(row.code) : null
+    const byName = row.name ? getProcessByName(row.name) : null
+    const proc = byCode || byName
+    return {
+      code: proc?.code || row.code || '',
+      name: proc?.name || row.name || '',
+    }
+  })
+}
+
+watch(
+  () => form.bizScope,
+  (val) => {
+    if (!isProcessInspectBizScope(val)) form.processLinks = []
+  },
+)
 
 const sheetPassRuleOpts = QC_TEMPLATE_SHEET_PASS_RULE_OPTIONS
 
@@ -882,6 +985,7 @@ function resetForm() {
   form.bizScope = '成品检'
   form.scopeType = QC_TEMPLATE_SCOPE_TYPE.GLOBAL
   form.objects = []
+  form.processLinks = []
   form.sheetPassRule = QC_TEMPLATE_SHEET_PASS_RULE.MANUAL
   form.sheetConclusionOptionItems = DEFAULT_CONCLUSION_OPTION_ITEMS.map((o) => ({ ...o }))
   form.fields = []
@@ -912,6 +1016,7 @@ function loadEdit(record) {
   form.bizScope = resolveBizScope(record)
   form.scopeType = resolveScopeType(record)
   form.objects = Array.isArray(record.objects) ? record.objects.map((o) => ({ ...o })) : []
+  form.processLinks = resolveProcessLinks(record)
   form.sheetPassRule = normalizeSheetPassRule(record.sheetPassRule)
   form.fields = ensureFieldsWithSystemFixedItems(record.fields || [], { layout: 'preserve' }).map(
     (f) => ({
@@ -956,6 +1061,7 @@ function captureDraft() {
       bizScope: form.bizScope,
       scopeType: form.scopeType,
       objects: (form.objects || []).map((o) => ({ ...o })),
+      processLinks: (form.processLinks || []).map((row) => ({ ...row })),
       fields: cloneFieldsForDraft(form.fields),
       sheetPassRule: form.sheetPassRule,
       sheetConclusionOptionItems: (form.sheetConclusionOptionItems || []).map((o) => ({ ...o })),
@@ -972,6 +1078,7 @@ function restoreDraft() {
   form.bizScope = draft.form.bizScope || '成品检'
   form.scopeType = draft.form.scopeType || QC_TEMPLATE_SCOPE_TYPE.GLOBAL
   form.objects = Array.isArray(draft.form.objects) ? draft.form.objects.map((o) => ({ ...o })) : []
+  form.processLinks = resolveProcessLinks({ processLinks: draft.form.processLinks || [] })
   form.fields = cloneFieldsForDraft(draft.form.fields)
   form.sheetPassRule = normalizeSheetPassRule(draft.form.sheetPassRule)
   form.sheetConclusionOptionItems = normalizeSheetConclusionOptionItems(
@@ -1353,6 +1460,9 @@ function buildSavePayload() {
     bizScope: form.bizScope,
     scopeType: form.scopeType,
     objects,
+    processLinks: isProcessInspectBizScope(form.bizScope)
+      ? (form.processLinks || []).map((row) => ({ ...row }))
+      : [],
     status: templateStatus.value || '停用',
     sheetPassRule: normalizeSheetPassRule(form.sheetPassRule),
     sheetConclusionOptionItems: sheetItems.map((o) => ({ ...o })),
@@ -1508,6 +1618,13 @@ function onConflictConfirm(resolution) {
   content: '*';
   color: #ff4d4f;
   margin-right: 4px;
+}
+
+.process-link-hint {
+  margin: -8px 0 16px 90px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
 }
 
 .form-row > :deep(.ant-input),

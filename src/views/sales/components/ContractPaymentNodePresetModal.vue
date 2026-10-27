@@ -1,14 +1,25 @@
 <template>
   <a-modal
     :open="open"
-    title="预设回款节点"
+    title="预设收付款节点"
     width="780px"
     :mask-closable="false"
     destroy-on-close
     @cancel="handleCancel"
   >
     <div class="settings-intro">
-      <div>全公司预设。新增合同时按「标准 / 框架」自动带入；也可勾选共用，两套一次配好。</div>
+      <div>
+        全公司预设。收入合同与支出合同分开配置；新增合同时按「标准 / 框架」自动带入，也可勾选共用。
+      </div>
+      <a-tabs
+        v-model:activeKey="directionTab"
+        size="small"
+        class="direction-tabs"
+        @change="onDirectionTabChange"
+      >
+        <a-tab-pane :key="CONTRACT_CASH_DIRECTION.INCOME" tab="收入合同（回款）" />
+        <a-tab-pane :key="CONTRACT_CASH_DIRECTION.EXPENSE" tab="支出合同（付款）" />
+      </a-tabs>
       <div class="shared-row">
         <a-checkbox v-model:checked="draft.shared" @change="onSharedChange">
           标准与框架共用同一套
@@ -46,7 +57,7 @@
               v-model:value="record.termStartType"
               size="small"
               allow-clear
-              :options="paymentTermStartOptions"
+              :options="termStartOpts"
               placeholder="起算类型"
               style="width: 100%"
             />
@@ -100,7 +111,7 @@
                 v-model:value="record.termStartType"
                 size="small"
                 allow-clear
-                :options="paymentTermStartOptions"
+                :options="termStartOpts"
                 placeholder="起算类型"
                 style="width: 100%"
               />
@@ -152,7 +163,7 @@
                 v-model:value="record.termStartType"
                 size="small"
                 allow-clear
-                :options="paymentTermStartOptions"
+                :options="termStartOpts"
                 placeholder="起算类型"
                 style="width: 100%"
               />
@@ -193,14 +204,11 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { paymentTermStartOptions } from '@/constants/customerMaster'
-import {
-  contractPaymentNodePresetState,
-  savePaymentNodePresets,
-} from '@/store/contractPaymentNodePresetStore'
+import { CONTRACT_CASH_DIRECTION, paymentTermStartOptionsFor } from '@/constants/salesContract'
+import { getPresetBucket, savePaymentNodePresets } from '@/store/contractPaymentNodePresetStore'
 
 defineOptions({ name: 'ContractPaymentNodePresetModal' })
 
@@ -209,6 +217,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:open'])
 
+const directionTab = ref(CONTRACT_CASH_DIRECTION.INCOME)
 const activeTab = ref('standard')
 const saving = ref(false)
 const draft = reactive({
@@ -216,6 +225,10 @@ const draft = reactive({
   standard: [],
   framework: [],
 })
+const termStartOpts = computed(() => paymentTermStartOptionsFor(directionTab.value))
+const nodeNoun = computed(() =>
+  directionTab.value === CONTRACT_CASH_DIRECTION.EXPENSE ? '付款' : '回款',
+)
 
 const nodeColumns = [
   { title: '节点名称', key: 'name', width: 140 },
@@ -233,16 +246,26 @@ function cloneNodes(list) {
   }))
 }
 
+function loadDraft() {
+  const bucket = getPresetBucket(directionTab.value)
+  draft.shared = bucket.shared !== false
+  draft.standard = cloneNodes(bucket.standard)
+  draft.framework = cloneNodes(bucket.framework)
+  activeTab.value = 'standard'
+}
+
 watch(
   () => props.open,
   (open) => {
     if (!open) return
-    draft.shared = contractPaymentNodePresetState.shared !== false
-    draft.standard = cloneNodes(contractPaymentNodePresetState.standard)
-    draft.framework = cloneNodes(contractPaymentNodePresetState.framework)
-    activeTab.value = 'standard'
+    directionTab.value = CONTRACT_CASH_DIRECTION.INCOME
+    loadDraft()
   },
 )
+
+function onDirectionTabChange() {
+  loadDraft()
+}
 
 function onSharedChange() {
   if (draft.shared) {
@@ -274,7 +297,7 @@ function handleCancel() {
 function validate(list, label) {
   const named = (list || []).filter((n) => String(n.name || '').trim())
   if (!named.length) {
-    message.warning(`请至少配置一条${label}回款节点`)
+    message.warning(`请至少配置一条${label}${nodeNoun.value}节点`)
     return null
   }
   const ratioSum = named.reduce((s, n) => s + (Number(n.ratio) || 0), 0)
@@ -295,7 +318,12 @@ function handleSave() {
     if (!one) return
     saving.value = true
     try {
-      savePaymentNodePresets({ shared: true, standard: one, framework: one })
+      savePaymentNodePresets({
+        cashDirection: directionTab.value,
+        shared: true,
+        standard: one,
+        framework: one,
+      })
       message.success('预设已保存（标准与框架共用）')
       emit('update:open', false)
     } finally {
@@ -309,7 +337,12 @@ function handleSave() {
   if (!framework) return
   saving.value = true
   try {
-    savePaymentNodePresets({ shared: false, standard, framework })
+    savePaymentNodePresets({
+      cashDirection: directionTab.value,
+      shared: false,
+      standard,
+      framework,
+    })
     message.success('预设已保存')
     emit('update:open', false)
   } finally {
@@ -324,6 +357,14 @@ function handleSave() {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
   line-height: 1.6;
+}
+
+.direction-tabs {
+  margin-top: 10px;
+
+  :deep(.ant-tabs-nav) {
+    margin-bottom: 0;
+  }
 }
 
 .shared-row {

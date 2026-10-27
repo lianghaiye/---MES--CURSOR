@@ -100,8 +100,12 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :disabled="!selectedRows.length" @click="handleConfirm">
-        确定 ({{ selectedRows.length }})
+      <a-button
+        type="primary"
+        :disabled="!allowEmpty && !selectedRows.length"
+        @click="handleConfirm"
+      >
+        确定{{ selectedRows.length ? ` (${selectedRows.length})` : '' }}
       </a-button>
     </template>
   </a-modal>
@@ -125,6 +129,10 @@ const props = defineProps({
   excludeNames: { type: Array, default: () => [] },
   /** 多选（报工添加工序）/ 单选（外协选工序） */
   multiple: { type: Boolean, default: true },
+  /** 打开时回填已选（工序编码） */
+  initialSelectedCodes: { type: Array, default: () => [] },
+  /** 允许不选任何工序确认（关联工序可为空=全部工序） */
+  allowEmpty: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -229,12 +237,27 @@ function clearSelection() {
   selectedRows.value = []
 }
 
+function hydrateInitialSelection() {
+  const codes = (props.initialSelectedCodes || [])
+    .map((c) => String(c || '').trim())
+    .filter(Boolean)
+  if (!codes.length) {
+    clearSelection()
+    return
+  }
+  const rows = processConfigState.processes.filter((p) => codes.includes(p.code))
+  syncSelectionFromKeys(
+    rows.map((r) => r.id),
+    rows,
+  )
+}
+
 watch(
   () => props.open,
   (visible) => {
     if (!visible) return
-    clearSelection()
     handleReset()
+    hydrateInitialSelection()
   },
 )
 
@@ -267,7 +290,7 @@ function handleCancel() {
 }
 
 function handleConfirm() {
-  if (!selectedRows.value.length) {
+  if (!selectedRows.value.length && !props.allowEmpty) {
     message.warning(props.multiple ? '请至少选择一道工序' : '请选择一道工序')
     return
   }

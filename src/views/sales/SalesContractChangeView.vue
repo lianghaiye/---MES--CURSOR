@@ -25,9 +25,9 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="客户名称">
+            <a-form-item label="相对方">
               <a-input
-                v-model:value="filters.customerName"
+                v-model:value="filters.partyName"
                 allow-clear
                 placeholder="请输入"
                 size="small"
@@ -151,6 +151,9 @@
           <template v-else-if="column.key === 'changeNo'">
             <a class="link-code" @click="openDetail(record)">{{ record.changeNo }}</a>
           </template>
+          <template v-else-if="column.key === 'partyName'">
+            {{ changePartyName(record) || '—' }}
+          </template>
           <template v-else-if="column.key === 'diffCount'">
             {{ diffCount(record) }}
           </template>
@@ -219,7 +222,7 @@ const { openTab } = useTabs()
 const filters = reactive({
   status: undefined,
   changeNo: '',
-  customerName: '',
+  partyName: '',
   contractNo: '',
   contractName: '',
   contractType: undefined,
@@ -230,6 +233,11 @@ const appliedFilters = ref({ ...filters, createdRange: null })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const selectedRowKeys = ref([])
 const tick = ref(0)
+
+function changePartyName(item) {
+  const snap = item?.afterSnapshot || item?.beforeSnapshot || {}
+  return snap.supplierName || item.supplierName || snap.customerName || item.customerName || ''
+}
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -249,7 +257,7 @@ const columns = [
   { title: '变更单号', key: 'changeNo', width: 150, fixed: 'left' },
   { title: '合同编号', dataIndex: 'contractNo', width: 140 },
   { title: '合同类型', dataIndex: 'contractType', width: 100 },
-  { title: '客户名称', dataIndex: 'customerName', width: 160, ellipsis: true },
+  { title: '相对方', key: 'partyName', width: 160, ellipsis: true },
   { title: '合同名称', dataIndex: 'contractName', width: 160, ellipsis: true },
   { title: '变更项数', key: 'diffCount', width: 90 },
   { title: '发起人', key: 'creator', width: 90 },
@@ -275,7 +283,7 @@ const filteredList = computed(() => {
   const changeNo = String(f.changeNo || '')
     .trim()
     .toLowerCase()
-  const customer = String(f.customerName || '')
+  const party = String(f.partyName || '')
     .trim()
     .toLowerCase()
   const contractNo = String(f.contractNo || '')
@@ -298,10 +306,10 @@ const filteredList = computed(() => {
     )
       return false
     if (
-      customer &&
-      !String(item.customerName || '')
+      party &&
+      !String(changePartyName(item) || '')
         .toLowerCase()
-        .includes(customer)
+        .includes(party)
     )
       return false
     if (
@@ -346,7 +354,7 @@ function handleSearch() {
 function handleReset() {
   filters.status = undefined
   filters.changeNo = ''
-  filters.customerName = ''
+  filters.partyName = ''
   filters.contractNo = ''
   filters.contractName = ''
   filters.contractType = undefined
@@ -390,26 +398,26 @@ function canCancel(record) {
 }
 
 function openEdit(record) {
-  const path = `/sales/contract-changes/${record.id}/edit`
+  const path = `/contracts/changes/${record.id}/edit`
   openTab(path, `编辑变更 ${record.changeNo || ''}`.trim())
   router.push(path)
 }
 
 function openDetail(record) {
-  const path = `/sales/contract-changes/${record.id}`
+  const path = `/contracts/changes/${record.id}`
   openTab(path, `变更单 ${record.changeNo || ''}`.trim())
   router.push(path)
 }
 
 function openInitiateChange() {
   openCreateTab(router, openTab, {
-    path: '/sales/contract-changes/new',
+    path: '/contracts/changes/new',
     title: '发起合同变更',
   })
 }
 
 function openApprove(record) {
-  const path = `/sales/contract-changes/${record.id}/approve`
+  const path = `/contracts/changes/${record.id}/approve`
   openTab(path, `审核变更 ${record.changeNo || ''}`.trim())
   router.push(path)
 }

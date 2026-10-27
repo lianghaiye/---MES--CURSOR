@@ -1,5 +1,5 @@
 <template>
-  <SalesContractChangeFormModal page-mode list-path="/sales/contract-changes" :record="record" />
+  <SalesContractChangeFormModal page-mode list-path="/contracts/changes" :record="record" />
 </template>
 
 <script setup>

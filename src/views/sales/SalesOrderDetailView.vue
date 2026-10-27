@@ -1955,7 +1955,7 @@ function handleGenerateContract() {
   }
   const existing = listContractsBySourceSalesOrder(order.value.id)
   const go = () => {
-    const page = findCreatePageByListPath('/sales/contracts')
+    const page = findCreatePageByListPath('/contracts')
     if (!page) return
     openCreateTab(router, openTab, {
       path: page.newPath,

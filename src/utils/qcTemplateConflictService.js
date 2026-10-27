@@ -1,4 +1,11 @@
 import { QC_TEMPLATE_SCOPE_TYPE } from '@/mock/qcTemplates'
+import {
+  formatProcessOverlapLabel,
+  isProcessInspectBizScope,
+  isProcessLinkedTemplate,
+  resolveProcessLinkOverlap,
+  stripOverlappingProcessLinks,
+} from '@/utils/qcTemplateProcessLink'
 
 function isEnabledCustom(row) {
   return row && !row.isSystem && row.status === '启用'
@@ -42,32 +49,42 @@ export function formatObjectLabel(obj = {}, scopeType) {
  */
 export function findEnabledScopeConflicts(
   rows = [],
-  { id, bizScope, scopeType, objects = [] } = {},
+  { id, bizScope, scopeType, objects = [], processLinks } = {},
   { isEnabled = isEnabledCustom, nameOf = (row) => row?.name, codeOf = (row) => row?.code } = {},
 ) {
   if (!scopeType) return { hasConflict: false, conflicts: [], kind: scopeType }
   const scope = bizScope != null ? String(bizScope).trim() : ''
+  const currentLinks = { processLinks, bizScope }
+  const inspectProcess = isProcessInspectBizScope(scope)
 
   const others = (rows || []).filter((t) => {
     if (!isEnabled(t) || t.scopeType !== scopeType || t.id === id) return false
-    if (scope) return t.bizScope === scope
+    if (scope && t.bizScope !== scope) return false
+    if (inspectProcess && !resolveProcessLinkOverlap(currentLinks, t).overlap) return false
     return true
   })
 
   if (scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) {
-    const hit = others[0] || null
-    if (!hit) return { hasConflict: false, conflicts: [], kind: 'global' }
+    if (!others.length) return { hasConflict: false, conflicts: [], kind: 'global' }
     return {
       hasConflict: true,
       kind: 'global',
-      conflicts: [
-        {
+      conflicts: others.map((hit, index) => {
+        const overlap = inspectProcess
+          ? resolveProcessLinkOverlap(currentLinks, hit)
+          : { overlap: true, unrestricted: true, links: [] }
+        return {
           key: `global:${hit.id}`,
+          index: index + 1,
+          objectLabel: '全局',
+          processLabel: inspectProcess ? formatProcessOverlapLabel(overlap) : '',
+          overlapProcessLinks: overlap.links || [],
+          otherUnrestricted: inspectProcess ? !isProcessLinkedTemplate(hit) : true,
           currentTemplateId: hit.id,
           currentTemplateName: nameOf(hit),
           currentTemplateCode: codeOf(hit),
-        },
-      ],
+        }
+      }),
     }
   }
 
@@ -78,11 +95,17 @@ export function findEnabledScopeConflicts(
   objs.forEach((obj, index) => {
     const hit = others.find((t) => (t.objects || []).some((o) => sameObject(o, obj)))
     if (!hit) return
+    const overlap = inspectProcess
+      ? resolveProcessLinkOverlap(currentLinks, hit)
+      : { overlap: true, unrestricted: true, links: [] }
     conflicts.push({
       key: objectKey(obj) || `row-${index}`,
       index: index + 1,
       object: { ...obj },
       objectLabel: formatObjectLabel(obj, scopeType),
+      processLabel: inspectProcess ? formatProcessOverlapLabel(overlap) : '',
+      overlapProcessLinks: overlap.links || [],
+      otherUnrestricted: inspectProcess ? !isProcessLinkedTemplate(hit) : true,
       currentTemplateId: hit.id,
       currentTemplateName: nameOf(hit),
       currentTemplateCode: codeOf(hit),
@@ -118,14 +141,26 @@ export function applyQcTemplateConflictReplace(
     touched.add(row.id)
 
     if (row.scopeType === QC_TEMPLATE_SCOPE_TYPE.GLOBAL) {
-      row.status = '停用'
+      const overlapLinks = c.overlapProcessLinks || []
+      if (isProcessLinkedTemplate(row) && overlapLinks.length) {
+        const { emptied } = stripOverlappingProcessLinks(row, overlapLinks)
+        if (emptied) row.status = '停用'
+      } else {
+        row.status = '停用'
+      }
       row.updater = operator
       row.updatedAt = now
       return
     }
 
-    row.objects = (row.objects || []).filter((o) => !sameObject(o, c.object))
-    if (!row.objects.length) row.status = '停用'
+    const overlapLinks = c.overlapProcessLinks || []
+    if (isProcessLinkedTemplate(row) && overlapLinks.length) {
+      const { emptied } = stripOverlappingProcessLinks(row, overlapLinks)
+      if (emptied) row.status = '停用'
+    } else {
+      row.objects = (row.objects || []).filter((o) => !sameObject(o, c.object))
+      if (!row.objects.length) row.status = '停用'
+    }
     row.updater = operator
     row.updatedAt = now
   })

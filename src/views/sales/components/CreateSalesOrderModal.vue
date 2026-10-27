@@ -56,10 +56,11 @@
                       form.contractType === '临时合同' ? '' : form.contractType || ''
                     "
                     :preferred-customer-name="form.customerName || ''"
+                    cash-direction="收入"
                     :placeholder="
                       form.contractType === '临时合同'
                         ? '可直接输入临时合同编号'
-                        : '搜索选择生效合同，也可直接输入编号'
+                        : '搜索选择生效收入合同，也可直接输入编号'
                     "
                     @change="onContractNoChange"
                   />
@@ -830,6 +831,7 @@ import {
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
 import { getCustomerOptions, getCustomerByName } from '@/store/customerStore'
+import { CONTRACT_CASH_DIRECTION } from '@/constants/salesContract'
 import { checkContractQuotaWarning, getSalesContractByNo } from '@/store/salesContractStore'
 import { resolveSalesLinePrice } from '@/utils/customerPrice'
 import {
@@ -1245,6 +1247,11 @@ function onContractNoChange(contractNo, contractFromSelect) {
     return
   }
   const contract = contractFromSelect || getSalesContractByNo(contractNo)
+  if (contract && contract.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE) {
+    message.warning('销售订单只能关联收入合同')
+    form.contractNo = ''
+    return
+  }
   if (!contract) {
     // 手填编号、台账中无对应合同：仅保留编号，不强制带明细
     message.info('未在合同台账中找到该编号，已按输入编号保存（不自动带出明细）')

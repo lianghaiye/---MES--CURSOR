@@ -57,9 +57,9 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
-            <a-form-item label="客户名称">
+            <a-form-item :label="partyFilterLabel">
               <a-input
-                v-model:value="filters.customerName"
+                v-model:value="filters.partyName"
                 allow-clear
                 placeholder="请输入"
                 size="small"
@@ -128,7 +128,7 @@
         <a-button size="small" danger @click="openToolbarDelete">删除</a-button>
         <a-button size="small" @click="presetModalOpen = true">
           <SettingOutlined />
-          预设回款节点
+          预设收付款节点
         </a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
@@ -150,6 +150,17 @@
       </template>
     </a-alert>
 
+    <a-tabs
+      v-model:activeKey="directionTab"
+      size="small"
+      class="list-status-tabs"
+      @change="onDirectionTabChange"
+    >
+      <a-tab-pane key="全部" tab="全部" />
+      <a-tab-pane key="收入" tab="收入合同" />
+      <a-tab-pane key="支出" tab="支出合同" />
+    </a-tabs>
+
     <div class="table-card">
       <a-table
         :columns="columns"
@@ -167,6 +178,15 @@
           </template>
           <template v-else-if="column.key === 'contractNo'">
             <a class="link-code" @click="goDetail(record)">{{ record.contractNo }}</a>
+          </template>
+          <template v-else-if="column.dataIndex === 'cashDirection'">
+            {{ record.cashDirection || '收入' }}
+          </template>
+          <template v-else-if="column.dataIndex === 'contractCategory'">
+            {{ record.contractCategory || '—' }}
+          </template>
+          <template v-else-if="column.key === 'partyName'">
+            {{ partyName(record) || '—' }}
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="contractStatusColor(record.status)">{{ record.status }}</a-tag>
@@ -311,8 +331,10 @@ import {
   salesContractChangeState,
 } from '@/store/salesContractChangeStore'
 import {
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_SIGN_STATUS,
   CONTRACT_STATUS,
+  getContractPartyName,
   contractPaymentStatusColor,
   contractSignStatusColor,
   contractSignStatusOptions,
@@ -338,6 +360,13 @@ const signRecord = ref(null)
 const presetModalOpen = ref(false)
 const selectedRowKeys = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+const directionTab = ref('全部')
+
+const partyFilterLabel = computed(() => {
+  if (directionTab.value === CONTRACT_CASH_DIRECTION.EXPENSE) return '供应商'
+  if (directionTab.value === CONTRACT_CASH_DIRECTION.INCOME) return '客户'
+  return '相对方'
+})
 
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 
@@ -347,7 +376,7 @@ const filters = reactive({
   contractType: undefined,
   contractNo: '',
   contractName: '',
-  customerName: '',
+  partyName: '',
   salesperson: undefined,
   creator: '',
   createdRange: null,
@@ -374,20 +403,22 @@ watch(
 const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
-  { title: '回款状态', key: 'paymentStatus', width: 100 },
+  { title: '收付款状态', key: 'paymentStatus', width: 100 },
   { title: '合同编号', key: 'contractNo', width: 150, fixed: 'left' },
   { title: '合同名称', dataIndex: 'contractName', width: 180, ellipsis: true },
+  { title: '收支方向', dataIndex: 'cashDirection', width: 90 },
+  { title: '类别', dataIndex: 'contractCategory', width: 80 },
   { title: '类型', dataIndex: 'contractType', width: 100 },
   { title: '签署', key: 'signStatus', width: 90 },
   { title: '变更状态', key: 'changeStatus', width: 100 },
   { title: '签署人', key: 'signer', width: 90 },
   { title: '签署日期', key: 'signedAt', width: 110 },
-  { title: '客户', dataIndex: 'customerName', width: 160, ellipsis: true },
+  { title: '相对方', key: 'partyName', width: 160, ellipsis: true },
   { title: '业务员', dataIndex: 'salesperson', width: 90 },
   { title: '额度执行', key: 'quota', width: 200 },
-  { title: '回款节点', key: 'paymentNodes', width: 90 },
-  { title: '待回款金额', key: 'unpaidTotal', width: 120, align: 'right' },
-  { title: '已回款金额', key: 'paidTotal', width: 120, align: 'right' },
+  { title: '收付款节点', key: 'paymentNodes', width: 90 },
+  { title: '待收/付款', key: 'unpaidTotal', width: 120, align: 'right' },
+  { title: '已收/付款', key: 'paidTotal', width: 120, align: 'right' },
   { title: '超额度', key: 'allowExceedQuota', width: 110 },
   { title: '账期天数', dataIndex: 'paymentTermDays', width: 90 },
   { title: '有效期', key: 'validRange', width: 200 },
@@ -426,13 +457,24 @@ const filteredList = computed(() => {
   const name = String(f.contractName || '')
     .trim()
     .toLowerCase()
-  const customer = String(f.customerName || '')
+  const party = String(f.partyName || '')
     .trim()
     .toLowerCase()
   const creator = String(f.creator || '')
     .trim()
     .toLowerCase()
+  const tab = directionTab.value
   return salesContractState.contracts.filter((item) => {
+    if (
+      tab === CONTRACT_CASH_DIRECTION.INCOME &&
+      item.cashDirection !== CONTRACT_CASH_DIRECTION.INCOME
+    )
+      return false
+    if (
+      tab === CONTRACT_CASH_DIRECTION.EXPENSE &&
+      item.cashDirection !== CONTRACT_CASH_DIRECTION.EXPENSE
+    )
+      return false
     if (f.contractType && item.contractType !== f.contractType) return false
     if (f.status && item.status !== f.status) return false
     if (f.signStatus && displaySignStatus(item) !== f.signStatus) return false
@@ -452,10 +494,10 @@ const filteredList = computed(() => {
     )
       return false
     if (
-      customer &&
-      !String(item.customerName || '')
+      party &&
+      !String(partyName(item) || '')
         .toLowerCase()
-        .includes(customer)
+        .includes(party)
     )
       return false
     if (
@@ -486,7 +528,7 @@ function handleReset() {
   filters.contractType = undefined
   filters.contractNo = ''
   filters.contractName = ''
-  filters.customerName = ''
+  filters.partyName = ''
   filters.salesperson = undefined
   filters.creator = ''
   filters.createdRange = null
@@ -537,11 +579,25 @@ function getSelectedContract() {
   return salesContractState.contracts.find((c) => c.id === selectedRowKeys.value[0]) || null
 }
 
+function partyName(record) {
+  return getContractPartyName(record)
+}
+
+function onDirectionTabChange() {
+  pagination.current = 1
+  selectedRowKeys.value = []
+}
+
 function openCreate() {
-  const page = findCreatePageByListPath('/sales/contracts')
+  const page = findCreatePageByListPath('/contracts')
   if (!page) return
+  const dir =
+    directionTab.value === CONTRACT_CASH_DIRECTION.EXPENSE
+      ? CONTRACT_CASH_DIRECTION.EXPENSE
+      : CONTRACT_CASH_DIRECTION.INCOME
   openCreateTab(router, openTab, {
     path: page.newPath,
+    query: { direction: dir },
   })
 }
 
@@ -551,7 +607,7 @@ function openEdit(record) {
 }
 
 function goDetail(record) {
-  const path = `/sales/contracts/${record.id}`
+  const path = `/contracts/${record.id}`
   openTab(path, `合同 ${record.contractNo || ''}`.trim())
   router.push(path)
 }
@@ -561,7 +617,7 @@ function openApprove(record) {
     message.warning('仅「待审」合同可审核')
     return
   }
-  const path = `/sales/contracts/${record.id}/approve`
+  const path = `/contracts/${record.id}/approve`
   openTab(path, `审核合同 ${record.contractNo || ''}`.trim())
   router.push({ name: 'sales-contracts-approve', params: { id: record.id } })
 }
@@ -587,7 +643,7 @@ function changeStatusColor(label) {
 function openContractChangePage(contractId) {
   const query = contractId ? { contractId } : undefined
   openCreateTab(router, openTab, {
-    path: '/sales/contract-changes/new',
+    path: '/contracts/changes/new',
     title: '发起合同变更',
     query,
   })
@@ -727,6 +783,28 @@ function handleDelete(record) {
 
 <style lang="less" scoped>
 .sales-contract-page {
+  .list-status-tabs {
+    margin-bottom: 0;
+    background: #fff;
+    border: 1px solid var(--divider, #e5e6eb);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 0 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    :deep(.ant-tabs-nav) {
+      margin: 0;
+    }
+
+    :deep(.ant-tabs-nav::before) {
+      border-bottom-color: #f0f0f0;
+    }
+  }
+
+  .list-status-tabs + .table-card {
+    border-radius: 0 0 6px 6px;
+  }
+
   .danger-link {
     color: #ff4d4f;
   }

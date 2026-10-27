@@ -1,11 +1,11 @@
 import { deliveryOrderState } from '@/store/deliveryOrderStore'
 import { productInfoState } from '@/store/productInfoStore'
-import { getActiveShipBomForProduct, getProductBomById } from '@/store/productBomStore'
+import { getActiveShipBomForProduct } from '@/store/productBomStore'
 import { calcBomMaterialCount } from '@/utils/productBomListEnrich'
 import {
-  probeShipAttachmentMatch,
+  normalizeShipAttachmentScope,
   shipAttachmentScopeTypeLabel,
-} from '@/utils/shipAttachmentMatchService'
+} from '@/utils/shipAttachmentScope'
 
 export function isAttachmentSelected(row) {
   return row?.selected !== false
@@ -161,31 +161,21 @@ export function findDeliveriesForProduct({ productId, productCode } = {}) {
 
 export function queryShipAttachmentByProduct(params = {}) {
   const product = resolveCatalogProduct(params)
-  const probe = probeShipAttachmentMatch({
-    itemId: product?.id || params.productId || params.itemId || '',
-    itemCode: product?.code || params.productCode || params.itemCode || '',
-    categoryCode: product?.categoryCode || params.categoryCode || '',
-    categoryKey: product?.categoryKey || params.categoryKey || '',
-  })
-  const kitBom =
-    (product?.id && getActiveShipBomForProduct(product.id)) ||
-    (probe.template?.id && getProductBomById(probe.template.id)) ||
-    null
+  const kitBom = product?.id ? getActiveShipBomForProduct(product.id) : null
+  const scopeType = kitBom ? normalizeShipAttachmentScope(kitBom).scopeType : ''
   return {
     product,
-    probe: {
-      ...probe,
-      scopeTypeLabel: shipAttachmentScopeTypeLabel(probe.template?.scopeType),
-    },
     kit: kitBom
       ? {
           id: kitBom.id,
           bomNo: kitBom.bomNo,
           bomName: kitBom.bomName,
+          scopeTypeLabel: shipAttachmentScopeTypeLabel(scopeType),
           materialCount: calcBomMaterialCount(kitBom.lineItems),
           lines: kitLinesOf(kitBom),
         }
       : null,
+    emptyMessage: kitBom ? '' : '该产品没有命中已启用的随货配件',
     deliveries: findDeliveriesForProduct({
       productId: product?.id || params.productId,
       productCode: product?.code || params.productCode,

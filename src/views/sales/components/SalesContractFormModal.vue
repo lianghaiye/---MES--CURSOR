@@ -31,6 +31,27 @@
           <a-form v-show="!basicInfoCollapsed" layout="inline" class="header-form horizontal-form">
             <a-row :gutter="[12, 8]" style="width: 100%">
               <a-col :span="6">
+                <a-form-item label="收支方向" required>
+                  <a-select
+                    v-model:value="form.cashDirection"
+                    size="small"
+                    :options="contractCashDirectionOptions"
+                    :disabled="isEdit"
+                    @change="onCashDirectionChange"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
+                <a-form-item label="合同类别" required>
+                  <a-select
+                    v-model:value="form.contractCategory"
+                    size="small"
+                    :options="categoryOpts"
+                    :disabled="isEdit"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :span="6">
                 <a-form-item label="合同类型" required>
                   <a-select
                     v-model:value="form.contractType"
@@ -61,17 +82,25 @@
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="客户名称" required>
+                <a-form-item :label="partyFieldLabel" required>
                   <CustomerSelect
+                    v-if="!isExpense"
                     v-model="form.customerName"
                     size="small"
                     placeholder="请搜索或选择客户名称"
                     @change="onCustomerChange"
                   />
+                  <PlanSupplierSelect
+                    v-else
+                    v-model:value="form.supplierName"
+                    size="small"
+                    placeholder="请搜索或选择供应商"
+                    @change="onSupplierChange"
+                  />
                 </a-form-item>
               </a-col>
               <a-col :span="6">
-                <a-form-item label="业务员" required>
+                <a-form-item label="业务员" :required="!isExpense">
                   <a-select
                     v-model:value="form.salesperson"
                     size="small"
@@ -148,10 +177,8 @@
                 <a-form-item>
                   <template #label>
                     <span class="label-with-tip">
-                      回款计划基数
-                      <a-tooltip
-                        title="框架合同生成回款计划时按哪笔金额拆节点：默认按关联销售订单含税合计；选「额度金额」时须填写额度金额。"
-                      >
+                      {{ paymentNoun }}计划基数
+                      <a-tooltip :title="paymentPlanBaseTip">
                         <QuestionCircleOutlined class="label-tip-icon" />
                       </a-tooltip>
                     </span>
@@ -160,7 +187,7 @@
                     v-model:value="form.paymentPlanBase"
                     size="small"
                     style="width: 100%"
-                    :options="paymentPlanBaseOptions"
+                    :options="planBaseOpts"
                   />
                 </a-form-item>
               </a-col>
@@ -273,7 +300,7 @@
           :class="{ 'is-collapsed': partyLegalCollapsed }"
         >
           <div class="section-title-row">
-            <span class="section-title">客户资质与开票信息</span>
+            <span class="section-title">相对方法人与开票信息</span>
             <a-button type="link" size="small" class="collapse-btn" @click="togglePartyLegal">
               {{ partyLegalCollapsed ? '展开' : '收起' }}
               <DownOutlined v-if="partyLegalCollapsed" />
@@ -560,16 +587,16 @@
 
         <div class="section-block">
           <div class="section-title-row">
-            <span class="section-title">回款节点</span>
+            <span class="section-title">{{ paymentNoun }}节点</span>
             <span class="section-extra-tip">
               合同金额
-              {{
-                formatMoney(contractAmountForPayment)
-              }}，金额按比例自动计算，可手工修改；计划回款时间可选填
+              {{ formatMoney(contractAmountForPayment) }}，金额按比例自动计算，可手工修改；计划{{
+                paymentNoun
+              }}时间可选填
             </span>
           </div>
           <div class="payment-term-hints">
-            <div v-for="(tip, idx) in PAYMENT_TERM_START_HINTS" :key="idx">{{ tip }}</div>
+            <div v-for="(tip, idx) in termStartHints" :key="idx">{{ tip }}</div>
           </div>
           <a-table
             :columns="nodeColumns"
@@ -612,7 +639,7 @@
                   size="small"
                   allow-clear
                   placeholder="请选择起算类型"
-                  :options="paymentTermStartOptions"
+                  :options="termStartOpts"
                   style="width: 100%"
                 />
               </template>
@@ -714,6 +741,8 @@ import {
   writeBackEmptyCustomerPartyFields,
 } from '@/store/customerStore'
 import CustomerSelect from './CustomerSelect.vue'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import { getSupplierByName } from '@/store/supplierStore'
 import {
   CONTRACT_DEFAULT_TAX_RATE,
   addSalesContract,
@@ -724,14 +753,21 @@ import {
 } from '@/store/salesContractStore'
 import { updateSalesOrder } from '@/store/salesOrderStore'
 import {
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_STATUS,
   CONTRACT_TYPE,
   PAYMENT_PLAN_BASE,
-  PAYMENT_TERM_START_HINTS,
+  paymentTermStartHintsFor,
+  paymentTermStartOptionsFor,
+  contractCashDirectionOptions,
+  contractCategoryOptions,
+  contractPartyFieldLabel,
+  contractPaymentNoun,
+  defaultContractCategory,
+  paymentPlanBaseOptionsFor,
   contractTypeOptions,
-  paymentPlanBaseOptions,
 } from '@/constants/salesContract'
-import { paymentTermStartOptions, settlementCycleOptions } from '@/constants/customerMaster'
+import { settlementCycleOptions } from '@/constants/customerMaster'
 import { salespersonOptions } from '@/mock/salesOrderOptions'
 import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
@@ -740,17 +776,15 @@ import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 const props = defineProps({
   open: { type: Boolean, default: false },
   pageMode: { type: Boolean, default: false },
-  listPath: { type: String, default: '/sales/contracts' },
+  listPath: { type: String, default: '/contracts' },
   record: { type: Object, default: null },
   /** 新建时预填（如由销售订单生成，无 id） */
   seedRecord: { type: Object, default: null },
   defaultType: { type: String, default: '' },
+  defaultCashDirection: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
-
-const PAYMENT_TERM_DAYS_TIP =
-  '账期起算日后的宽限天数。例如起算=开票日、天数=30，表示开票后 30 天内应付清对应回款。默认 30 天，可修改。'
 
 const basicInfoCollapsed = ref(false)
 const partyLegalCollapsed = ref(false)
@@ -816,20 +850,14 @@ const lineColumns = computed(() => [
   { title: '操作', key: 'action', width: 70, fixed: 'right' },
 ])
 
-const nodeColumns = [
-  { title: '节点名称', key: 'name', width: 110 },
-  { title: '比例(%)', key: 'ratioPercent', width: 90 },
-  { title: '金额', key: 'amount', width: 100 },
-  { title: '账期起算', key: 'termStartType', width: 120 },
-  { title: '计划回款时间', key: 'planDate', width: 130 },
-  { title: '操作', key: 'action', width: 70 },
-]
-
 const form = reactive({
+  cashDirection: CONTRACT_CASH_DIRECTION.INCOME,
+  contractCategory: defaultContractCategory(CONTRACT_CASH_DIRECTION.INCOME),
   contractType: CONTRACT_TYPE.STANDARD,
   contractNo: '',
   contractName: '',
   customerName: undefined,
+  supplierName: undefined,
   salesperson: undefined,
   signer: '',
   signedAt: null,
@@ -852,6 +880,31 @@ const form = reactive({
   sourceSalesOrderId: '',
   sourceSalesOrderNo: '',
 })
+
+const isExpense = computed(() => form.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE)
+const partyFieldLabel = computed(() => contractPartyFieldLabel(form.cashDirection))
+const paymentNoun = computed(() => contractPaymentNoun(form.cashDirection))
+const categoryOpts = computed(() => contractCategoryOptions(form.cashDirection))
+const planBaseOpts = computed(() => paymentPlanBaseOptionsFor(form.cashDirection))
+const termStartOpts = computed(() => paymentTermStartOptionsFor(form.cashDirection))
+const termStartHints = computed(() => paymentTermStartHintsFor(form.cashDirection))
+const PAYMENT_TERM_DAYS_TIP = computed(
+  () =>
+    `账期起算日后的宽限天数。例如起算=开票日、天数=30，表示开票后 30 天内应付清对应${paymentNoun.value}。默认 30 天，可修改。`,
+)
+const paymentPlanBaseTip = computed(() =>
+  isExpense.value
+    ? '框架合同生成付款计划时按哪笔金额拆节点：默认按关联采购/外协订单金额；选「额度金额」时须填写额度金额。'
+    : '框架合同生成回款计划时按哪笔金额拆节点：默认按关联销售订单含税合计；选「额度金额」时须填写额度金额。',
+)
+const nodeColumns = computed(() => [
+  { title: '节点名称', key: 'name', width: 110 },
+  { title: '比例(%)', key: 'ratioPercent', width: 90 },
+  { title: '金额', key: 'amount', width: 100 },
+  { title: '账期起算', key: 'termStartType', width: 120 },
+  { title: `计划${paymentNoun.value}时间`, key: 'planDate', width: 130 },
+  { title: '操作', key: 'action', width: 70 },
+])
 
 const sourceOrderHint = computed(() => {
   if (!form.sourceSalesOrderNo) return ''
@@ -1012,6 +1065,40 @@ function applyPartyLegalFromCustomer(customer, { force = false } = {}) {
   if (force || !p.address) {
     p.address = resolveCustomerAddressText(customer)
   }
+}
+
+function applyDefaultPaymentNodes() {
+  form.paymentNodes = createDefaultPaymentNodes(form.contractType, form.cashDirection).map(
+    (item) => ({
+      ...item,
+      termStartType: item.termStartType || undefined,
+      planDate: item.planDate || '',
+      amountManual: false,
+    }),
+  )
+  syncAllPaymentNodeAmounts({ force: true })
+}
+
+function onCashDirectionChange() {
+  form.contractCategory = defaultContractCategory(form.cashDirection)
+  form.paymentPlanBase = isExpense.value
+    ? PAYMENT_PLAN_BASE.PURCHASE_ORDERS
+    : PAYMENT_PLAN_BASE.ORDERS
+  if (isExpense.value) {
+    form.customerName = undefined
+    form.sourceSalesOrderId = ''
+    form.sourceSalesOrderNo = ''
+  } else {
+    form.supplierName = undefined
+  }
+  if (!isEdit.value) applyDefaultPaymentNodes()
+}
+
+function onSupplierChange(name) {
+  const supplier = getSupplierByName(name)
+  form.partyLegal = createEmptyPartyLegal({
+    name: name || supplier?.name || '',
+  })
 }
 
 function onCustomerChange(name) {
@@ -1194,9 +1281,13 @@ function onRemoveFile(file) {
 function loadForm() {
   const r = props.record?.id ? props.record : props.seedRecord || props.record
   form.contractType = r?.contractType || props.defaultType || CONTRACT_TYPE.STANDARD
+  form.cashDirection =
+    r?.cashDirection || props.defaultCashDirection || CONTRACT_CASH_DIRECTION.INCOME
+  form.contractCategory = r?.contractCategory || defaultContractCategory(form.cashDirection)
   form.contractNo = r?.contractNo || ''
   form.contractName = r?.contractName || ''
   form.customerName = r?.customerName
+  form.supplierName = r?.supplierName || undefined
   form.salesperson = r?.salesperson || undefined
   form.signer = r?.signer || ''
   form.signedAt = r?.signedAt ? dayjs(r.signedAt) : r?.validFrom ? dayjs(r.validFrom) : null
@@ -1218,7 +1309,9 @@ function loadForm() {
   form.paymentPlanBase =
     r?.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT
       ? PAYMENT_PLAN_BASE.LIMIT
-      : PAYMENT_PLAN_BASE.ORDERS
+      : form.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+        ? PAYMENT_PLAN_BASE.PURCHASE_ORDERS
+        : PAYMENT_PLAN_BASE.ORDERS
   form.remark = r?.remark || ''
   form.serviceContent = r?.serviceContent || ''
   form.attachments = [...(r?.attachments || [])]
@@ -1238,7 +1331,9 @@ function loadForm() {
   form.lineItems = (r?.lineItems || []).map((item) => createEmptyLine(item))
   const contractType = form.contractType
   form.paymentNodes = (
-    r?.paymentNodes?.length ? r.paymentNodes : createDefaultPaymentNodes(contractType)
+    r?.paymentNodes?.length
+      ? r.paymentNodes
+      : createDefaultPaymentNodes(contractType, form.cashDirection)
   ).map((item) => ({
     ...item,
     termStartType: item.termStartType || undefined,
@@ -1282,13 +1377,7 @@ watch(
   () => form.contractType,
   (type, prev) => {
     if (isEdit.value || !type || !prev || type === prev) return
-    form.paymentNodes = createDefaultPaymentNodes(type).map((item) => ({
-      ...item,
-      termStartType: item.termStartType || undefined,
-      planDate: item.planDate || '',
-      amountManual: false,
-    }))
-    syncAllPaymentNodeAmounts({ force: true })
+    applyDefaultPaymentNodes()
   },
 )
 
@@ -1327,10 +1416,14 @@ function buildPayload() {
       0,
     )
   }
+  const partyName = isExpense.value ? form.supplierName : form.customerName
   return {
     contractNo: form.contractNo,
     contractName: form.contractName,
-    customerName: form.customerName,
+    cashDirection: form.cashDirection,
+    contractCategory: form.contractCategory,
+    customerName: isExpense.value ? '' : form.customerName,
+    supplierName: isExpense.value ? form.supplierName : '',
     contractType: form.contractType,
     salesperson: form.salesperson || '',
     signer: form.signer || '',
@@ -1338,7 +1431,7 @@ function buildPayload() {
     taxInclusive: form.taxInclusive !== false,
     partyLegal: createEmptyPartyLegal({
       ...form.partyLegal,
-      name: form.customerName || form.partyLegal.name || '',
+      name: partyName || form.partyLegal.name || '',
     }),
     defaultDiscountRate: normalizeDiscountRate(form.defaultDiscountPercent / 100, 1),
     settlementCycle: form.settlementCycle || '',
@@ -1371,7 +1464,11 @@ function buildPayload() {
             : undefined,
       })),
     lineItems,
-    paymentPlanBase: isFramework.value ? form.paymentPlanBase : PAYMENT_PLAN_BASE.ORDERS,
+    paymentPlanBase: isFramework.value
+      ? form.paymentPlanBase
+      : isExpense.value
+        ? PAYMENT_PLAN_BASE.PURCHASE_ORDERS
+        : PAYMENT_PLAN_BASE.ORDERS,
     paymentNodes: form.paymentNodes
       .filter((item) => item.name?.trim())
       .map((item) => ({
@@ -1401,11 +1498,16 @@ function handleSave(submit) {
     message.warning('请输入合同编号')
     return
   }
-  if (!form.customerName) {
+  if (isExpense.value) {
+    if (!form.supplierName) {
+      message.warning('请选择供应商')
+      return
+    }
+  } else if (!form.customerName) {
     message.warning('请选择客户')
     return
   }
-  if (!form.salesperson) {
+  if (!isExpense.value && !form.salesperson) {
     message.warning('请选择业务员')
     return
   }
@@ -1414,7 +1516,7 @@ function handleSave(submit) {
     form.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT &&
     !(Number(form.limitAmount) > 0)
   ) {
-    message.warning('回款计划基数为「额度金额」时，请填写额度金额')
+    message.warning(`${paymentNoun.value}计划基数为「额度金额」时，请填写额度金额`)
     return
   }
   const payload = buildPayload()
@@ -1426,12 +1528,15 @@ function handleSave(submit) {
     return
   }
   linkSourceSalesOrder(res.data)
-  const writeBack = writeBackEmptyCustomerPartyFields({
-    ...form.partyLegal,
-    name: form.customerName || form.partyLegal.name || '',
-  })
-  const writeBackTip =
-    writeBack.ok && writeBack.count > 0 ? `；已回写客户主数据 ${writeBack.count} 项空字段` : ''
+  let writeBackTip = ''
+  if (!isExpense.value) {
+    const writeBack = writeBackEmptyCustomerPartyFields({
+      ...form.partyLegal,
+      name: form.customerName || form.partyLegal.name || '',
+    })
+    writeBackTip =
+      writeBack.ok && writeBack.count > 0 ? `；已回写客户主数据 ${writeBack.count} 项空字段` : ''
+  }
   if (submit) {
     const sub = submitSalesContract(res.data.id)
     if (!sub.ok) {

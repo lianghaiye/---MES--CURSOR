@@ -26,6 +26,10 @@ import {
 } from '@/utils/qcFieldStandard'
 import { pickComplexFieldProps } from '@/utils/qcComplexField'
 import { QC_TEMPLATE_SHEET_PASS_RULE, normalizeSheetPassRule } from '@/utils/qcTemplateSheetPass'
+import {
+  isProcessInspectBizScope,
+  normalizeTemplateProcessLinks,
+} from '@/utils/qcTemplateProcessLink'
 
 export const qcTemplateStatusOptions = ['启用', '停用']
 
@@ -94,6 +98,9 @@ export function createQcTemplate(partial = {}) {
     scopeType: resolvedScopeType,
     sheetPassRule,
     sheetConclusionOptionItems,
+    processLinks: isProcessInspectBizScope(partial.bizScope)
+      ? normalizeTemplateProcessLinks(partial)
+      : [],
   }
 }
 
@@ -407,6 +414,7 @@ export const mockQcTemplates = [
       scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
       bizScope: '生产过程检',
       objects: [],
+      processNames: ['车削'],
       fields,
       sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS,
       sheetConclusionOptionItems: SHEET_CONCLUSION_STRICT.map((o) => ({ ...o })),
@@ -457,6 +465,7 @@ export const mockQcTemplates = [
       scopeType: QC_TEMPLATE_SCOPE_TYPE.GLOBAL,
       bizScope: '生产过程检',
       objects: [],
+      processNames: ['热处理'],
       fields,
       sheetPassRule: QC_TEMPLATE_SHEET_PASS_RULE.ALL_PASS,
       sheetConclusionOptionItems: SHEET_CONCLUSION_STRICT.map((o) => ({ ...o })),
@@ -1082,6 +1091,7 @@ export function cloneQcTemplates() {
     return {
       ...t,
       objects: [...(t.objects || [])],
+      processLinks: normalizeTemplateProcessLinks(t),
       fields,
       fieldCount: fields.length,
       sheetConclusionOptionItems: Array.isArray(t.sheetConclusionOptionItems)

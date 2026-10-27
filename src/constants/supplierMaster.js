@@ -39,7 +39,7 @@ export const settlementTypeOptions = [
 /** 账期起算：与客户主数据同源口径 */
 export const paymentTermStartOptions = [
   { label: '开票日', value: '开票日' },
-  { label: '发货日', value: '发货日' },
+  { label: '到货日', value: '到货日' },
   { label: '验收日', value: '验收日' },
   { label: '对账日', value: '对账日' },
   { label: '合同签订日', value: '合同签订日' },

@@ -1,15 +1,19 @@
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import {
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_PAYMENT_STATUS,
   CONTRACT_STATUS,
   CONTRACT_TYPE,
   PAYMENT_LINK_TYPE,
   PAYMENT_PLAN_BASE,
+  resolveContractCashDirection,
 } from '@/constants/salesContract'
 import {
   calcContractExecutedAmount,
   getOrdersLinkedToContract,
+  getOutsourcingOrdersLinkedToContract,
+  getPurchaseOrdersLinkedToContract,
   getSalesContractByNo,
   salesContractState,
 } from '@/store/salesContractStore'
@@ -282,8 +286,39 @@ export function resolveAutoStartDate(contract, termStartType) {
   if (type === '发货日') {
     return resolveShipmentStartDate(contract)
   }
+  if (type === '到货日') {
+    return resolveArrivalStartDate(contract)
+  }
   // 验收日 / 开票日 / 对账日 / 自定义：不自动带入，合同中后补
   return ''
+}
+
+/** 支出合同到货日：关联采购/外协入库单最早确认入库时间 */
+export function resolveArrivalStartDate(contract) {
+  const contractNo = contract?.contractNo
+  if (!contractNo) return ''
+  const pos = getPurchaseOrdersLinkedToContract(contractNo) || []
+  const wxs = getOutsourcingOrdersLinkedToContract(contractNo) || []
+  const poIds = new Set(pos.map((o) => o.id).filter(Boolean))
+  const wxIds = new Set(wxs.map((o) => o.id).filter(Boolean))
+  const poNos = new Set(pos.map((o) => o.orderNo).filter(Boolean))
+  const wxNos = new Set(wxs.map((o) => o.orderNo).filter(Boolean))
+  // eslint-disable-next-line global-require
+  const { inboundOrderState } = require('@/store/inboundOrderStore')
+  void inboundOrderState.orders
+  const hits = (inboundOrderState.orders || []).filter((o) => {
+    if (o.contractNo && o.contractNo === contractNo) return true
+    if (o.purchaseOrderId && poIds.has(o.purchaseOrderId)) return true
+    if (o.outsourcingOrderId && wxIds.has(o.outsourcingOrderId)) return true
+    if (o.sourceOrderNo && (poNos.has(o.sourceOrderNo) || wxNos.has(o.sourceOrderNo))) return true
+    return false
+  })
+  if (!hits.length) return ''
+  const dates = hits
+    .map((o) => String(o.confirmedAt || o.inboundDate || o.approvedAt || '').slice(0, 10))
+    .filter((d) => d && dayjs(d).isValid())
+    .sort()
+  return dates[0] || ''
 }
 
 function ratioTextOf(planAmount, ratio, total) {
@@ -303,7 +338,10 @@ function ratioTextOf(planAmount, ratio, total) {
 export function resolveContractPaymentBaseAmount(contract) {
   if (!contract) return 0
   if (contract.contractType === CONTRACT_TYPE.FRAMEWORK) {
-    if (contract.paymentPlanBase === PAYMENT_PLAN_BASE.ORDERS) {
+    if (
+      contract.paymentPlanBase === PAYMENT_PLAN_BASE.ORDERS ||
+      contract.paymentPlanBase === PAYMENT_PLAN_BASE.PURCHASE_ORDERS
+    ) {
       return round2(calcContractExecutedAmount(contract))
     }
     if (contract.limitAmount != null && contract.limitAmount !== '') {
@@ -649,6 +687,7 @@ export function listContractPaymentSummaries() {
   ensureAllPaymentPlans()
   return salesContractState.contracts
     .filter((c) => c.status === CONTRACT_STATUS.ACTIVE || c.status === CONTRACT_STATUS.COMPLETED)
+    .filter((c) => resolveContractCashDirection(c) === CONTRACT_CASH_DIRECTION.INCOME)
     .map((c) => buildContractPaymentSummary(c))
     .filter((row) => row && (row.planTotal > 0 || row.paidTotal > 0 || row.nodeTotal > 0))
 }
@@ -673,6 +712,10 @@ export function calcPaymentDashboardStats(summaries) {
   const monthPaidTotal = round2(
     salesPaymentState.payments
       .filter((p) => isInCurrentMonth(p.receivedAt))
+      .filter((p) => {
+        const c = getSalesContractByNo(p.contractNo)
+        return !c || resolveContractCashDirection(c) === CONTRACT_CASH_DIRECTION.INCOME
+      })
       .reduce((s, p) => s + (Number(p.amount) || 0), 0),
   )
 

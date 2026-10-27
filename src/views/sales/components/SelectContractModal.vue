@@ -46,9 +46,9 @@
               @press-enter="handleSearch"
             />
           </a-form-item>
-          <a-form-item label="客户名称">
+          <a-form-item :label="partyFilterLabel">
             <a-input
-              v-model:value="search.customerName"
+              v-model:value="search.partyName"
               allow-clear
               size="small"
               placeholder="请输入"
@@ -76,6 +76,9 @@
             <template #bodyCell="{ column, record }">
               <template v-if="column.key === 'status'">
                 <a-tag :color="contractStatusColor(record.status)">{{ record.status }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'partyName'">
+                {{ getContractPartyName(record) || '—' }}
               </template>
               <template v-else-if="column.key === 'validRange'">
                 {{ record.validFrom || '—' }} ~ {{ record.validTo || '—' }}
@@ -138,9 +141,14 @@ import { computed, reactive, ref, watch } from 'vue'
 import { CloseOutlined } from '@ant-design/icons-vue'
 import ListFilterBar from '@/components/ListFilterBar.vue'
 import {
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_STATUS,
+  contractPartyFieldLabel,
   contractStatusColor,
   contractTypeOptions,
+  getContractPartyName,
+  resolveContractCashDirection,
+  resolveContractCategory,
 } from '@/constants/salesContract'
 import { salesContractState } from '@/store/salesContractStore'
 
@@ -152,21 +160,32 @@ const props = defineProps({
   lockContractType: { type: String, default: '' },
   /** 优先按客户过滤（可清空） */
   preferredCustomerName: { type: String, default: '' },
+  preferredSupplierName: { type: String, default: '' },
+  cashDirection: { type: String, default: CONTRACT_CASH_DIRECTION.INCOME },
+  contractCategory: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
+
+const partyFilterLabel = computed(() => contractPartyFieldLabel(props.cashDirection))
+
+function preferredPartyName() {
+  return props.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? props.preferredSupplierName || ''
+    : props.preferredCustomerName || ''
+}
 
 const search = reactive({
   contractType: undefined,
   contractNo: '',
   contractName: '',
-  customerName: '',
+  partyName: '',
 })
 const applied = reactive({
   contractType: undefined,
   contractNo: '',
   contractName: '',
-  customerName: '',
+  partyName: '',
 })
 const selectedRow = ref(null)
 const page = ref(1)
@@ -176,7 +195,7 @@ const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 140, ellipsis: true },
   { title: '合同名称', dataIndex: 'contractName', key: 'contractName', width: 180, ellipsis: true },
   { title: '合同类型', dataIndex: 'contractType', key: 'contractType', width: 100 },
-  { title: '客户名称', dataIndex: 'customerName', key: 'customerName', width: 160, ellipsis: true },
+  { title: '相对方', key: 'partyName', width: 160, ellipsis: true },
   { title: '状态', key: 'status', width: 90 },
   { title: '业务员', dataIndex: 'salesperson', key: 'salesperson', width: 90 },
   { title: '有效期', key: 'validRange', width: 200 },
@@ -184,7 +203,14 @@ const columns = [
 
 const pickableContracts = computed(() => {
   void salesContractState.contracts
-  return (salesContractState.contracts || []).filter((c) => c.status === CONTRACT_STATUS.ACTIVE)
+  const dir = props.cashDirection || CONTRACT_CASH_DIRECTION.INCOME
+  const cat = String(props.contractCategory || '').trim()
+  return (salesContractState.contracts || []).filter((c) => {
+    if (c.status !== CONTRACT_STATUS.ACTIVE) return false
+    if (resolveContractCashDirection(c) !== dir) return false
+    if (cat && resolveContractCategory(c) !== cat) return false
+    return true
+  })
 })
 
 const filteredList = computed(() => {
@@ -195,7 +221,7 @@ const filteredList = computed(() => {
   const nameKw = String(applied.contractName || '')
     .trim()
     .toLowerCase()
-  const customerKw = String(applied.customerName || '')
+  const partyKw = String(applied.partyName || '')
     .trim()
     .toLowerCase()
   return pickableContracts.value.filter((c) => {
@@ -215,10 +241,10 @@ const filteredList = computed(() => {
     )
       return false
     if (
-      customerKw &&
-      !String(c.customerName || '')
+      partyKw &&
+      !String(getContractPartyName(c) || '')
         .toLowerCase()
-        .includes(customerKw)
+        .includes(partyKw)
     )
       return false
     return true
@@ -245,11 +271,11 @@ watch(
     search.contractType = props.lockContractType || undefined
     search.contractNo = ''
     search.contractName = ''
-    search.customerName = props.preferredCustomerName || ''
+    search.partyName = preferredPartyName()
     applied.contractType = props.lockContractType || undefined
     applied.contractNo = ''
     applied.contractName = ''
-    applied.customerName = props.preferredCustomerName || ''
+    applied.partyName = preferredPartyName()
     page.value = 1
     const hit = pickableContracts.value.find((c) => c.contractNo === props.selected)
     selectedRow.value = hit || null
@@ -278,7 +304,7 @@ function handleSearch() {
   applied.contractType = search.contractType
   applied.contractNo = search.contractNo
   applied.contractName = search.contractName
-  applied.customerName = search.customerName
+  applied.partyName = search.partyName
   page.value = 1
 }
 
@@ -286,7 +312,7 @@ function handleClear() {
   search.contractType = props.lockContractType || undefined
   search.contractNo = ''
   search.contractName = ''
-  search.customerName = ''
+  search.partyName = ''
   handleSearch()
 }
 

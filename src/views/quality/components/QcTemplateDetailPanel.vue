@@ -35,6 +35,10 @@
             <span class="info-label">适用范围：</span>
             <span class="info-value">{{ qcTemplateScopeTypeLabel(record.scopeType) }}</span>
           </a-col>
+          <a-col v-if="processLinksText" :span="6">
+            <span class="info-label">关联工序：</span>
+            <span class="info-value">{{ processLinksText }}</span>
+          </a-col>
           <a-col :span="6">
             <span class="info-label">指标数量：</span>
             <span class="info-value">{{ fieldList.length }}</span>
@@ -187,6 +191,10 @@ export default { name: 'QcTemplateDetailPanel' }
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed } from 'vue'
 import { QC_TEMPLATE_SCOPE_TYPE, qcTemplateScopeTypeLabel } from '@/mock/qcTemplates'
+import {
+  formatQcTemplateProcessLinks,
+  isProcessInspectBizScope,
+} from '@/utils/qcTemplateProcessLink'
 import { fieldTypeTagColor } from '@/mock/qcFieldLibrary'
 import { buildStandardText } from '@/utils/qcFieldStandard'
 import {
@@ -257,6 +265,12 @@ function isCompositeRow(row) {
 const fieldExpandable = computed(() => ({
   rowExpandable: (row) => isCompositeRow(row),
 }))
+
+const processLinksText = computed(() => {
+  const record = props.record
+  if (!record || !isProcessInspectBizScope(record.bizScope)) return ''
+  return formatQcTemplateProcessLinks(record)
+})
 
 const scopeObjectsText = computed(() => {
   const record = props.record

@@ -121,9 +121,10 @@
       "key": "shipAttachmentDecideStage",
       "label": "随货配件确定时机",
       "options": [
-        { "value": "apply", "label": "申请发货时确定" },
-        { "value": "warehouse", "label": "仓管发货时确定" }
-      ]
+        { "value": "order", "label": "销售订单时确定" },
+        { "value": "apply", "label": "申请发货时确定" }
+      ],
+      "note": "warehouse（仓管发货时确定）暂未开放，历史配置回落 apply"
     },
     {
       "key": "transferRequireInboundConfirm",

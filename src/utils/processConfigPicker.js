@@ -37,10 +37,19 @@ export function filterProcessConfigOptions(options, keyword) {
   })
 }
 
+export function getProcessConfigOptionsByCode(processes = []) {
+  return listEnabledProcessConfigs(processes).map((p) => ({
+    label: `${p.name || '—'}（${p.code || '—'}）`,
+    value: p.code,
+    process: p,
+  }))
+}
+
 export function buildProcessConfigDisplayOptions({
   options,
   keyword,
   selectedValue,
+  selectedValues,
   quickLimit = PROCESS_CONFIG_DROPDOWN_QUICK_LIMIT,
 }) {
   const filtered = filterProcessConfigOptions(options, keyword)
@@ -50,14 +59,19 @@ export function buildProcessConfigDisplayOptions({
     label: opt.label,
     value: opt.value,
   }))
-  if (selectedValue && !display.some((opt) => opt.value === selectedValue)) {
-    const hit = options.find((opt) => opt.value === selectedValue)
+  const keep = [
+    ...(Array.isArray(selectedValues) ? selectedValues : []),
+    ...(selectedValue ? [selectedValue] : []),
+  ]
+  keep.forEach((val) => {
+    if (!val || display.some((opt) => opt.value === val)) return
+    const hit = options.find((opt) => opt.value === val)
     if (hit) {
       display.unshift({
         label: hit.label,
         value: hit.value,
       })
     }
-  }
+  })
   return display
 }

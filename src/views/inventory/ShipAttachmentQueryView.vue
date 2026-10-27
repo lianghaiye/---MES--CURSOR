@@ -171,7 +171,7 @@
           <div class="section-title">命中的标准随货包</div>
           <a-empty
             v-if="!productResult.kit"
-            :description="productResult.probe.message || '该产品没有命中已启用的随货配件'"
+            :description="productResult.emptyMessage || '该产品没有命中已启用的随货配件'"
           />
           <template v-else>
             <a-descriptions bordered size="small" :column="2" class="winner-block">
@@ -180,15 +180,12 @@
                 productResult.kit.bomName
               }}</a-descriptions-item>
               <a-descriptions-item label="适用范围">
-                {{ productResult.probe.scopeTypeLabel || '—' }}
-              </a-descriptions-item>
-              <a-descriptions-item label="命中原因">
-                <a-tag color="blue">{{ productResult.probe.matchSourceLabel }}</a-tag>
+                {{ productResult.kit.scopeTypeLabel || '—' }}
               </a-descriptions-item>
               <a-descriptions-item label="物料数">
                 {{ productResult.kit.materialCount }}
               </a-descriptions-item>
-              <a-descriptions-item label="操作">
+              <a-descriptions-item label="操作" :span="2">
                 <a-button
                   type="link"
                   size="small"
@@ -198,7 +195,6 @@
                 </a-button>
               </a-descriptions-item>
             </a-descriptions>
-            <div class="priority-tip">{{ productResult.probe.priorityTip }}</div>
             <a-table
               :columns="kitLineColumns"
               :data-source="productResult.kit.lines"
@@ -589,12 +585,6 @@ function openShipAttachment(id) {
 
 .winner-block {
   margin-bottom: 8px;
-}
-
-.priority-tip {
-  font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
-  margin-bottom: 10px;
 }
 
 .table-pagination {

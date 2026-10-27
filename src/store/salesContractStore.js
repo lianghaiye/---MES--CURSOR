@@ -2,12 +2,17 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
 import {
+  CONTRACT_CATEGORY,
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_SIGN_STATUS,
   CONTRACT_SOURCE,
   CONTRACT_STATUS,
   CONTRACT_TYPE,
   PAYMENT_PLAN_BASE,
-  DEFAULT_PAYMENT_NODES,
+  defaultPaymentNodesFor,
+  defaultContractCategory,
+  resolveContractCashDirection,
+  resolveContractCategory,
   resolveContractSource,
 } from '@/constants/salesContract'
 import { normalizeSalesOrderProgressStatus, SALES_ORDER_STATUS } from '@/utils/salesOrderStatus'
@@ -18,7 +23,7 @@ const SYSTEM_AUTO_APPROVER = '系统自动审批'
 
 const STORAGE_KEY = 'i_doms_sales_contracts'
 const LEGACY_FRAMEWORK_KEY = 'i_doms_framework_contracts'
-const DATA_VERSION = 5
+const DATA_VERSION = 7
 
 /** 合同明细默认税率（%） */
 export const CONTRACT_DEFAULT_TAX_RATE = 13
@@ -51,15 +56,17 @@ function createPaymentNode(partial = {}) {
   }
 }
 
-/** 取公司级预设回款节点；未配置时回退系统默认 */
-export function createDefaultPaymentNodes(contractType) {
-  const preset = getPresetPaymentNodes(contractType)
+/** 取公司级预设收付款节点；未配置时回退系统默认（收入/支出各一套） */
+export function createDefaultPaymentNodes(contractType, cashDirection) {
+  const preset = getPresetPaymentNodes(contractType, cashDirection)
   if (preset.length) return preset.map((item) => createPaymentNode({ ...item }))
-  return DEFAULT_PAYMENT_NODES.map((item) => createPaymentNode({ ...item }))
+  return defaultPaymentNodesFor(cashDirection).map((item) => createPaymentNode({ ...item }))
 }
 
 function seedContracts() {
-  const nodes = () => createDefaultPaymentNodes()
+  const nodes = () =>
+    createDefaultPaymentNodes(CONTRACT_TYPE.STANDARD, CONTRACT_CASH_DIRECTION.INCOME)
+  const expenseNodes = (type) => createDefaultPaymentNodes(type, CONTRACT_CASH_DIRECTION.EXPENSE)
   return [
     {
       id: 'sc-fc-1',
@@ -429,6 +436,77 @@ function seedContracts() {
       approvedAt: '2025-01-10 11:00',
       approvedBy: 'admin',
     },
+    {
+      id: 'sc-po-1',
+      contractNo: 'HT-CG-20261001-001',
+      contractName: '铸件年度采购框架',
+      cashDirection: CONTRACT_CASH_DIRECTION.EXPENSE,
+      contractCategory: CONTRACT_CATEGORY.PURCHASE,
+      supplierName: '多功能供应商01',
+      customerName: '',
+      contractType: CONTRACT_TYPE.FRAMEWORK,
+      defaultDiscountRate: 0.97,
+      settlementCycle: '月结',
+      paymentTermStart: '到货日',
+      paymentTermDays: 30,
+      validFrom: '2026-01-01',
+      validTo: '2026-12-31',
+      limitAmount: 2000000,
+      limitQty: null,
+      allowExceedQuota: true,
+      paymentPlanBase: PAYMENT_PLAN_BASE.PURCHASE_ORDERS,
+      priceItems: [],
+      lineItems: [],
+      paymentNodes: expenseNodes(CONTRACT_TYPE.FRAMEWORK),
+      attachments: [],
+      salesperson: '赵采购',
+      signer: '李法务',
+      taxInclusive: true,
+      partyLegal: {
+        name: '多功能供应商01',
+      },
+      remark: '铸件、机加毛坯年度协议价。',
+      status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+      signedAt: '2026-01-06 10:00',
+      signedBy: '李法务',
+      createdAt: '2026-01-04 09:00',
+      updatedAt: '2026-01-06 10:00',
+      approvedAt: '2026-01-05 11:00',
+      approvedBy: 'admin',
+    },
+    {
+      id: 'sc-wx-1',
+      contractNo: 'HT-WX-20261008-001',
+      contractName: '热处理外协加工合同',
+      cashDirection: CONTRACT_CASH_DIRECTION.EXPENSE,
+      contractCategory: CONTRACT_CATEGORY.OUTSOURCE,
+      supplierName: '多功能供应商01',
+      customerName: '',
+      contractType: CONTRACT_TYPE.STANDARD,
+      defaultDiscountRate: 1,
+      settlementCycle: '月结',
+      paymentTermDays: 15,
+      validFrom: '2026-10-01',
+      validTo: '2027-03-31',
+      limitAmount: 180000,
+      paymentPlanBase: PAYMENT_PLAN_BASE.PURCHASE_ORDERS,
+      priceItems: [],
+      lineItems: [],
+      paymentNodes: expenseNodes(CONTRACT_TYPE.STANDARD),
+      attachments: [],
+      salesperson: '赵采购',
+      signer: '',
+      taxInclusive: true,
+      partyLegal: { name: '多功能供应商01' },
+      remark: '叶轮、轴热处理工序外协。',
+      status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.UNSIGNED,
+      createdAt: '2026-10-02 14:00',
+      updatedAt: '2026-10-02 14:00',
+      approvedAt: '2026-10-03 09:00',
+      approvedBy: 'admin',
+    },
   ]
 }
 
@@ -443,7 +521,7 @@ function migrateFromFramework(list = []) {
       lineItems: item.lineItems || [],
       paymentNodes: Array.isArray(item.paymentNodes)
         ? item.paymentNodes.map(createPaymentNode)
-        : createDefaultPaymentNodes(),
+        : createDefaultPaymentNodes(item.contractType, resolveContractCashDirection(item)),
       attachments: item.attachments || [],
     }),
   )
@@ -496,13 +574,25 @@ export function resolveContractSignStatus(contract = {}) {
   return contract.signStatus || CONTRACT_SIGN_STATUS.UNSIGNED
 }
 
+function resolvePaymentPlanBase(row = {}) {
+  if (row.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT) return PAYMENT_PLAN_BASE.LIMIT
+  if (resolveContractCashDirection(row) === CONTRACT_CASH_DIRECTION.EXPENSE) {
+    return PAYMENT_PLAN_BASE.PURCHASE_ORDERS
+  }
+  return PAYMENT_PLAN_BASE.ORDERS
+}
+
 export function normalizeContractRecord(row = {}) {
   const signedAt = row.signedAt || ''
   return {
     id: row.id || `sc-${Date.now()}`,
     contractNo: row.contractNo || '',
     contractName: row.contractName || '',
+    cashDirection: resolveContractCashDirection(row),
+    contractCategory:
+      resolveContractCategory(row) || defaultContractCategory(resolveContractCashDirection(row)),
     customerName: row.customerName || '',
+    supplierName: row.supplierName || '',
     contractType: row.contractType || CONTRACT_TYPE.FRAMEWORK,
     salesperson: row.salesperson || '',
     signer: row.signer || '',
@@ -519,16 +609,13 @@ export function normalizeContractRecord(row = {}) {
     limitAmount: row.limitAmount != null && row.limitAmount !== '' ? Number(row.limitAmount) : null,
     limitQty: row.limitQty != null && row.limitQty !== '' ? Number(row.limitQty) : null,
     allowExceedQuota: row.allowExceedQuota !== false,
-    /** 框架合同：回款计划按额度还是按关联销售订单金额 */
-    paymentPlanBase:
-      row.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT
-        ? PAYMENT_PLAN_BASE.LIMIT
-        : PAYMENT_PLAN_BASE.ORDERS,
+    /** 框架合同：收付款计划按额度还是按关联订单金额 */
+    paymentPlanBase: resolvePaymentPlanBase(row),
     priceItems: Array.isArray(row.priceItems) ? row.priceItems : [],
     lineItems: Array.isArray(row.lineItems) ? row.lineItems : [],
     paymentNodes: Array.isArray(row.paymentNodes)
       ? row.paymentNodes.map(createPaymentNode)
-      : createDefaultPaymentNodes(row.contractType),
+      : createDefaultPaymentNodes(row.contractType, resolveContractCashDirection(row)),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     remark: row.remark || '',
     serviceContent: row.serviceContent || '',
@@ -623,10 +710,20 @@ try {
   persist()
 }
 
-export function listSalesContracts({ contractType, customerName, status } = {}) {
+export function listSalesContracts({
+  contractType,
+  customerName,
+  supplierName,
+  status,
+  cashDirection,
+  contractCategory,
+} = {}) {
   return salesContractState.contracts.filter((item) => {
     if (contractType && item.contractType !== contractType) return false
     if (customerName && item.customerName !== customerName) return false
+    if (supplierName && item.supplierName !== supplierName) return false
+    if (cashDirection && resolveContractCashDirection(item) !== cashDirection) return false
+    if (contractCategory && resolveContractCategory(item) !== contractCategory) return false
     if (status && item.status !== status) return false
     return true
   })
@@ -643,12 +740,24 @@ export function getSalesContractByNo(contractNo) {
 }
 
 /** 生效中且在有效期内的合同选项（下单用） */
-export function getActiveSalesContractOptions(customerName = '', contractType = '') {
+export function getActiveSalesContractOptions(customerName = '', contractType = '', extra = {}) {
   const today = dayjs().format('YYYY-MM-DD')
+  const cashDirection = extra.cashDirection || CONTRACT_CASH_DIRECTION.INCOME
+  const supplierName = extra.supplierName || ''
   return salesContractState.contracts
     .filter((item) => item.status === CONTRACT_STATUS.ACTIVE)
-    .filter((item) => !customerName || item.customerName === customerName)
+    .filter((item) => resolveContractCashDirection(item) === cashDirection)
+    .filter((item) => {
+      if (cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE) {
+        return !supplierName || item.supplierName === supplierName
+      }
+      return !customerName || item.customerName === customerName
+    })
     .filter((item) => !contractType || item.contractType === contractType)
+    .filter((item) => {
+      const cat = extra.contractCategory || ''
+      return !cat || resolveContractCategory(item) === cat
+    })
     .filter((item) => {
       if (item.validFrom && today < item.validFrom) return false
       if (item.validTo && today > item.validTo) return false
@@ -738,9 +847,41 @@ export function getOrdersCountedInContractQuota(contractNo) {
   return getOrdersLinkedToContract(contractNo).filter(isOrderCountedInContractQuota)
 }
 
-/** 已执行金额：关联销售订单当前含税金额合计（订单变更生效后按新金额重算） */
+function isExpenseDocCounted(status) {
+  return String(status || '') !== '已作废'
+}
+
+export function getPurchaseOrdersLinkedToContract(contractNo) {
+  if (!contractNo) return []
+  // eslint-disable-next-line global-require
+  const { purchaseOrderState } = require('@/store/purchaseOrderStore')
+  void purchaseOrderState.orders
+  return (purchaseOrderState.orders || []).filter((o) => o.contractNo === contractNo)
+}
+
+export function getOutsourcingOrdersLinkedToContract(contractNo) {
+  if (!contractNo) return []
+  // eslint-disable-next-line global-require
+  const { outsourcingOrderState } = require('@/store/outsourcingOrderStore')
+  void outsourcingOrderState.orders
+  return (outsourcingOrderState.orders || []).filter((o) => o.contractNo === contractNo)
+}
+
+/** 已执行金额：收入合同按销售订单；支出合同按采购/外协含税金额 */
 export function calcContractExecutedAmount(contract) {
   if (!contract?.contractNo) return 0
+  if (resolveContractCashDirection(contract) === CONTRACT_CASH_DIRECTION.EXPENSE) {
+    const pos = getPurchaseOrdersLinkedToContract(contract.contractNo).filter((o) =>
+      isExpenseDocCounted(o.status),
+    )
+    const wxs = getOutsourcingOrdersLinkedToContract(contract.contractNo).filter((o) =>
+      isExpenseDocCounted(o.status),
+    )
+    const sum =
+      pos.reduce((s, o) => s + (Number(o.amountInTax) || 0), 0) +
+      wxs.reduce((s, o) => s + (Number(o.amountInTax) || 0), 0)
+    return Math.round(sum * 100) / 100
+  }
   const orders = getOrdersCountedInContractQuota(contract.contractNo)
   return (
     Math.round(
@@ -751,6 +892,24 @@ export function calcContractExecutedAmount(contract) {
 
 export function calcContractExecutedQty(contract) {
   if (!contract?.contractNo) return 0
+  if (resolveContractCashDirection(contract) === CONTRACT_CASH_DIRECTION.EXPENSE) {
+    const pos = getPurchaseOrdersLinkedToContract(contract.contractNo).filter((o) =>
+      isExpenseDocCounted(o.status),
+    )
+    const wxs = getOutsourcingOrdersLinkedToContract(contract.contractNo).filter((o) =>
+      isExpenseDocCounted(o.status),
+    )
+    const poQty = pos.reduce(
+      (s, o) =>
+        s + (o.lineItems || []).reduce((n, l) => n + (Number(l.purchaseQty ?? l.qty) || 0), 0),
+      0,
+    )
+    const wxQty = wxs.reduce(
+      (s, o) => s + (o.lineItems || []).reduce((n, l) => n + (Number(l.planQty ?? l.qty) || 0), 0),
+      0,
+    )
+    return Math.round((poQty + wxQty) * 1000) / 1000
+  }
   const orders = getOrdersCountedInContractQuota(contract.contractNo)
   return orders.reduce((sum, o) => {
     const lines = o.lineItems || []
@@ -864,7 +1023,10 @@ export function buildContractDraftFromSalesOrder(order) {
       remark: `由销售订单 ${order.orderNo || ''} 生成`.trim(),
       lineItems,
       priceItems: [],
-      paymentNodes: createDefaultPaymentNodes(CONTRACT_TYPE.STANDARD),
+      paymentNodes: createDefaultPaymentNodes(
+        CONTRACT_TYPE.STANDARD,
+        CONTRACT_CASH_DIRECTION.INCOME,
+      ),
       attachments: [],
       status: CONTRACT_STATUS.DRAFT,
       sourceType: CONTRACT_SOURCE.FROM_ORDER,

@@ -16,7 +16,7 @@ import {
 } from '@/utils/qcTemplateConflictService'
 
 const TEMPLATE_SEED_KEY = 'i_doms_qc_templates_seed_v'
-const TEMPLATE_SEED_VERSION = '14'
+const TEMPLATE_SEED_VERSION = '15'
 /** 与小程序共用：模板快照落盘，供移动端回填 templateFields */
 const TEMPLATE_STORAGE_KEY = 'i_doms_qc_templates'
 const TEMPLATE_STORAGE_VERSION = 1
@@ -183,6 +183,7 @@ export function enableQcTemplate(id, { conflictResolution, operator = 'admin1' }
     bizScope: row.bizScope,
     scopeType: row.scopeType,
     objects: row.objects || [],
+    processLinks: row.processLinks || [],
   })
 
   if (conflict.hasConflict && !conflictResolution) {
@@ -297,11 +298,14 @@ export function updateQcTemplate(
   )
 
   if (willEnable) {
+    const nextProcessLinks =
+      payload.processLinks != null ? payload.processLinks : row.processLinks || []
     const conflict = findQcTemplateConflicts(qcTemplateState.templates, {
       id: row.id,
       bizScope: nextBizScope,
       scopeType: nextScopeType,
       objects: nextObjects,
+      processLinks: nextProcessLinks,
     })
     if (conflict.hasConflict && !conflictResolution) {
       return { ok: false, needConflict: true, conflict, template: row }
@@ -327,6 +331,7 @@ export function updateQcTemplate(
       scopeType: nextScopeType,
       bizScope: nextBizScope,
       objects: objectsToSave,
+      processLinks: nextProcessLinks,
       status: '启用',
       sheetPassRule:
         payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
@@ -347,6 +352,7 @@ export function updateQcTemplate(
     scopeType: nextScopeType,
     bizScope: nextBizScope,
     objects: nextObjects,
+    processLinks: payload.processLinks != null ? payload.processLinks : row.processLinks || [],
     status: nextStatus,
     sheetPassRule:
       payload.sheetPassRule != null ? payload.sheetPassRule : row.sheetPassRule || 'manual',
@@ -378,6 +384,9 @@ export function copyQcTemplate(id, operator = 'admin1') {
       bizScope: source.bizScope,
       scopeType: source.scopeType,
       objects: Array.isArray(source.objects) ? [...source.objects] : [],
+      processLinks: Array.isArray(source.processLinks)
+        ? source.processLinks.map((row) => ({ ...row }))
+        : [],
       sheetPassRule: source.sheetPassRule,
       sheetConclusionOptionItems: source.sheetConclusionOptionItems,
       fields,

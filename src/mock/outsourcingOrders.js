@@ -78,6 +78,7 @@ export function createOutsourcingOrder(partial = {}) {
     orderNo: '',
     workOrderName: '',
     salesOrderNo: '',
+    contractNo: '',
     salesOrderId: '',
     source: '新增',
     sourceOrderNo: '',

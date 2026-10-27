@@ -9,8 +9,8 @@
   >
     <a-alert type="info" show-icon style="margin-bottom: 16px">
       <template #message>
-        按与建单相同的规则试算：单产品 &gt; 产品类别 &gt; 全局自定义 &gt;
-        系统通用。选择业务类型与产品后点击试算。
+        过程检可再选工序。关联了该工序的模板优先，未关联工序的模板再按 单产品 &gt; 产品类别 &gt;
+        全局 &gt; 系统通用。
       </template>
     </a-alert>
 
@@ -21,6 +21,16 @@
           placeholder="请选择业务类型"
           :options="bizScopeOpts"
           allow-clear
+        />
+      </a-form-item>
+      <a-form-item v-if="isProcessInspect" label="工序">
+        <a-select
+          v-model:value="form.processCode"
+          allow-clear
+          show-search
+          option-filter-prop="label"
+          placeholder="过程检请选择工序"
+          :options="processOpts"
         />
       </a-form-item>
       <a-form-item label="产品 / 物料">
@@ -121,6 +131,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { qcTemplateBizScopeOptions, qcTemplateScopeTypeLabel } from '@/mock/qcTemplates'
 import { probeQcTemplateMatch } from '@/utils/qcTemplateMatchService'
+import { isProcessInspectBizScope } from '@/utils/qcTemplateProcessLink'
+import { processConfigState } from '@/store/processConfigStore'
 import { buildBomSubItemPickerRows, filterBomSubItemPickerRows } from '@/utils/bomSubItemPicker'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 
@@ -138,12 +150,27 @@ const probeResult = ref(null)
 
 const form = reactive({
   bizScope: '来料质检',
+  processCode: undefined,
   itemCode: undefined,
   itemName: '',
   categoryKey: '',
   categoryCode: '',
   categoryName: '',
 })
+
+const isProcessInspect = computed(() => isProcessInspectBizScope(form.bizScope))
+const processOpts = computed(() =>
+  (processConfigState.processes || [])
+    .filter((p) => p.status === '使用中')
+    .map((p) => ({ label: `${p.name}（${p.code}）`, value: p.code })),
+)
+
+watch(
+  () => form.bizScope,
+  (val) => {
+    if (!isProcessInspectBizScope(val)) form.processCode = undefined
+  },
+)
 
 const allItemRows = computed(() =>
   buildBomSubItemPickerRows({
@@ -212,6 +239,7 @@ function onItemPicked(payload) {
 
 function resetForm() {
   form.bizScope = '来料质检'
+  form.processCode = undefined
   form.itemCode = undefined
   form.itemName = ''
   form.categoryKey = ''
@@ -227,11 +255,14 @@ function runProbe() {
   }
   probing.value = true
   try {
+    const proc = (processConfigState.processes || []).find((p) => p.code === form.processCode)
     probeResult.value = probeQcTemplateMatch({
       bizScope: form.bizScope,
       itemCode: form.itemCode || '',
       categoryCode: form.categoryCode || '',
       categoryKey: form.categoryKey || '',
+      processCode: form.processCode || '',
+      processName: proc?.name || '',
     })
   } finally {
     probing.value = false

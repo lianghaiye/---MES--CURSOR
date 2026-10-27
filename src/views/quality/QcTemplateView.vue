@@ -143,6 +143,9 @@
               {{ formatQcTemplateObjects(record) }}
             </span>
           </template>
+          <template v-else-if="column.key === 'processLinks'">
+            {{ formatQcTemplateProcessLinks(record) }}
+          </template>
           <template v-else-if="column.key === 'createdAt'">
             {{ formatDateTimeMinute(record.createdAt) }}
           </template>
@@ -221,6 +224,7 @@ import {
   qcTemplateTypeOptions,
   sortQcTemplatesForBrowse,
 } from '@/mock/qcTemplates'
+import { formatQcTemplateProcessLinks } from '@/utils/qcTemplateProcessLink'
 import {
   qcTemplateState,
   enableQcTemplate,
@@ -297,6 +301,7 @@ const baseColumns = [
   { title: '业务类型', key: 'bizScope', dataIndex: 'bizScope', width: 110 },
   { title: '适用范围', key: 'scopeType', width: 90 },
   { title: '适用对象', key: 'objects', width: 160, ellipsis: true },
+  { title: '关联工序', key: 'processLinks', width: 140, ellipsis: true },
   { title: '字段数量', dataIndex: 'fieldCount', width: 90, align: 'right' },
   { title: '创建人', dataIndex: 'creator', width: 90 },
   { title: '创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 150 },
@@ -306,7 +311,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('qc-template-list-v5', baseColumns)
+  useTableColumnSettings('qc-template-list-v6', baseColumns)
 
 const filteredList = computed(() => {
   const base = filterQcTemplates(qcTemplateState.templates, appliedFilters.value)

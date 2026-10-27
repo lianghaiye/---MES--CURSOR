@@ -99,7 +99,6 @@
           <PlusOutlined />
           新增随货配件
         </a-button>
-        <a-button v-if="isShipList" size="small" @click="probeOpen = true">匹配试算</a-button>
         <a-button v-if="!isShipList" size="small" @click="handleBatchEnable">
           <CheckOutlined />
           审核发布
@@ -340,8 +339,6 @@
       @cancel="pendingShipEnableId = ''"
     />
 
-    <ShipAttachmentMatchProbeDrawer v-if="isShipList" v-model:open="probeOpen" />
-
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -410,7 +407,6 @@ import BomEnableReferenceModal from './components/BomEnableReferenceModal.vue'
 import BomArchiveReferenceModal from './components/BomArchiveReferenceModal.vue'
 import BomRelationDrawer from './components/BomRelationDrawer.vue'
 import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
-import ShipAttachmentMatchProbeDrawer from './components/ShipAttachmentMatchProbeDrawer.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -484,7 +480,6 @@ const shipConflictKind = ref('single')
 const shipConflictRows = ref([])
 const shipConflictName = ref('')
 const pendingShipEnableId = ref('')
-const probeOpen = ref(false)
 
 const itemFilterOptions = computed(() => {
   const products = productInfoState.products

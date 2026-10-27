@@ -39,7 +39,7 @@ export const WORKBENCH_TODO_ITEMS = [
     key: 'contract-approve',
     label: '合同待审核',
     tone: 'geekblue',
-    path: '/sales/contracts',
+    path: '/contracts',
     query: { status: '待审' },
     title: '合同管理',
   },

@@ -17,7 +17,7 @@ import {
 import { createLineItem } from '@/mock/purchaseRequisitions'
 import { materialInfoState, updateMaterial } from '@/store/materialInfoStore'
 import { productInfoState, updateProduct } from '@/store/productInfoStore'
-import { addWorkOrder, createWorkOrderPayload } from '@/store/workOrderStore'
+import { appendOrCreateProductionPlanForShipAccessories } from '@/store/productionPlanStore'
 import { addOutsourcingOrder } from '@/store/outsourcingOrderStore'
 import { SUPPLY_FORM_OPTIONS } from '@/utils/masterDataMigrate'
 import {
@@ -334,30 +334,14 @@ export function buildRequisitionFromShipAccessoryGaps(salesOrder, accessories, o
   }
 }
 
-function createProduceOrdersForAccessoryGaps(salesOrder, rows, warehouse) {
-  const created = []
-  ;(rows || []).forEach((row) => {
-    const qty = accessoryFulfillQty(row)
-    const wo = createWorkOrderPayload({
-      productName: row.materialName || row.materialCode,
-      materialCode: row.materialCode || row.itemCode || '',
-      planQty: qty,
-      scheduleQty: qty,
-      source: 'sales_ship_accessory',
-      sourceOrderNo: salesOrder?.orderNo || '',
-      salesOrderId: salesOrder?.id || '',
-      salesLineId: row.salesLineId || '',
-      warehouse: warehouse || '',
-      remark: `随货配件缺口转生产（供应型态：${row.supplyForm || '自制件'}）`,
-      urgency: salesOrder?.urgency === '紧急' ? '紧急' : '普通',
-      customerName: salesOrder?.customerName || '',
-      salesperson: salesOrder?.salesperson || '',
-      skipEbom: true,
-    })
-    addWorkOrder(wo)
-    created.push(wo)
-  })
-  return created
+/** 自制件/组装 → 写入生产计划（待下达），由计划页再下推工单 */
+function createProducePlanItemsForAccessoryGaps(salesOrder, rows) {
+  const payloadRows = (rows || []).map((row) => ({
+    ...row,
+    planQty: accessoryFulfillQty(row),
+    qty: accessoryFulfillQty(row),
+  }))
+  return appendOrCreateProductionPlanForShipAccessories(salesOrder, payloadRows)
 }
 
 function createOutsourcingOrdersForAccessoryGaps(salesOrder, rows) {
@@ -382,7 +366,7 @@ function createOutsourcingOrdersForAccessoryGaps(salesOrder, rows) {
 }
 
 /**
- * 按供应型态分流生成采购申请 / 生产工单 / 外协订单
+ * 按供应型态分流：外购→采购申请；自制/组装→生产计划；外协→外协订单
  * options.existingRequisition：外购缺口合并进该申请
  * options.skipPurchase / skipProduce / skipOutsourcing
  * options.skipPersist：采购申请不单独落库（由调用方 add）
@@ -417,7 +401,13 @@ export function fulfillShipAccessoryGapsBySupply(salesOrder, accessories, option
     existing = getPurchaseRequisitionById(salesOrder.purchaseRequisitionId)
   }
 
-  const results = { purchase: null, produce: [], outsourcing: [], messages: [] }
+  const results = {
+    purchase: null,
+    produce: [],
+    productionPlan: null,
+    outsourcing: [],
+    messages: [],
+  }
 
   if (!options.skipPurchase && buckets.purchase.length) {
     const res = buildRequisitionFromShipAccessoryGaps(salesOrder, buckets.purchase, {
@@ -433,10 +423,18 @@ export function fulfillShipAccessoryGapsBySupply(salesOrder, accessories, option
   }
 
   if (!options.skipProduce && buckets.produce.length) {
-    results.produce = createProduceOrdersForAccessoryGaps(salesOrder, buckets.produce, warehouse)
+    const planRes = createProducePlanItemsForAccessoryGaps(salesOrder, buckets.produce)
+    results.produce = planRes.workItems || []
+    results.productionPlan = planRes.plan || null
     if (results.produce.length) {
       markAccessoryBucketConverted(buckets.produce, 'produce')
-      results.messages.push(`已生成生产工单 ${results.produce.length} 张`)
+      const verb = planRes.created ? '已生成生产计划' : '已写入生产计划'
+      results.messages.push(
+        `${verb} ${planRes.plan?.orderNo || salesOrder?.orderNo || ''}（自制/组装 ${results.produce.length} 项，待下达）`,
+      )
+    } else if (planRes.plan) {
+      markAccessoryBucketConverted(buckets.produce, 'produce')
+      results.messages.push(`随货配件自制/组装已在生产计划 ${planRes.plan.orderNo} 中`)
     }
   }
 

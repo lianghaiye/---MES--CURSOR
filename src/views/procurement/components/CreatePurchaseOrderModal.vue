@@ -53,10 +53,14 @@
               </a-col>
               <a-col :span="6">
                 <a-form-item label="合同编号">
-                  <a-input
-                    v-model:value="form.contractNo"
+                  <ContractSelect
+                    v-model="form.contractNo"
                     size="small"
-                    placeholder="请输入 合同编号"
+                    cash-direction="支出"
+                    contract-category="采购"
+                    :preferred-supplier-name="form.supplier || ''"
+                    placeholder="搜索选择支出合同，也可直接输入编号"
+                    @change="onContractChange"
                   />
                 </a-form-item>
               </a-col>
@@ -744,6 +748,7 @@ import SelectBomMaterialModal from '@/views/product-process/components/SelectBom
 import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeModal.vue'
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
+import ContractSelect from '@/views/sales/components/ContractSelect.vue'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import WorkOrderSearchSelect from './WorkOrderSearchSelect.vue'
 import PurchaseOrderLineEditModal from './PurchaseOrderLineEditModal.vue'
@@ -1021,6 +1026,12 @@ function loadEditForm(record) {
   form.remark = record.remark || ''
   form.lineItems = normalizeLineItems(record.lineItems || [])
   syncHeaderTrackers()
+}
+
+function onContractChange(_no, contract) {
+  if (contract?.supplierName && !form.supplier) {
+    form.supplier = contract.supplierName
+  }
 }
 
 function onSupplierChange() {

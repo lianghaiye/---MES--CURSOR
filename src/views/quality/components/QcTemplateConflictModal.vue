@@ -13,9 +13,7 @@
       <div>
         <div class="conflict-title">检测到{{ entityLabel }}冲突</div>
         <div v-if="kind === 'global'" class="conflict-desc">
-          系统已存在生效的全局{{ entityLabel }}，是否确认用当前{{ entityLabel }}替换原有全局{{
-            entityLabel
-          }}？
+          {{ globalHint }}
         </div>
         <div v-else class="conflict-desc">
           {{ listHint }}请
@@ -53,9 +51,9 @@
     <div v-if="kind !== 'global'" class="action-hint">
       <div>
         <strong>自动替换</strong>
-        ：将该{{ objectNoun }}的生效{{ entityLabel }}替换为当前{{ entityLabel }}；原{{
+        ：将该{{ objectNoun }}的生效{{ entityLabel }}替换为当前{{ entityLabel }}。原{{
           entityLabel
-        }}保留但解除对应绑定，若绑定清空则停用。
+        }}若关联了重叠工序，则只解除这些工序；未关联工序时解除该{{ objectNoun }}。绑定清空则停用。
       </div>
       <div>
         <strong>跳过冲突</strong>
@@ -92,11 +90,28 @@ const isCategory = computed(() => props.kind === QC_TEMPLATE_SCOPE_TYPE.CATEGORY
 
 const objectNoun = computed(() => (isCategory.value ? '类别' : '产品'))
 
-const listHint = computed(() =>
-  isCategory.value
-    ? `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}。`
-    : `本次${props.entityLabel}中，以下产品型号已关联其他生效的单产品${props.entityLabel}。`,
+const hasProcessOverlap = computed(() =>
+  (props.conflicts || []).some((c) => String(c.processLabel || '').trim()),
 )
+
+const listHint = computed(() => {
+  const processBit = hasProcessOverlap.value ? '且关联工序有重叠' : ''
+  if (isCategory.value) {
+    return `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}${processBit}。`
+  }
+  return `本次${props.entityLabel}中，以下产品型号已关联其他生效的单产品${props.entityLabel}${processBit}。`
+})
+
+const globalHint = computed(() => {
+  const names = (props.conflicts || [])
+    .map((c) => c.currentTemplateName || c.currentTemplateCode)
+    .filter(Boolean)
+  const processBit = hasProcessOverlap.value
+    ? `重叠工序：${[...new Set((props.conflicts || []).map((c) => c.processLabel).filter(Boolean))].join('；')}。`
+    : ''
+  const who = names.length ? `（${names.join('、')}）` : ''
+  return `系统已存在生效的全局${props.entityLabel}${who}，是否确认用当前${props.entityLabel}替换？${processBit}`
+})
 
 const actionOptions = computed(() => [
   { value: 'replace', label: '自动替换' },
@@ -105,13 +120,19 @@ const actionOptions = computed(() => [
 
 const columns = computed(() => {
   const objectTitle = isCategory.value ? '产品类别' : '产品信息'
-  return [
+  const cols = [
     { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
     { title: objectTitle, dataIndex: 'objectLabel', ellipsis: true, width: 160 },
+  ]
+  if (hasProcessOverlap.value) {
+    cols.push({ title: '重叠工序', dataIndex: 'processLabel', ellipsis: true, width: 160 })
+  }
+  cols.push(
     { title: `当前生效${props.entityLabel}`, dataIndex: 'currentTemplateName', ellipsis: true },
     { title: `本次操作${props.entityLabel}`, key: 'current', ellipsis: true, width: 140 },
     { title: '处理方式', key: 'action', width: 200 },
-  ]
+  )
+  return cols
 })
 
 watch(

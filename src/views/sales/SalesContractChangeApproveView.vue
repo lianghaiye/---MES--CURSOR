@@ -2,7 +2,7 @@
   <SalesContractChangeFormModal
     page-mode
     review-mode
-    list-path="/sales/contract-changes"
+    list-path="/contracts/changes"
     :record="record"
   />
 </template>

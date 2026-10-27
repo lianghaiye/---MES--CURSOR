@@ -28,6 +28,8 @@ export function snapshotContractForChange(contract) {
   CONTRACT_CHANGE_FIELDS.forEach((key) => {
     snap[key] = cloneJson(row[key])
   })
+  snap.cashDirection = row.cashDirection
+  snap.contractCategory = row.contractCategory
   return snap
 }
 
@@ -120,6 +122,7 @@ export function normalizeChange(row = {}) {
     contractName: row.contractName || '',
     contractType: row.contractType || '',
     customerName: row.customerName || '',
+    supplierName: row.supplierName || '',
     status: row.status || CONTRACT_CHANGE_STATUS.DRAFT,
     reason: row.reason || '',
     beforeSnapshot: row.beforeSnapshot || {},
@@ -219,6 +222,7 @@ export function createContractChangeFromContract(
     contractName: contract.contractName,
     contractType: contract.contractType,
     customerName: contract.customerName,
+    supplierName: contract.supplierName,
     status: CONTRACT_CHANGE_STATUS.DRAFT,
     reason,
     beforeSnapshot: snap,
@@ -250,6 +254,7 @@ export function updateContractChange(id, patch) {
     contractId: row.contractId,
     beforeSnapshot: row.beforeSnapshot,
     customerName: nextAfter?.customerName ?? patch.customerName ?? row.customerName,
+    supplierName: nextAfter?.supplierName ?? patch.supplierName ?? row.supplierName,
     contractName: nextAfter?.contractName ?? patch.contractName ?? row.contractName,
     status: CONTRACT_CHANGE_STATUS.DRAFT,
     updatedAt: dayjs().format('YYYY-MM-DD HH:mm'),

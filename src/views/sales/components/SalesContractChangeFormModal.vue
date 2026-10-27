@@ -40,7 +40,7 @@
           type="warning"
           show-icon
           class="pending-alert"
-          message="待审核：通过后将把本次变更应用到合同台账（基本信息、明细/协议折扣、回款节点等）。"
+          :message="`待审核：通过后将把本次变更应用到合同台账（基本信息、明细/协议折扣、${paymentNoun}节点等）。`"
         />
 
         <fieldset :disabled="reviewMode" class="change-fieldset">
@@ -84,7 +84,8 @@
                 </a-col>
                 <a-col :span="6">
                   <a-form-item
-                    label="客户名称"
+                    v-if="!isExpense"
+                    :label="partyFieldLabel"
                     :class="{ 'is-changed': !!headerDiffs.customerName }"
                   >
                     <CustomerSelect
@@ -94,6 +95,19 @@
                       @change="onCustomerChange"
                     />
                     <FieldChangeHint :diff="headerDiffs.customerName" />
+                  </a-form-item>
+                  <a-form-item
+                    v-else
+                    :label="partyFieldLabel"
+                    :class="{ 'is-changed': !!headerDiffs.supplierName }"
+                  >
+                    <PlanSupplierSelect
+                      v-model:value="form.after.supplierName"
+                      size="small"
+                      placeholder="请选择供应商"
+                      @change="onSupplierChange"
+                    />
+                    <FieldChangeHint :diff="headerDiffs.supplierName" />
                   </a-form-item>
                 </a-col>
                 <a-col :span="6">
@@ -186,14 +200,14 @@
                 </a-col>
                 <a-col v-if="isFramework" :span="6">
                   <a-form-item
-                    label="回款计划基数"
+                    :label="`${paymentNoun}计划基数`"
                     :class="{ 'is-changed': !!headerDiffs.paymentPlanBase }"
                   >
                     <a-select
                       v-model:value="form.after.paymentPlanBase"
                       size="small"
                       style="width: 100%"
-                      :options="paymentPlanBaseOptions"
+                      :options="planBaseOpts"
                     />
                     <FieldChangeHint :diff="headerDiffs.paymentPlanBase" />
                   </a-form-item>
@@ -293,7 +307,7 @@
             :class="{ 'is-collapsed': partyLegalCollapsed }"
           >
             <div class="section-title-row">
-              <span class="section-title">客户资质与开票信息</span>
+              <span class="section-title">相对方法人与开票信息</span>
               <a-button type="link" size="small" class="collapse-btn" @click="togglePartyLegal">
                 {{ partyLegalCollapsed ? '展开' : '收起' }}
               </a-button>
@@ -611,14 +625,16 @@
 
           <div class="section-block">
             <div class="section-title-row">
-              <span class="section-title">回款节点</span>
+              <span class="section-title">{{ paymentNoun }}节点</span>
               <span class="section-extra-tip">
                 合同金额
-                {{ formatMoney(contractAmountForPayment) }}，金额按比例自动计算；计划回款时间可选填
+                {{ formatMoney(contractAmountForPayment) }}，金额按比例自动计算；计划{{
+                  paymentNoun
+                }}时间可选填
               </span>
             </div>
             <div class="payment-term-hints">
-              <div v-for="(tip, idx) in PAYMENT_TERM_START_HINTS" :key="idx">{{ tip }}</div>
+              <div v-for="(tip, idx) in termStartHints" :key="idx">{{ tip }}</div>
             </div>
             <a-table
               :columns="nodeColumns"
@@ -661,7 +677,7 @@
                     size="small"
                     allow-clear
                     placeholder="请选择起算类型"
-                    :options="paymentTermStartOptions"
+                    :options="termStartOpts"
                     style="width: 100%"
                   />
                 </template>
@@ -784,10 +800,15 @@ import {
   CONTRACT_CHANGE_FIELD_LABELS,
   CONTRACT_STATUS,
   PAYMENT_PLAN_BASE,
-  PAYMENT_TERM_START_HINTS,
-  paymentPlanBaseOptions,
+  contractPartyFieldLabel,
+  contractPaymentNoun,
+  getContractPartyName,
+  isExpenseContract,
+  paymentPlanBaseOptionsFor,
+  paymentTermStartHintsFor,
+  paymentTermStartOptionsFor,
 } from '@/constants/salesContract'
-import { paymentTermStartOptions, settlementCycleOptions } from '@/constants/customerMaster'
+import { settlementCycleOptions } from '@/constants/customerMaster'
 import { salespersonOptions } from '@/mock/salesOrderOptions'
 import {
   CONTRACT_DEFAULT_TAX_RATE,
@@ -795,6 +816,7 @@ import {
   salesContractState,
 } from '@/store/salesContractStore'
 import { getCustomerByName, resolveCustomerAddressText } from '@/store/customerStore'
+import { getSupplierByName } from '@/store/supplierStore'
 import {
   approveContractChange,
   createContractChangeFromContract,
@@ -810,6 +832,7 @@ import { normalizeDiscountRate } from '@/utils/salesOrderPricing'
 import SelectBomMaterialModal from '@/views/product-process/components/SelectBomMaterialModal.vue'
 import SalesLineLongTextCell from './SalesLineLongTextCell.vue'
 import CustomerSelect from './CustomerSelect.vue'
+import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 
 const FieldChangeHint = defineComponent({
   name: 'FieldChangeHint',
@@ -831,7 +854,7 @@ const FieldChangeHint = defineComponent({
 const props = defineProps({
   open: { type: Boolean, default: false },
   pageMode: { type: Boolean, default: false },
-  listPath: { type: String, default: '/sales/contract-changes' },
+  listPath: { type: String, default: '/contracts/changes' },
   record: { type: Object, default: null },
   /** 新建页预选合同 id（从合同列表/详情发起时带入） */
   initialContractId: { type: String, default: '' },
@@ -871,6 +894,7 @@ const form = reactive({
   defaultDiscountPercent: 100,
   after: {
     customerName: undefined,
+    supplierName: undefined,
     contractName: '',
     salesperson: undefined,
     signer: '',
@@ -894,6 +918,12 @@ const form = reactive({
 })
 
 const isFramework = computed(() => form.contractType === CONTRACT_TYPE.FRAMEWORK)
+const isExpense = computed(() => isExpenseContract(form.before))
+const partyFieldLabel = computed(() => contractPartyFieldLabel(form.before.cashDirection))
+const paymentNoun = computed(() => contractPaymentNoun(form.before.cashDirection))
+const planBaseOpts = computed(() => paymentPlanBaseOptionsFor(form.before.cashDirection))
+const termStartOpts = computed(() => paymentTermStartOptionsFor(form.before.cashDirection))
+const termStartHints = computed(() => paymentTermStartHintsFor(form.before.cashDirection))
 const needPickContract = computed(() => !form.id)
 
 const {
@@ -918,7 +948,7 @@ const contractSelectOptions = computed(() => {
       const blocked = Boolean(getPendingContractChange(c.id))
       const statusText = changeStatus === '-' ? '无变更' : changeStatus
       return {
-        label: `${c.contractNo} · ${c.contractName || c.contractType} · ${c.customerName || ''} · ${statusText}`,
+        label: `${c.contractNo} · ${c.contractName || c.contractType} · ${getContractPartyName(c) || ''} · ${statusText}`,
         value: c.id,
         disabled: blocked,
       }
@@ -967,7 +997,7 @@ const nodeColumns = [
   { title: '比例(%)', key: 'ratioPercent', width: 90 },
   { title: '金额', key: 'amount', width: 100 },
   { title: '账期起算', key: 'termStartType', width: 120 },
-  { title: '计划回款时间', key: 'planDate', width: 130 },
+  { title: '计划日期', key: 'planDate', width: 130 },
   { title: '操作', key: 'action', width: 70 },
 ]
 
@@ -1070,6 +1100,7 @@ const headerDiffs = computed(() => {
   const after = currentAfterSnapshot.value
   return {
     customerName: makeFieldDiff('customerName', before.customerName, after.customerName),
+    supplierName: makeFieldDiff('supplierName', before.supplierName, after.supplierName),
     contractName: makeFieldDiff('contractName', before.contractName, after.contractName),
     salesperson: makeFieldDiff('salesperson', before.salesperson, after.salesperson),
     signer: makeFieldDiff('signer', before.signer, after.signer),
@@ -1359,7 +1390,10 @@ function onRemoveFile(file) {
 function buildAfterSnapshot() {
   const [from, to] = form.validRange || []
   return {
-    customerName: form.after.customerName || '',
+    cashDirection: form.before.cashDirection,
+    contractCategory: form.before.contractCategory,
+    customerName: isExpense.value ? '' : form.after.customerName || '',
+    supplierName: isExpense.value ? form.after.supplierName || '' : '',
     contractName: form.after.contractName || '',
     salesperson: form.after.salesperson || '',
     signer: form.after.signer || '',
@@ -1459,6 +1493,7 @@ function resetForm() {
   form.defaultDiscountPercent = 100
   form.before = {}
   form.after.customerName = undefined
+  form.after.supplierName = undefined
   form.after.contractName = ''
   form.after.salesperson = undefined
   form.after.signer = ''
@@ -1504,6 +1539,7 @@ function loadFormFromRecord(r) {
     ? Number((after.defaultDiscountRate * 100).toFixed(2))
     : 100
   form.after.customerName = after.customerName || r.customerName || undefined
+  form.after.supplierName = after.supplierName || r.supplierName || undefined
   form.after.contractName = after.contractName || ''
   form.after.salesperson = after.salesperson || undefined
   form.after.signer = after.signer || ''
@@ -1590,6 +1626,19 @@ function applyPartyLegalFromCustomer(customer, { force = false } = {}) {
   if (force || !p.address) p.address = resolveCustomerAddressText(customer)
 }
 
+function onSupplierChange(name) {
+  form.after.supplierName = name || undefined
+  form.customerName = name || ''
+  if (!name) {
+    form.after.partyLegal = createEmptyPartyLegal()
+    return
+  }
+  const supplier = getSupplierByName(name)
+  form.after.partyLegal = createEmptyPartyLegal({
+    name: name || supplier?.name || '',
+  })
+}
+
 function onCustomerChange(name) {
   form.after.customerName = name || undefined
   form.customerName = name || ''
@@ -1674,7 +1723,12 @@ function handleSave(submit) {
     message.warning('请填写变更原因')
     return
   }
-  if (!form.after.customerName?.trim()) {
+  if (isExpense.value) {
+    if (!String(form.after.supplierName || '').trim()) {
+      message.warning('请选择供应商')
+      return
+    }
+  } else if (!form.after.customerName?.trim()) {
     message.warning('请选择客户名称')
     return
   }
@@ -1683,7 +1737,7 @@ function handleSave(submit) {
     form.after.paymentPlanBase === PAYMENT_PLAN_BASE.LIMIT &&
     !(Number(form.after.limitAmount) > 0)
   ) {
-    message.warning('回款计划基数为「额度金额」时，请填写额度金额')
+    message.warning(`${paymentNoun.value}计划基数为「额度金额」时，请填写额度金额`)
     return
   }
   const afterSnapshot = buildAfterSnapshot()
@@ -1696,6 +1750,7 @@ function handleSave(submit) {
     reason: form.reason.trim(),
     afterSnapshot,
     customerName: afterSnapshot.customerName,
+    supplierName: afterSnapshot.supplierName,
   })
   if (!res.ok) {
     message.warning(res.message)

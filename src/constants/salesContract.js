@@ -9,6 +9,73 @@ export const contractTypeOptions = [
   { label: CONTRACT_TYPE.FRAMEWORK, value: CONTRACT_TYPE.FRAMEWORK },
 ]
 
+/** 合同收支方向（台账一级分类） */
+export const CONTRACT_CASH_DIRECTION = {
+  INCOME: '收入',
+  EXPENSE: '支出',
+}
+
+export const contractCashDirectionOptions = [
+  { label: CONTRACT_CASH_DIRECTION.INCOME, value: CONTRACT_CASH_DIRECTION.INCOME },
+  { label: CONTRACT_CASH_DIRECTION.EXPENSE, value: CONTRACT_CASH_DIRECTION.EXPENSE },
+]
+
+/** 合同业务类别（方向之下的细分） */
+export const CONTRACT_CATEGORY = {
+  SALES: '销售',
+  PURCHASE: '采购',
+  OUTSOURCE: '外协',
+}
+
+export const incomeContractCategoryOptions = [
+  { label: CONTRACT_CATEGORY.SALES, value: CONTRACT_CATEGORY.SALES },
+]
+
+export const expenseContractCategoryOptions = [
+  { label: CONTRACT_CATEGORY.PURCHASE, value: CONTRACT_CATEGORY.PURCHASE },
+  { label: CONTRACT_CATEGORY.OUTSOURCE, value: CONTRACT_CATEGORY.OUTSOURCE },
+]
+
+export function contractCategoryOptions(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? expenseContractCategoryOptions
+    : incomeContractCategoryOptions
+}
+
+export function resolveContractCashDirection(row = {}) {
+  return row.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? CONTRACT_CASH_DIRECTION.EXPENSE
+    : CONTRACT_CASH_DIRECTION.INCOME
+}
+
+export function isExpenseContract(row = {}) {
+  return resolveContractCashDirection(row) === CONTRACT_CASH_DIRECTION.EXPENSE
+}
+
+export function resolveContractCategory(row = {}) {
+  const raw = String(row.contractCategory || '').trim()
+  if (raw) return raw
+  return isExpenseContract(row) ? CONTRACT_CATEGORY.PURCHASE : CONTRACT_CATEGORY.SALES
+}
+
+export function defaultContractCategory(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? CONTRACT_CATEGORY.PURCHASE
+    : CONTRACT_CATEGORY.SALES
+}
+
+export function getContractPartyName(row = {}) {
+  return isExpenseContract(row) ? row.supplierName || '' : row.customerName || ''
+}
+
+export function contractPartyFieldLabel(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE ? '供应商' : '客户'
+}
+
+export function contractPaymentNoun(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE ? '付款' : '回款'
+}
+
 export const CONTRACT_STATUS = {
   DRAFT: '草稿',
   PENDING: '待审',
@@ -77,7 +144,7 @@ export function resolveContractSource(row = {}) {
 }
 
 /**
- * 默认回款节点（比例可改；各节点可有独立账期起算类型）
+ * 默认回款节点（收入合同；比例可改；各节点可有独立账期起算类型）
  * 例：预付款按合同签订日，发货款按发货日
  */
 export const DEFAULT_PAYMENT_NODES = [
@@ -87,6 +154,43 @@ export const DEFAULT_PAYMENT_NODES = [
   { name: '质保金', ratio: 0.05, termStartType: '验收日' },
 ]
 
+/** 默认付款节点（支出合同） */
+export const DEFAULT_EXPENSE_PAYMENT_NODES = [
+  { name: '预付款', ratio: 0.3, termStartType: '合同签订日' },
+  { name: '到货款', ratio: 0.6, termStartType: '到货日' },
+  { name: '质保金', ratio: 0.1, termStartType: '验收日' },
+]
+
+export function defaultPaymentNodesFor(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? DEFAULT_EXPENSE_PAYMENT_NODES
+    : DEFAULT_PAYMENT_NODES
+}
+
+export const incomePaymentTermStartOptions = [
+  { label: '合同签订日', value: '合同签订日' },
+  { label: '发货日', value: '发货日' },
+  { label: '验收日', value: '验收日' },
+  { label: '开票日', value: '开票日' },
+  { label: '对账日', value: '对账日' },
+  { label: '自定义', value: '自定义' },
+]
+
+export const expensePaymentTermStartOptions = [
+  { label: '合同签订日', value: '合同签订日' },
+  { label: '到货日', value: '到货日' },
+  { label: '验收日', value: '验收日' },
+  { label: '开票日', value: '开票日' },
+  { label: '对账日', value: '对账日' },
+  { label: '自定义', value: '自定义' },
+]
+
+export function paymentTermStartOptionsFor(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? expensePaymentTermStartOptions
+    : incomePaymentTermStartOptions
+}
+
 /** 回款节点区：各账期起算类型说明（蓝色提示） */
 export const PAYMENT_TERM_START_HINTS = [
   '合同签订日：默认带入签署日期（无则取有效期开始日），可修改。',
@@ -94,6 +198,19 @@ export const PAYMENT_TERM_START_HINTS = [
   '验收日 / 开票日 / 对账日：不自动带入，可在合同或回款维护中后补起算日。',
   '自定义：不自动带入，由业务手工填写起算日。',
 ]
+
+export const EXPENSE_PAYMENT_TERM_START_HINTS = [
+  '合同签订日：默认带入签署日期（无则取有效期开始日），可修改。',
+  '到货日：取合同关联采购/外协订单对应入库单的确认入库时间；取不到则留空后补。',
+  '验收日 / 开票日 / 对账日：不自动带入，可在合同详情中后补起算日。',
+  '自定义：不自动带入，由业务手工填写起算日。',
+]
+
+export function paymentTermStartHintsFor(cashDirection) {
+  return cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE
+    ? EXPENSE_PAYMENT_TERM_START_HINTS
+    : PAYMENT_TERM_START_HINTS
+}
 
 /**
  * 框架合同回款计划金额基数
@@ -103,12 +220,23 @@ export const PAYMENT_TERM_START_HINTS = [
 export const PAYMENT_PLAN_BASE = {
   LIMIT: '额度金额',
   ORDERS: '销售订单金额',
+  PURCHASE_ORDERS: '采购订单金额',
 }
 
 export const paymentPlanBaseOptions = [
   { label: '按额度金额', value: PAYMENT_PLAN_BASE.LIMIT },
   { label: '按销售订单金额', value: PAYMENT_PLAN_BASE.ORDERS },
 ]
+
+export function paymentPlanBaseOptionsFor(cashDirection) {
+  if (cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE) {
+    return [
+      { label: '按额度金额', value: PAYMENT_PLAN_BASE.LIMIT },
+      { label: '按采购/外协订单金额', value: PAYMENT_PLAN_BASE.PURCHASE_ORDERS },
+    ]
+  }
+  return paymentPlanBaseOptions
+}
 
 export const PAYMENT_LINK_TYPE = {
   CONTRACT: '合同',
@@ -191,6 +319,7 @@ export function contractChangeStatusColor(status) {
 /** 变更单可改字段（快照，与新增合同可编辑业务字段对齐） */
 export const CONTRACT_CHANGE_FIELDS = [
   'customerName',
+  'supplierName',
   'contractName',
   'salesperson',
   'signer',
@@ -216,6 +345,7 @@ export const CONTRACT_CHANGE_FIELDS = [
 
 export const CONTRACT_CHANGE_FIELD_LABELS = {
   customerName: '客户名称',
+  supplierName: '供应商',
   contractName: '合同名称',
   salesperson: '业务员',
   signer: '签署人',

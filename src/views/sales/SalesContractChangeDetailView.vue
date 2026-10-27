@@ -58,7 +58,7 @@
               <SalesContractBasicInfoSection :contract="displayContract" :quota="quota" />
             </DetailSectionCard>
 
-            <DetailSectionCard title="变更后 · 客户资质与开票信息">
+            <DetailSectionCard title="变更后 · 相对方法人与开票信息">
               <SalesContractPartyLegalSection :contract="displayContract" />
             </DetailSectionCard>
 
@@ -267,6 +267,9 @@ const displayContract = computed(() => {
     contractNo: r?.contractNo || after.contractNo,
     contractType: r?.contractType || after.contractType,
     customerName: r?.customerName || after.customerName,
+    supplierName: r?.supplierName || after.supplierName,
+    cashDirection: after.cashDirection || r?.beforeSnapshot?.cashDirection,
+    contractCategory: after.contractCategory || r?.beforeSnapshot?.contractCategory,
     status: r?.status,
   }
 })
@@ -396,17 +399,17 @@ watch(
 )
 
 function goBack() {
-  router.push('/sales/contract-changes')
+  router.push('/contracts/changes')
 }
 
 function openEdit() {
-  const path = `/sales/contract-changes/${record.value.id}/edit`
+  const path = `/contracts/changes/${record.value.id}/edit`
   openTab(path, `编辑变更 ${record.value.changeNo || ''}`.trim())
   router.push(path)
 }
 
 function openApprove() {
-  const path = `/sales/contract-changes/${record.value.id}/approve`
+  const path = `/contracts/changes/${record.value.id}/approve`
   openTab(path, `审核变更 ${record.value.changeNo || ''}`.trim())
   router.push(path)
 }

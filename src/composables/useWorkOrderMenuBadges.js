@@ -40,8 +40,8 @@ const WORK_ORDER_BADGE_PATHS = [
 const ORDER_APPROVE_BADGE_PATHS = [
   '/sales/orders',
   '/sales/order-changes',
-  '/sales/contracts',
-  '/sales/contract-changes',
+  '/contracts',
+  '/contracts/changes',
   '/procurement/purchase-orders',
   '/procurement/outsourcing-orders',
 ]
@@ -170,9 +170,9 @@ export function countPendingByPath(path) {
       return countSalesPendingApprove()
     case '/sales/order-changes':
       return countOrderChangePendingApprove()
-    case '/sales/contracts':
+    case '/contracts':
       return countContractPendingApprove()
-    case '/sales/contract-changes':
+    case '/contracts/changes':
       return countContractChangePendingApprove()
     case '/procurement/purchase-orders':
       return countPurchasePendingApprove()

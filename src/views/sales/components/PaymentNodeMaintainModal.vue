@@ -35,7 +35,7 @@
                 v-model:value="form.termStartType"
                 allow-clear
                 placeholder="请选择"
-                :options="paymentTermStartOptions"
+                :options="termStartOpts"
                 style="width: 100%"
               />
             </a-form-item>
@@ -70,13 +70,13 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="待收金额">
+            <a-form-item :label="isExpense ? '待付金额' : '待收金额'">
               <span>¥ {{ formatMoney(node?.unpaid) }}</span>
             </a-form-item>
           </a-col>
         </a-row>
 
-        <a-row :gutter="12">
+        <a-row v-if="!isExpense" :gutter="12">
           <a-col :span="24">
             <a-form-item label="关联销售订单">
               <a-select
@@ -115,18 +115,18 @@
 
         <a-row :gutter="12">
           <a-col :span="8">
-            <a-form-item label="回款金额" required>
+            <a-form-item :label="`${paymentNoun}金额`" required>
               <a-input-number
                 v-model:value="form.amount"
                 :min="0.01"
                 :precision="2"
                 style="width: 100%"
-                placeholder="请输入回款金额"
+                :placeholder="`请输入${paymentNoun}金额`"
               />
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="回款方式">
+            <a-form-item :label="`${paymentNoun}方式`">
               <a-select
                 v-model:value="form.paymentMethod"
                 allow-clear
@@ -137,7 +137,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="到账日期">
+            <a-form-item :label="isExpense ? '付款日期' : '到账日期'">
               <a-date-picker v-model:value="form.receivedAt" style="width: 100%" />
             </a-form-item>
           </a-col>
@@ -175,8 +175,13 @@
 import { computed, reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { PAYMENT_LINK_TYPE, paymentMethodOptions } from '@/constants/salesContract'
-import { paymentTermStartOptions } from '@/constants/customerMaster'
+import {
+  CONTRACT_CASH_DIRECTION,
+  PAYMENT_LINK_TYPE,
+  contractPaymentNoun,
+  paymentMethodOptions,
+  paymentTermStartOptionsFor,
+} from '@/constants/salesContract'
 import { addSalesPayment, updatePaymentPlanNode } from '@/store/salesPaymentStore'
 import { getOrdersLinkedToContract } from '@/store/salesContractStore'
 import { findSalesOrderByOrderNo, salesOrderState } from '@/store/salesOrderStore'
@@ -187,8 +192,9 @@ const props = defineProps({
   open: { type: Boolean, default: false },
   summary: { type: Object, default: null },
   node: { type: Object, default: null },
-  /** startDate=维护起算日；register=登记回款 */
+  /** startDate=维护起算日；register=登记回款/付款 */
   mode: { type: String, default: 'startDate' },
+  cashDirection: { type: String, default: CONTRACT_CASH_DIRECTION.INCOME },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -211,10 +217,14 @@ const selectedOrderColumns = [
   { title: '金额（含税）', key: 'amount', width: 120, align: 'right' },
 ]
 
+const isExpense = computed(() => props.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE)
+const paymentNoun = computed(() => contractPaymentNoun(props.cashDirection))
+const termStartOpts = computed(() => paymentTermStartOptionsFor(props.cashDirection))
+
 const modalTitle = computed(() => {
   const name = props.node?.name || ''
   if (props.mode === 'register') {
-    return name ? `登记回款 · ${name}` : '登记回款'
+    return name ? `登记${paymentNoun.value} · ${name}` : `登记${paymentNoun.value}`
   }
   return name ? `维护起算日 · ${name}` : '维护起算日'
 })
@@ -303,7 +313,7 @@ function handleOk() {
   }
 
   if (!(Number(form.amount) > 0)) {
-    message.warning('请填写回款金额')
+    message.warning(`请填写${paymentNoun.value}金额`)
     return Promise.reject()
   }
   if (!props.summary?.contractNo) {
@@ -328,7 +338,7 @@ function handleOk() {
     message.warning(payRes.message)
     return Promise.reject()
   }
-  message.success('回款已登记')
+  message.success(`${paymentNoun.value}已登记`)
   emit('saved')
   emit('update:open', false)
   return Promise.resolve()

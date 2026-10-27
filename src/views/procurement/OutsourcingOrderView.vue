@@ -579,6 +579,7 @@ const baseColumns = [
   { title: '供应商', dataIndex: 'supplier', width: 130, ellipsis: true },
   { title: '外协数量', key: 'qtySummary', width: 110 },
   { title: '销售单号', dataIndex: 'salesOrderNo', width: 140, ellipsis: true },
+  { title: '合同编号', dataIndex: 'contractNo', width: 140, ellipsis: true },
   { title: '计划日期', key: 'planDate', width: 180 },
   { title: '加工总价', key: 'amountInTax', width: 110, align: 'right' },
   { title: '结算类型', dataIndex: 'settlementType', width: 110 },

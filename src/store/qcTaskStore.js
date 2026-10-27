@@ -787,14 +787,25 @@ export function buildQcTaskFromTemplateMatch({
   templateCode,
   itemCode,
   categoryCode,
+  processCode,
+  processName,
   ...rest
 }) {
-  const matched = matchQcTemplate({ bizScope, templateCode, itemCode, categoryCode })
+  const matched = matchQcTemplate({
+    bizScope,
+    templateCode,
+    itemCode,
+    categoryCode,
+    processCode,
+    processName,
+  })
   if (!matched.ok) return { ok: false, message: matched.message || '未匹配到模板' }
   const template = matched.template
   const task = createQcTask({
     ...rest,
     bizScope,
+    processCode,
+    processName,
     template,
     templateCode: template.code,
     inspectMethod: rest.inspectMethod || resolveInspectMethodFromTemplate(template) || '抽检',

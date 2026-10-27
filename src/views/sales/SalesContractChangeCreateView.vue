@@ -1,7 +1,7 @@
 <template>
   <SalesContractChangeFormModal
     page-mode
-    list-path="/sales/contract-changes"
+    list-path="/contracts/changes"
     :initial-contract-id="initialContractId"
   />
 </template>

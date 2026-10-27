@@ -139,7 +139,6 @@ export function ensureProcessQcTasksOnDispatch(workOrder, batch) {
 
       const built = buildQcTaskFromTemplateMatch({
         bizScope: cfg.bizScope,
-        templateCode: cfg.templateCode,
         itemCode: workOrder.productCode || workOrder.itemCode || '',
         sourceType: 'work_order_dispatch',
         sourceDocId: workOrder.id,
