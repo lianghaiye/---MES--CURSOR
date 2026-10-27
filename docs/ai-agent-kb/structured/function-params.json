@@ -122,9 +122,10 @@
       "label": "随货配件确定时机",
       "options": [
         { "value": "order", "label": "销售订单时确定" },
-        { "value": "apply", "label": "申请发货时确定" }
+        { "value": "apply", "label": "申请发货时确定" },
+        { "value": "off", "label": "关闭" }
       ],
-      "note": "warehouse（仓管发货时确定）暂未开放，历史配置回落 apply"
+      "note": "关闭时销售订单与发货均不展示随货配件；warehouse（仓管发货时确定）暂未开放，历史配置回落 apply"
     },
     {
       "key": "transferRequireInboundConfirm",

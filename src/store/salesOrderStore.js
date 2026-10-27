@@ -687,7 +687,7 @@ export function approveSalesOrder(id, opinion = '') {
     }
   }
 
-  // 随货配件库存 enrichment，供外购合并与后续履约使用
+  // 随货配件库存 enrichment，供外购合并与后续履约使用（仅「销售订单时确定」）
   // eslint-disable-next-line global-require
   const {
     enrichShipAccessoryList,
@@ -697,11 +697,20 @@ export function approveSalesOrder(id, opinion = '') {
     getShipAccessoryPurchaseGapRows,
     markAccessoryBucketConverted,
   } = require('@/utils/salesOrderShipAccessories')
+  // eslint-disable-next-line global-require
+  const { isShipAttachmentDecidedAtOrder } = require('@/store/functionParamStore')
   const warehouse = order.defaultWarehouse || ''
-  if (Array.isArray(order.shipAccessories) && order.shipAccessories.length) {
+  const shipAccessoryEnabled = isShipAttachmentDecidedAtOrder()
+  if (
+    shipAccessoryEnabled &&
+    Array.isArray(order.shipAccessories) &&
+    order.shipAccessories.length
+  ) {
     order.shipAccessories = enrichShipAccessoryList(order.shipAccessories, warehouse)
   }
-  const accessoryPurchaseGaps = getShipAccessoryPurchaseGapRows(order, warehouse)
+  const accessoryPurchaseGaps = shipAccessoryEnabled
+    ? getShipAccessoryPurchaseGapRows(order, warehouse)
+    : []
 
   if (purchaseLines.length || accessoryPurchaseGaps.length) {
     if (order.purchaseRequisitionNo) {
@@ -750,7 +759,11 @@ export function approveSalesOrder(id, opinion = '') {
 
   // 审核通过时：随货配件自制/组装→生产计划，外协→外协订单；外购已合并进上方采购申请
   let shipAccessoryFulfillHint = ''
-  if (Array.isArray(order.shipAccessories) && order.shipAccessories.length) {
+  if (
+    shipAccessoryEnabled &&
+    Array.isArray(order.shipAccessories) &&
+    order.shipAccessories.length
+  ) {
     const accRes = fulfillShipAccessoryGapsBySupply(order, order.shipAccessories, {
       warehouse,
       skipPurchase: true,

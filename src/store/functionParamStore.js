@@ -126,11 +126,13 @@ export const SALES_OUTBOUND_ISSUE_RULE_DESCRIPTION =
  * 随货配件在哪一环节确定纳入清单
  * - order：销售订单时确定清单与采购；发货继承，本票仅勾选发哪些/改数量，不可新增配件
  * - apply：申请发货时确定，发货单可添加配件（能力对齐销售订单随货配件）
+ * - off：关闭，销售订单与发货均不展示随货配件
  * - warehouse：仓管发货时确定（暂隐藏，未开放）
  */
 export const SHIP_ATTACHMENT_DECIDE_STAGES = {
   ORDER: 'order',
   APPLY: 'apply',
+  OFF: 'off',
   WAREHOUSE: 'warehouse',
 }
 
@@ -138,11 +140,13 @@ export const SHIP_ATTACHMENT_DECIDE_STAGES = {
 export const SHIP_ATTACHMENT_DECIDE_STAGE_OPTIONS = [
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.ORDER, label: '销售订单时确定' },
   { value: SHIP_ATTACHMENT_DECIDE_STAGES.APPLY, label: '申请发货时确定' },
+  { value: SHIP_ATTACHMENT_DECIDE_STAGES.OFF, label: '关闭' },
 ]
 
 export const SHIP_ATTACHMENT_DECIDE_STAGE_DESCRIPTION =
   '销售订单时确定：下单维护随货配件并可转采购；发货继承订单清单，本票仅勾选发哪些、调整发货数量，不可新增配件。' +
   '申请发货时确定：新增/编辑发货单时可添加配件（配件包、从主数据添加），能力与销售订单随货配件一致。' +
+  '关闭：销售订单与发货均不展示随货配件相关信息。' +
   '「仓管发货时确定」暂未开放。'
 
 /**
@@ -981,6 +985,11 @@ export function isStocktakeAutoPostOnApprove() {
 export function setStocktakeAutoPostOnApprove(value) {
   functionParamState.params.stocktakeAutoPostOnApprove = Boolean(value)
   return { ok: true }
+}
+
+/** 随货配件能力是否启用（非「关闭」） */
+export function isShipAttachmentFeatureEnabled() {
+  return getShipAttachmentDecideStage() !== SHIP_ATTACHMENT_DECIDE_STAGES.OFF
 }
 
 /** 销售订单时即确定随货配件 */

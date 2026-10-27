@@ -57,6 +57,7 @@ import { getMtsFreeStockWipByItemCode } from '@/utils/mtsFreeStockWip'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { productionPlanState } from '@/store/productionPlanStore'
+import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
 
 const MTS_WIP_COLUMN_TIP =
   '当前仅展示自由备货相关数量，即计划策略为「按库存MTS」的在途/在制（待下发/执行中）。不含按销售订单排产的在制。'
@@ -115,29 +116,32 @@ const rows = computed(() => {
         material: line.material || '',
       }),
     )
-  const accessoryRows = (order?.shipAccessories || [])
-    .filter((row) => row.materialCode || row.itemCode)
-    .map((row) => {
-      const code = row.materialCode || row.itemCode
-      return toRemindRow(
-        {
-          id: row.id,
-          productCode: code,
-          productName: row.materialName || '',
-          specModel: row.specModel || '',
-          material: row.material || '',
-          salesQty: Number(row.shipQty ?? row.planQty) || 0,
-        },
-        order,
-        {
-          lineId: `acc-${row.id}`,
-          source: '随货配件',
-          productName: row.materialName || '',
-          specModel: row.specModel || '',
-          material: row.material || '',
-        },
-      )
-    })
+  void functionParamState.params.shipAttachmentDecideStage
+  const accessoryRows = isShipAttachmentDecidedAtOrder()
+    ? (order?.shipAccessories || [])
+        .filter((row) => row.materialCode || row.itemCode)
+        .map((row) => {
+          const code = row.materialCode || row.itemCode
+          return toRemindRow(
+            {
+              id: row.id,
+              productCode: code,
+              productName: row.materialName || '',
+              specModel: row.specModel || '',
+              material: row.material || '',
+              salesQty: Number(row.shipQty ?? row.planQty) || 0,
+            },
+            order,
+            {
+              lineId: `acc-${row.id}`,
+              source: '随货配件',
+              productName: row.materialName || '',
+              specModel: row.specModel || '',
+              material: row.material || '',
+            },
+          )
+        })
+    : []
   return [...salesRows, ...accessoryRows]
 })
 

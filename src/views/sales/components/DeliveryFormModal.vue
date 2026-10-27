@@ -28,7 +28,7 @@
                 v-model:value="form.deliveryType"
                 size="small"
                 placeholder="请选择 发货类型"
-                :options="DELIVERY_TYPE_OPTIONS"
+                :options="deliveryTypeOptions"
               />
             </a-form-item>
           </a-col>
@@ -572,7 +572,7 @@
     </div>
 
     <DeliveryShipAttachmentSection
-      v-if="showShipAttachmentUi || isAccessoryReship"
+      v-if="showShipAttachmentUi"
       ref="attachmentSectionRef"
       v-model="form.shipAttachments"
       :line-items="form.lineItems"
@@ -679,6 +679,7 @@ import {
   isSalesOutboundByOrder,
   isShipAttachmentDecidedAtApply,
   isShipAttachmentDecidedAtOrder,
+  isShipAttachmentFeatureEnabled,
   functionParamState,
 } from '@/store/functionParamStore'
 import { findLinkedSalesOutbound } from '@/utils/deliveryOutbound'
@@ -836,8 +837,26 @@ const {
 const prevHeaderWarehouse = ref(undefined)
 const attachmentSectionRef = ref(null)
 
+const deliveryTypeOptions = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  if (!isShipAttachmentFeatureEnabled()) {
+    return DELIVERY_TYPE_OPTIONS.filter((o) => o.value !== DELIVERY_TYPE.ACCESSORY_RESHIP)
+  }
+  return DELIVERY_TYPE_OPTIONS
+})
+
+watch(
+  () => [functionParamState.params.shipAttachmentDecideStage, form.deliveryType],
+  () => {
+    if (!isShipAttachmentFeatureEnabled() && form.deliveryType === DELIVERY_TYPE.ACCESSORY_RESHIP) {
+      form.deliveryType = DELIVERY_TYPE.SALES
+    }
+  },
+)
+
 const showShipAttachmentUi = computed(() => {
   void functionParamState.params.shipAttachmentDecideStage
+  if (!isShipAttachmentFeatureEnabled()) return false
   if (isAccessoryReship.value) return Boolean(form.salesOrderId || isEdit.value)
   // 申请发货时确定：空白新增单不展示，选定销售订单后再加载
   if (!isShipAttachmentDecidedAtOrder() && !isEdit.value && !form.salesOrderId) return false

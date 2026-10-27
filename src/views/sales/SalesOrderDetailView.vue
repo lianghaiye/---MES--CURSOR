@@ -226,7 +226,10 @@
             </DetailSectionCard>
 
             <DetailSectionCard title="销售明细">
-              <div v-if="unassignedShipAccessorySummary.text" class="section-hint">
+              <div
+                v-if="showShipAccessoriesTab && unassignedShipAccessorySummary.text"
+                class="section-hint"
+              >
                 {{ unassignedShipAccessorySummary.text }}
               </div>
               <a-table
@@ -1080,7 +1083,11 @@ import {
 } from '@/store/salesContractStore'
 import { CONTRACT_TYPE } from '@/constants/salesContract'
 import { findCreatePageByListPath } from '@/config/createPages'
-import { functionParamState, isShipAttachmentDecidedAtOrder } from '@/store/functionParamStore'
+import {
+  functionParamState,
+  isShipAttachmentDecidedAtOrder,
+  isShipAttachmentFeatureEnabled,
+} from '@/store/functionParamStore'
 import { deliveryTypeLabel, normalizeDeliveryType } from '@/utils/accessoryReship'
 import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
@@ -1338,10 +1345,16 @@ const ebomTableScrollX = computed(() =>
   ebomColumns.reduce((sum, col) => sum + (col.width || 100), 0),
 )
 
-const lineColumns = salesOrderDetailLineColumns
+const lineColumns = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  if (!isShipAttachmentFeatureEnabled()) {
+    return salesOrderDetailLineColumns.filter((col) => col.key !== 'shipAccessories')
+  }
+  return salesOrderDetailLineColumns
+})
 
 const lineTableScrollX = computed(() =>
-  lineColumns.reduce((sum, col) => sum + (col.width || 100), 0),
+  lineColumns.value.reduce((sum, col) => sum + (col.width || 100), 0),
 )
 
 const industrialLabelLineColumns = [

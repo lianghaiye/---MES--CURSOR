@@ -185,6 +185,7 @@ import {
   buildSalesOrderApprovalTimeline,
 } from '@/utils/salesApprovalDisplay'
 import { salesOrderDetailLineColumns } from '@/utils/salesOrderLineColumns'
+import { functionParamState, isShipAttachmentFeatureEnabled } from '@/store/functionParamStore'
 import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
 import SalesOrderBasicInfoSection from './components/SalesOrderBasicInfoSection.vue'
 import SalesOrderStockRemindPanel from './components/SalesOrderStockRemindPanel.vue'
@@ -238,11 +239,18 @@ watch(
 /** 审核页只需是否勾选工业标识；申请结果在详情「工业标识」Tab 查看 */
 const APPROVE_HIDDEN_LINE_KEYS = new Set(['industrialLabelStatus', 'industrialLabelSuccessCount'])
 
-const lineColumns = salesOrderDetailLineColumns.filter(
-  (col) => !APPROVE_HIDDEN_LINE_KEYS.has(col.key),
-)
+const lineColumns = computed(() => {
+  void functionParamState.params.shipAttachmentDecideStage
+  return salesOrderDetailLineColumns.filter((col) => {
+    if (APPROVE_HIDDEN_LINE_KEYS.has(col.key)) return false
+    if (col.key === 'shipAccessories' && !isShipAttachmentFeatureEnabled()) return false
+    return true
+  })
+})
 
-const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
+const lineTableScrollX = computed(() =>
+  lineColumns.value.reduce((sum, col) => sum + (col.width || 100), 0),
+)
 
 const summary = computed(() => {
   const lines = record.value?.lineItems || []
