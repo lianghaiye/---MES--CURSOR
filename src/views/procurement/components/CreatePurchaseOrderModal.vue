@@ -666,6 +666,108 @@
   />
 
   <a-modal
+    v-model:open="contractLinePickOpen"
+    title="从标准合同带入明细"
+    width="min(1200px, 94vw)"
+    :mask-closable="false"
+    destroy-on-close
+    class="contract-line-pick-modal"
+    @cancel="contractLinePickOpen = false"
+  >
+    <a-alert
+      type="info"
+      show-icon
+      class="contract-pick-alert"
+      :message="`合同 ${contractPickContract?.contractNo || ''} · 左侧勾选明细，右侧为已选（默认全选）`"
+    />
+    <div class="contract-picker-body">
+      <div class="contract-table-panel">
+        <a-table
+          size="small"
+          bordered
+          row-key="pickKey"
+          :columns="contractPickColumns"
+          :data-source="contractPickPagedRows"
+          :pagination="false"
+          :row-selection="contractPickRowSelection"
+          :scroll="{ x: 720, y: 360 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'unitPriceExTax'">
+              {{ formatQty(record.unitPriceExTax) }}
+            </template>
+            <template v-else-if="column.key === 'qty'">
+              {{ formatQty(record.qty) }}
+            </template>
+          </template>
+        </a-table>
+        <div class="contract-table-pager">
+          <a-pagination
+            v-model:current="contractPickPage.current"
+            v-model:page-size="contractPickPage.pageSize"
+            size="small"
+            :total="contractPickRows.length"
+            show-size-changer
+            :page-size-options="['10', '20', '50']"
+            :show-total="(t) => `共 ${t} 条`"
+          />
+        </div>
+      </div>
+      <div class="contract-selected-panel">
+        <div class="contract-selected-head">
+          <span class="contract-selected-title">已选 {{ contractPickSelectedRows.length }} 项</span>
+          <a-button
+            v-if="contractPickSelectedRows.length"
+            type="link"
+            size="small"
+            class="contract-clear-btn"
+            @click="clearContractPickSelection"
+          >
+            清空
+          </a-button>
+        </div>
+        <div v-if="contractPickSelectedRows.length" class="contract-selected-list">
+          <div
+            v-for="item in contractPickSelectedRows"
+            :key="item.pickKey"
+            class="contract-selected-item"
+          >
+            <div class="contract-selected-main">
+              <span class="contract-selected-code">{{ item.productCode || '—' }}</span>
+              <span class="contract-selected-name" :title="item.productName">{{
+                item.productName || '—'
+              }}</span>
+              <span class="contract-selected-meta">
+                {{ formatQty(item.qty) }} {{ item.unit || '' }} · 未税
+                {{ formatQty(item.unitPriceExTax) }}
+              </span>
+            </div>
+            <a-button
+              type="text"
+              size="small"
+              class="contract-remove-btn"
+              @click="removeContractPickRow(item.pickKey)"
+            >
+              <CloseOutlined />
+            </a-button>
+          </div>
+        </div>
+        <a-empty v-else :image="false" description="请从左侧选择" class="contract-selected-empty" />
+      </div>
+    </div>
+    <template #footer>
+      <a-button @click="contractLinePickOpen = false">取消</a-button>
+      <a-button
+        type="primary"
+        :disabled="!contractPickSelectedRows.length"
+        @click="confirmContractLinePick"
+      >
+        带入所选{{ contractPickSelectedRows.length ? ` (${contractPickSelectedRows.length})` : '' }}
+      </a-button>
+    </template>
+  </a-modal>
+
+  <a-modal
     v-model:open="reassignSupplierOpen"
     title="更换供应商"
     ok-text="确认拆出"
@@ -749,6 +851,8 @@ import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeMo
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import ContractSelect from '@/views/sales/components/ContractSelect.vue'
+import { getSalesContractByNo, resolveContractPrice } from '@/store/salesContractStore'
+import { CONTRACT_CASH_DIRECTION, CONTRACT_TYPE } from '@/constants/salesContract'
 import SalesOrderSearchSelect from './SalesOrderSearchSelect.vue'
 import WorkOrderSearchSelect from './WorkOrderSearchSelect.vue'
 import PurchaseOrderLineEditModal from './PurchaseOrderLineEditModal.vue'
@@ -797,6 +901,37 @@ const addingItems = ref(false)
 const basicInfoCollapsed = ref(false)
 const productPickerOpen = ref(false)
 const prevHeaderDeliveryDate = ref('')
+/** 当前关联的支出合同（用于新增行套价） */
+const linkedContract = ref(null)
+const contractLinePickOpen = ref(false)
+const contractPickContract = ref(null)
+const contractPickRows = ref([])
+const contractPickKeys = ref([])
+const contractPickSelectedRows = ref([])
+const contractPickPage = reactive({ current: 1, pageSize: 10 })
+const contractPickColumns = [
+  { title: '物料编码', dataIndex: 'productCode', width: 130, ellipsis: true },
+  { title: '名称', dataIndex: 'productName', width: 160, ellipsis: true },
+  { title: '规格', dataIndex: 'specModel', width: 120, ellipsis: true },
+  { title: '数量', key: 'qty', dataIndex: 'qty', width: 88, align: 'right' },
+  { title: '单位', dataIndex: 'unit', width: 64 },
+  {
+    title: '未税单价',
+    key: 'unitPriceExTax',
+    dataIndex: 'unitPriceExTax',
+    width: 100,
+    align: 'right',
+  },
+]
+const contractPickPagedRows = computed(() => {
+  const start = (contractPickPage.current - 1) * contractPickPage.pageSize
+  return contractPickRows.value.slice(start, start + contractPickPage.pageSize)
+})
+const contractPickRowSelection = computed(() => ({
+  selectedRowKeys: contractPickKeys.value,
+  onChange: onContractPickKeysChange,
+  preserveSelectedRowKeys: true,
+}))
 const prevHeaderReceivingWarehouse = ref(undefined)
 const lineEditOpen = ref(false)
 const lineEditTarget = ref(null)
@@ -979,6 +1114,7 @@ function syncHeaderTrackers() {
 }
 
 function resetForm() {
+  linkedContract.value = null
   form.orderNo = ''
   form.applyType = '日常采购'
   form.supplier = ''
@@ -1025,13 +1161,223 @@ function loadEditForm(record) {
   form.purchaser = record.purchaser
   form.remark = record.remark || ''
   form.lineItems = normalizeLineItems(record.lineItems || [])
+  linkedContract.value = form.contractNo ? getSalesContractByNo(form.contractNo) : null
   syncHeaderTrackers()
 }
 
-function onContractChange(_no, contract) {
-  if (contract?.supplierName && !form.supplier) {
+function resolveLinkedContract() {
+  if (linkedContract.value?.contractNo === form.contractNo) return linkedContract.value
+  if (!form.contractNo) return null
+  return getSalesContractByNo(form.contractNo)
+}
+
+/** 按合同协议价/折扣写入采购行未税单价；返回是否命中合同价 */
+function applyContractPriceToPoLine(line, contract) {
+  if (!line || !contract) return false
+  const code = lineItemCode(line)
+  const master =
+    resolveMasterBySkuId(line.productId) ||
+    materialInfoState.materials.find((m) => m.code === code) ||
+    productInfoState.products.find((p) => p.code === code) ||
+    null
+  const baseList = Number(master?.unitPrice) || Number(line.unitPriceExTax) || 0
+  const priced = resolveContractPrice(contract, line.productId || '', code, baseList)
+  const rate = Number(priced.lineDiscountRate)
+  const list = Number(priced.listUnitPriceExTax) || 0
+  const finalEx = roundNumber(list * (Number.isFinite(rate) ? rate : 1), 4)
+  if (!(finalEx > 0) && priced.priceSource !== 'contract') return false
+  const before = Number(line.unitPriceExTax) || 0
+  line.unitPriceExTax = finalEx
+  line.priceSource = priced.priceSource
+  // 协议价按未税写入；表头口径跟随合同（含税合同切换为含税录入模式并反算）
+  taxModeExcluding.value = contract.taxInclusive === false
+  if (!taxModeExcluding.value) {
+    const rate = Number(line.taxRate) || 13
+    line.unitPriceInTax = roundNumber(finalEx * (1 + rate / 100), 4)
+  }
+  recalcLineWithMode(line)
+  return (
+    priced.priceSource === 'contract' ||
+    (Number.isFinite(rate) && rate < 1 - 1e-9) ||
+    Math.abs(finalEx - before) > 1e-9
+  )
+}
+
+function applyContractPricingToExistingLines(contract) {
+  let hit = 0
+  ;(form.lineItems || []).forEach((line) => {
+    if (applyContractPriceToPoLine(line, contract)) hit += 1
+  })
+  return hit
+}
+
+function mapContractLineToPoLine(cl, contract) {
+  const code = String(cl.productCode || cl.itemCode || '').trim()
+  const master =
+    materialInfoState.materials.find((m) => m.code === code) ||
+    productInfoState.products.find((p) => p.code === code) ||
+    null
+  const qty = Number(cl.qty ?? cl.purchaseQty) || 1
+  const unitPrice = Number(cl.unitPriceExTax) || Number(master?.unitPrice) || 0
+  const taxRate = Number(master?.inputTaxRate ?? 13)
+  const line = createPoLineItem({
+    productName: cl.productName || cl.itemName || master?.name || '',
+    productCode: code,
+    itemName: cl.productName || cl.itemName || master?.name || '',
+    itemCode: code,
+    itemType:
+      master?.itemType ||
+      (productInfoState.products.some((p) => p.code === code) ? '产品' : '物料'),
+    category: master?.categoryName || '',
+    specModel: cl.specModel || master?.specModel || '',
+    material: cl.material || master?.material || '',
+    drawingNo: master?.drawingNo || '',
+    stockQty: resolveStockQty(code),
+    purchaseQty: qty,
+    unit: cl.unit || resolvePurchaseUnit(master || {}),
+    purchaseUnit: cl.unit || resolvePurchaseUnit(master || {}),
+    inventoryUnit: resolveInventoryUnit(master || {}),
+    unitPriceExTax: unitPrice,
+    taxRate,
+    deliveryDate: cl.deliveryDate || headerDeliveryDateStr(),
+    salesOrderNo: form.salesOrderNo || '',
+    receivingWarehouse: form.receivingWarehouse || '',
+    urgency: '正常',
+    priceSource: 'contract',
+    productId: master?.id || cl.productId || '',
+  })
+  if (master) applySettleFieldsFromMaterial(line, master)
+  applyContractPriceToPoLine(line, contract)
+  recalcLineWithMode(line)
+  return line
+}
+
+function syncContractPickSelectedFromKeys(keys) {
+  const list = Array.isArray(keys) ? keys : []
+  const map = new Map(contractPickRows.value.map((r) => [r.pickKey, r]))
+  contractPickKeys.value = list
+  contractPickSelectedRows.value = list.map((key) => map.get(key)).filter(Boolean)
+}
+
+function onContractPickKeysChange(keys) {
+  syncContractPickSelectedFromKeys(keys)
+}
+
+function clearContractPickSelection() {
+  contractPickKeys.value = []
+  contractPickSelectedRows.value = []
+}
+
+function removeContractPickRow(pickKey) {
+  syncContractPickSelectedFromKeys(contractPickKeys.value.filter((k) => k !== pickKey))
+}
+
+function openStandardContractLinePicker(contract) {
+  const rows = (contract.lineItems || [])
+    .filter(
+      (l) => String(l.productCode || l.itemCode || '').trim() || String(l.productName || '').trim(),
+    )
+    .map((l, idx) => ({
+      ...l,
+      pickKey: l.id || `${l.productCode || 'row'}-${idx}`,
+      productCode: l.productCode || l.itemCode || '',
+      productName: l.productName || l.itemName || '',
+      qty: Number(l.qty ?? l.purchaseQty) || 0,
+      unitPriceExTax: Number(l.unitPriceExTax) || 0,
+    }))
+  if (!rows.length) {
+    message.info(`标准合同「${contract.contractNo}」暂无明细可带出`)
+    return
+  }
+  contractPickContract.value = contract
+  contractPickRows.value = rows
+  contractPickPage.current = 1
+  contractPickPage.pageSize = 10
+  syncContractPickSelectedFromKeys(rows.map((r) => r.pickKey))
+  contractLinePickOpen.value = true
+}
+
+function confirmContractLinePick() {
+  const contract = contractPickContract.value
+  if (!contract) {
+    contractLinePickOpen.value = false
+    return
+  }
+  const selected = contractPickSelectedRows.value
+  if (!selected.length) {
+    message.warning('请至少选择一行合同明细')
+    return
+  }
+  taxModeExcluding.value = contract.taxInclusive === false
+  form.lineItems = selected.map((row) => mapContractLineToPoLine(row, contract))
+  contractLinePickOpen.value = false
+  message.success(
+    `已从标准合同「${contract.contractNo}」带入 ${selected.length} 条采购明细` +
+      (contract.taxInclusive !== false ? '' : '（合同为未税口径）'),
+  )
+}
+
+function onContractChange(no, contractFromSelect) {
+  if (!no) {
+    linkedContract.value = null
+    return
+  }
+  const contract = contractFromSelect || getSalesContractByNo(no)
+  if (!contract) {
+    linkedContract.value = null
+    message.info('未在合同台账中找到该编号，已按输入编号保存（不自动带出明细/协议价）')
+    return
+  }
+  if (contract.cashDirection && contract.cashDirection !== CONTRACT_CASH_DIRECTION.EXPENSE) {
+    message.warning('采购订单只能关联支出合同')
+    form.contractNo = ''
+    linkedContract.value = null
+    return
+  }
+  linkedContract.value = contract
+  if (contract.supplierName && !form.supplier) {
     form.supplier = contract.supplierName
   }
+  if (contract.settlementCycle) {
+    form.settlementCycle = contract.settlementCycle
+  }
+  if (contract.settlementMethod) {
+    form.settlementMethod = contract.settlementMethod
+  }
+
+  const hasLines = hasMeaningfulPoLines()
+
+  if (contract.contractType === CONTRACT_TYPE.FRAMEWORK) {
+    const hit = hasLines ? applyContractPricingToExistingLines(contract) : 0
+    if (hasLines) {
+      message.success(
+        hit
+          ? `已按框架合同「${contract.contractNo}」匹配协议价（命中 ${hit} 行；未命中行保持原价或默认折扣）`
+          : `已关联框架合同「${contract.contractNo}」：当前明细未命中价目，后续添加物料将自动尝试套协议价`,
+      )
+    } else {
+      message.info(
+        `已关联框架合同「${contract.contractNo}」：不整单带入清单；添加物料后按编码匹配协议价`,
+      )
+    }
+    return
+  }
+
+  if (contract.contractType === CONTRACT_TYPE.STANDARD) {
+    if (hasLines) {
+      const hit = applyContractPricingToExistingLines(contract)
+      message.success(
+        hit
+          ? `订单已有明细，已按标准合同「${contract.contractNo}」匹配更新 ${hit} 行协议价（不追加合同行）`
+          : `订单已有明细，标准合同「${contract.contractNo}」未匹配到可更新单价的行（明细未改动）`,
+      )
+      return
+    }
+    openStandardContractLinePicker(contract)
+    return
+  }
+
+  if (hasLines) applyContractPricingToExistingLines(contract)
 }
 
 function onSupplierChange() {
@@ -1106,12 +1452,23 @@ function mapPickerToPoLine(payload) {
     variantValues,
     variantSummary: master?.variantSummary || payload.variantSummary || '',
   })
-  recalcLineWithMode(line)
+  const contract = resolveLinkedContract()
+  if (contract) applyContractPriceToPoLine(line, contract)
+  else recalcLineWithMode(line)
   return line
 }
 
 function lineItemCode(line) {
   return line.productCode || line.itemCode || ''
+}
+
+/** 是否已有有效采购明细（排除空白占位行） */
+function hasMeaningfulPoLines() {
+  return (form.lineItems || []).some(
+    (line) =>
+      String(lineItemCode(line) || '').trim() ||
+      String(line.productName || line.itemName || '').trim(),
+  )
 }
 
 function openProductPicker() {
@@ -1204,7 +1561,9 @@ function onVariantConfigConfirm(payload) {
     target.drawingNo = master.drawingNo || target.drawingNo || ''
     target.category = master.categoryName || target.category || ''
   }
-  recalcLineWithMode(target)
+  const contract = resolveLinkedContract()
+  if (contract) applyContractPriceToPoLine(target, contract)
+  else recalcLineWithMode(target)
   message.success('变体已配置')
 }
 
@@ -1737,6 +2096,133 @@ function handleSave() {
   font-size: 13px;
   color: rgba(0, 0, 0, 0.65);
   line-height: 1.5;
+}
+
+.contract-pick-alert {
+  margin-bottom: 12px;
+}
+
+.contract-picker-body {
+  display: flex;
+  gap: 12px;
+  height: 480px;
+  max-height: calc(80vh - 200px);
+  min-height: 400px;
+}
+
+.contract-table-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.contract-table-pager {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.contract-selected-panel {
+  width: 28%;
+  min-width: 220px;
+  max-width: 300px;
+  flex-shrink: 0;
+  height: 100%;
+  min-height: 0;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  background: #fafafa;
+  overflow: hidden;
+}
+
+.contract-selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.contract-selected-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.contract-clear-btn {
+  padding: 0;
+  height: auto;
+}
+
+.contract-selected-list {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.contract-selected-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.contract-selected-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.contract-selected-code {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.contract-selected-name,
+.contract-selected-meta {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contract-remove-btn {
+  flex-shrink: 0;
+  color: rgba(0, 0, 0, 0.45);
+
+  &:hover {
+    color: #ff4d4f;
+  }
+}
+
+.contract-selected-empty {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
 }
 
 .order-size-link {

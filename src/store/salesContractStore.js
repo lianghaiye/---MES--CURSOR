@@ -23,7 +23,8 @@ const SYSTEM_AUTO_APPROVER = '系统自动审批'
 
 const STORAGE_KEY = 'i_doms_sales_contracts'
 const LEGACY_FRAMEWORK_KEY = 'i_doms_framework_contracts'
-const DATA_VERSION = 7
+/** v8：采购框架价目 + 采购标准合同明细演示 */
+const DATA_VERSION = 8
 
 /** 合同明细默认税率（%） */
 export const CONTRACT_DEFAULT_TAX_RATE = 13
@@ -455,7 +456,22 @@ function seedContracts() {
       limitQty: null,
       allowExceedQuota: true,
       paymentPlanBase: PAYMENT_PLAN_BASE.PURCHASE_ORDERS,
-      priceItems: [],
+      priceItems: [
+        {
+          productCode: 'MAT-FLG-80',
+          agreementUnitPriceExTax: 78,
+          agreementDiscountRate: null,
+        },
+        {
+          productCode: 'MAT-SEAL-80',
+          agreementUnitPriceExTax: 11,
+          agreementDiscountRate: null,
+        },
+        {
+          productCode: '010050003',
+          agreementDiscountRate: 0.95,
+        },
+      ],
       lineItems: [],
       paymentNodes: expenseNodes(CONTRACT_TYPE.FRAMEWORK),
       attachments: [],
@@ -465,7 +481,7 @@ function seedContracts() {
       partyLegal: {
         name: '多功能供应商01',
       },
-      remark: '铸件、机加毛坯年度协议价。',
+      remark: '铸件、机加毛坯年度协议价。演示：价目含法兰/密封垫协议价、叶轮默认折扣。',
       status: CONTRACT_STATUS.ACTIVE,
       signStatus: CONTRACT_SIGN_STATUS.SIGNED,
       signedAt: '2026-01-06 10:00',
@@ -473,6 +489,76 @@ function seedContracts() {
       createdAt: '2026-01-04 09:00',
       updatedAt: '2026-01-06 10:00',
       approvedAt: '2026-01-05 11:00',
+      approvedBy: 'admin',
+    },
+    {
+      id: 'sc-po-std-1',
+      contractNo: 'HT-CG-20260901-STD',
+      contractName: '紧固件一批采购标准合同',
+      cashDirection: CONTRACT_CASH_DIRECTION.EXPENSE,
+      contractCategory: CONTRACT_CATEGORY.PURCHASE,
+      supplierName: '多功能供应商01',
+      customerName: '',
+      contractType: CONTRACT_TYPE.STANDARD,
+      defaultDiscountRate: 1,
+      settlementCycle: '月结',
+      paymentTermStart: '到货日',
+      paymentTermDays: 30,
+      validFrom: '2026-09-01',
+      validTo: '2026-12-31',
+      limitAmount: 50000,
+      allowExceedQuota: false,
+      paymentPlanBase: PAYMENT_PLAN_BASE.PURCHASE_ORDERS,
+      priceItems: [],
+      lineItems: [
+        {
+          id: 'sci-po-1',
+          productCode: 'MAT-BOLT-M16',
+          productName: '高强度螺栓',
+          specModel: 'M16×70',
+          material: '35CrMo',
+          qty: 200,
+          unit: '套',
+          unitPriceExTax: 2.9,
+          amountExTax: 580,
+        },
+        {
+          id: 'sci-po-2',
+          productCode: 'MAT-NUT-M16',
+          productName: '配套螺母',
+          specModel: 'M16',
+          material: '35CrMo',
+          qty: 200,
+          unit: '个',
+          unitPriceExTax: 0.72,
+          amountExTax: 144,
+        },
+        {
+          id: 'sci-po-3',
+          productCode: 'MAT-FLG-80',
+          productName: '碳钢法兰',
+          specModel: 'DN80 PN16',
+          material: 'Q235B',
+          qty: 20,
+          unit: '片',
+          unitPriceExTax: 80,
+          amountExTax: 1600,
+        },
+      ],
+      paymentNodes: expenseNodes(CONTRACT_TYPE.STANDARD),
+      attachments: [],
+      salesperson: '赵采购',
+      signer: '李法务',
+      taxInclusive: false,
+      partyLegal: { name: '多功能供应商01' },
+      remark: '演示：标准合同带明细勾选带入采购订单。',
+      status: CONTRACT_STATUS.ACTIVE,
+      signStatus: CONTRACT_SIGN_STATUS.SIGNED,
+      signedAt: '2026-09-02 10:00',
+      signedBy: '李法务',
+      createdAt: '2026-09-01 09:00',
+      updatedAt: '2026-09-02 10:00',
+      approvedAt: '2026-09-01 15:00',
       approvedBy: 'admin',
     },
     {
