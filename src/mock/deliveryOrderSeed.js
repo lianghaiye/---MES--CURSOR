@@ -329,7 +329,7 @@ export function buildDeliveryOrderSeed() {
             itemWeightKg: 12.5,
             deliveryUnitPriceExTax: 28.77,
             packagingForm: '纸箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
         ],
         shipAttachments: demoPumpKitAttachments({ qty: 3, selectedSpare: false }),
@@ -572,7 +572,7 @@ export function buildDeliveryOrderSeed() {
             deliveryAmountExTax: 17600,
             itemWeightKg: 48,
             packagingForm: '木箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
           {
             id: 'dl-whole-2',
@@ -586,7 +586,7 @@ export function buildDeliveryOrderSeed() {
             deliveryAmountExTax: 6200,
             itemWeightKg: 32,
             packagingForm: '纸箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
         ],
         shipAttachments: demoPumpKitAttachments({ qty: 2, selectedSpare: true }),
@@ -655,7 +655,7 @@ export function buildDeliveryOrderSeed() {
             deliveryAmountExTax: 9600,
             itemWeightKg: 48,
             packagingForm: '木箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
         ],
         scatterShipments: [
@@ -715,7 +715,7 @@ export function buildDeliveryOrderSeed() {
             deliveryAmountExTax: 3200,
             itemWeightKg: 12.5,
             packagingForm: '纸箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
           {
             id: 'dl-mixed-whole-2',
@@ -729,7 +729,7 @@ export function buildDeliveryOrderSeed() {
             deliveryAmountExTax: 2800,
             itemWeightKg: 18,
             packagingForm: '纸箱',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
           },
         ],
         scatterShipments: [

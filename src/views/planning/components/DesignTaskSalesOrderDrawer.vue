@@ -39,7 +39,7 @@
           <a-descriptions-item label="材质">{{ salesLine.material || '—' }}</a-descriptions-item>
           <a-descriptions-item label="交付方式">
             <a-tag :color="salesLine.deliveryMode === '散件' ? 'orange' : 'blue'">
-              {{ salesLine.deliveryMode || '整机' }}
+              {{ salesLine.deliveryMode || '整件' }}
             </a-tag>
           </a-descriptions-item>
           <a-descriptions-item label="交付日期">{{

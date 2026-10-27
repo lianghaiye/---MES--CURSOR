@@ -86,7 +86,7 @@ export function buildMockDesignTasks(products = []) {
     {
       id: 'dt-seed-003',
       taskNo: 'SJ-2026-0003',
-      status: DESIGN_TASK_STATUS.DESIGNING,
+      status: DESIGN_TASK_STATUS.PENDING_AUDIT,
       source: DESIGN_TASK_SOURCE.SALES_ORDER,
       salesOrderNo: '1-20260601-018',
       salesLineId: 'line-seed-custom-qj',

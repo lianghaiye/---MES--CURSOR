@@ -426,11 +426,22 @@ export function fulfillShipAccessoryGapsBySupply(salesOrder, accessories, option
     const planRes = createProducePlanItemsForAccessoryGaps(salesOrder, buckets.produce)
     results.produce = planRes.workItems || []
     results.productionPlan = planRes.plan || null
+    results.designTasks = planRes.designTasks || []
     if (results.produce.length) {
       markAccessoryBucketConverted(buckets.produce, 'produce')
       const verb = planRes.created ? '已生成生产计划' : '已写入生产计划'
+      const pendingBom = results.produce.filter((w) => w.status === '待BOM').length
+      const ready = results.produce.length - pendingBom
+      const parts = []
+      if (ready > 0) parts.push(`待下达 ${ready} 项`)
+      if (pendingBom > 0) {
+        parts.push(`待BOM ${pendingBom} 项`)
+        if (results.designTasks.length) {
+          parts.push(`已建补BOM设计任务 ${results.designTasks.length} 条`)
+        }
+      }
       results.messages.push(
-        `${verb} ${planRes.plan?.orderNo || salesOrder?.orderNo || ''}（自制/组装 ${results.produce.length} 项，待下达）`,
+        `${verb} ${planRes.plan?.orderNo || salesOrder?.orderNo || ''}（自制/组装 ${parts.join('，')}）`,
       )
     } else if (planRes.plan) {
       markAccessoryBucketConverted(buckets.produce, 'produce')

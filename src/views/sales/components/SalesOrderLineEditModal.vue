@@ -561,7 +561,7 @@ function createDraft(line = {}) {
     material: line.material || '',
     unit: line.unit || '件',
     salesQty: line.salesQty ?? line.qty ?? 1,
-    deliveryMode: line.deliveryMode || '整机',
+    deliveryMode: line.deliveryMode || '整件',
     stockFulfillmentMode: normalizeStockFulfillmentMode(line.stockFulfillmentMode),
     preferStockTakeQty: normalizePreferStockTakeQty(line.preferStockTakeQty),
     deliveryDate: line.deliveryDate || '',

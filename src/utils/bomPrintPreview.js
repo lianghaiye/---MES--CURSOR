@@ -22,10 +22,11 @@ function clonePrintSource(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-function pruneOldBomPrintPayloads() {
+function pruneStorageKeys(storage) {
+  if (!storage) return
   const keys = []
-  for (let i = 0; i < sessionStorage.length; i += 1) {
-    const key = sessionStorage.key(i)
+  for (let i = 0; i < storage.length; i += 1) {
+    const key = storage.key(i)
     if (key && key.startsWith(STORAGE_PREFIX)) keys.push(key)
   }
   keys
@@ -33,11 +34,46 @@ function pruneOldBomPrintPayloads() {
     .slice(0, Math.max(0, keys.length - 8))
     .forEach((key) => {
       try {
-        sessionStorage.removeItem(key)
+        storage.removeItem(key)
       } catch {
         /* ignore */
       }
     })
+}
+
+function pruneOldBomPrintPayloads() {
+  pruneStorageKeys(sessionStorage)
+  try {
+    pruneStorageKeys(localStorage)
+  } catch {
+    /* ignore */
+  }
+}
+
+function writePreviewRaw(storageKey, raw) {
+  try {
+    sessionStorage.setItem(storageKey, raw)
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+      pruneOldBomPrintPayloads()
+      sessionStorage.setItem(storageKey, raw)
+    } else {
+      throw err
+    }
+  }
+  // 双写 localStorage：about:blank 新窗再跳转时，子窗 sessionStorage 常读不到父页后写入的数据
+  try {
+    localStorage.setItem(storageKey, raw)
+  } catch (err) {
+    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+      pruneOldBomPrintPayloads()
+      try {
+        localStorage.setItem(storageKey, raw)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
 
 /** 构建 BOM 打印/预览数据 */
@@ -101,35 +137,38 @@ export function buildBomPrintPayload({
 
 export function saveBomPrintPayload(payload) {
   const key = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
-  const raw = JSON.stringify(payload)
-  try {
-    sessionStorage.setItem(STORAGE_PREFIX + key, raw)
-  } catch (err) {
-    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
-      pruneOldBomPrintPayloads()
-      sessionStorage.setItem(STORAGE_PREFIX + key, raw)
-    } else {
-      throw err
-    }
-  }
+  writePreviewRaw(STORAGE_PREFIX + key, JSON.stringify(payload))
   return key
 }
 
 export function updateBomPrintPayload(key, payload) {
   if (!key || !payload) return
-  try {
-    sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(payload))
-  } catch (err) {
-    if (err?.name === 'QuotaExceededError' || err?.code === 22) {
-      pruneOldBomPrintPayloads()
-      sessionStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(payload))
-    }
-  }
+  writePreviewRaw(STORAGE_PREFIX + key, JSON.stringify(payload))
 }
 
 export function loadBomPrintPayload(key) {
   if (!key) return null
-  const raw = sessionStorage.getItem(STORAGE_PREFIX + key)
+  const storageKey = STORAGE_PREFIX + key
+  let raw = sessionStorage.getItem(storageKey)
+  if (!raw) {
+    try {
+      raw = localStorage.getItem(storageKey)
+    } catch {
+      raw = null
+    }
+    if (raw) {
+      try {
+        sessionStorage.setItem(storageKey, raw)
+      } catch {
+        /* ignore */
+      }
+      try {
+        localStorage.removeItem(storageKey)
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   if (!raw) return null
   try {
     return JSON.parse(raw)
@@ -152,6 +191,13 @@ export function openBomPrintPreview(
 ) {
   try {
     const key = saveBomPrintPayload(payload)
+    const storageKey = STORAGE_PREFIX + key
+    let raw = null
+    try {
+      raw = sessionStorage.getItem(storageKey) || localStorage.getItem(storageKey)
+    } catch {
+      raw = sessionStorage.getItem(storageKey)
+    }
     const query = { key }
     if (autoPrint) query.autoPrint = '1'
     const { href } = router.resolve({ name: 'product-process-bom-preview', query })
@@ -159,6 +205,12 @@ export function openBomPrintPreview(
 
     // 优先使用点击瞬间已打开的窗口（避免丢失用户手势被当广告拦截）
     if (previewWin && !previewWin.closed) {
+      // about:blank 子窗 sessionStorage 是打开瞬间拷贝，父页后写入的 key 子窗读不到
+      try {
+        if (raw) previewWin.sessionStorage.setItem(storageKey, raw)
+      } catch {
+        /* localStorage 双写已作兜底 */
+      }
       previewWin.location.href = absoluteHref
       return { ok: true }
     }

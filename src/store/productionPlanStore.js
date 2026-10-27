@@ -6,11 +6,14 @@ import { mockMaterials } from '@/mock/materialInfo'
 import { buildMockSalesOrders } from '@/mock/salesOrderSeed'
 import { buildInitialProductionPlans } from '@/mock/productionPlanSeed'
 import { getOwnActiveBomForItem, getProductBomById } from '@/store/productBomStore'
+import { productInfoState } from '@/store/productInfoStore'
+import { materialInfoState } from '@/store/materialInfoStore'
 import { buildEbomSnapshotFromBom, createPlanMaterial } from '@/utils/ebomSnapshot'
 import { enrichWorkItem, resolveSalesLineForWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
 import { ensurePackageConvertDemoOnPlans } from '@/mock/packageConvertPurchaseDemoSeed'
+import { ensureShipAccessoryProduceDemoPlans } from '@/mock/shipAccessoryProduceDemoSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
 import { MATERIAL_RELEASE_STATUS } from '@/constants/ecnPlanReschedule'
 import { flattenMaterials } from '@/utils/material'
@@ -76,7 +79,9 @@ function normalizePlanStatuses(orders) {
     firstSales._pendingDemoApplied = true
   }
 
-  return ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized))
+  return ensureShipAccessoryProduceDemoPlans(
+    ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized)),
+  )
 }
 
 /** 让 ECN-DEMO-COVER 的修改/替换/取消能对上这张订单的计划物料 */
@@ -296,39 +301,113 @@ export function createProductionPlanFromSalesOrder(salesOrder, options = {}) {
   return plan
 }
 
+/** 按配件编码解析主数据与自有生效产品 BOM（非发运 BOM） */
+function resolveShipAccessoryProduceBom(row = {}) {
+  const code = String(row.materialCode || row.itemCode || '').trim()
+  const products = productInfoState.products || []
+  const materials = materialInfoState.materials || []
+  const product =
+    (row.masterProductId && products.find((p) => String(p.id) === String(row.masterProductId))) ||
+    (code && products.find((p) => String(p.code || '').trim() === code)) ||
+    null
+  const material =
+    (row.masterMaterialId &&
+      materials.find((m) => String(m.id) === String(row.masterMaterialId))) ||
+    (code && materials.find((m) => String(m.code || '').trim() === code)) ||
+    null
+
+  if (product) {
+    const bom = getOwnActiveBomForItem('product', product.id)
+    return {
+      itemType: 'product',
+      productId: product.id,
+      productCode: product.code || code,
+      productName: product.name || row.materialName || code,
+      bom,
+    }
+  }
+  if (material) {
+    const bom = getOwnActiveBomForItem('material', material.id)
+    return {
+      itemType: 'material',
+      productId: material.id,
+      productCode: material.code || code,
+      productName: material.name || row.materialName || code,
+      bom,
+    }
+  }
+  return {
+    itemType: '',
+    productId: '',
+    productCode: code,
+    productName: row.materialName || code,
+    bom: null,
+  }
+}
+
 /**
- * 随货配件自制/组装缺口 → 生产计划工作项（待下达；不直建工单）
- * @param {object} salesOrder
- * @param {Array<object>} accessoryRows 已按履约数量筛好的配件行（含 qty/planQty）
- * @returns {{ plan: object|null, workItems: object[], created: boolean, appended: boolean }}
+ * 随货配件自制/组装缺口 → 生产计划工作项
+ * 有自有生效 BOM → 待下达 + EBOM 快照；无 BOM → 待 BOM + 补 BOM 轻类型设计任务
+ * @returns {{ plan, workItems, created, appended, designTasks }}
  */
 export function appendOrCreateProductionPlanForShipAccessories(salesOrder, accessoryRows = []) {
   const rows = (accessoryRows || []).filter((r) => (Number(r.planQty) || Number(r.qty) || 0) > 0)
   if (!rows.length || !salesOrder?.orderNo) {
-    return { plan: null, workItems: [], created: false, appended: false }
+    return { plan: null, workItems: [], created: false, appended: false, designTasks: [] }
   }
 
   const deliveryDate = resolveDeliveryDate(salesOrder.lineItems, salesOrder.documentDate)
+  const designTasks = []
   const newWorkItems = rows.map((row, index) => {
     const planQty = Math.max(0, Number(row.planQty ?? row.qty) || 0)
     const supplyForm = String(row.supplyForm || '自制件')
     const topLevelSupplyType = /组装/.test(supplyForm) ? '组装' : '自制件'
     const stockQty = Math.max(0, Number(row.availableStock) || 0)
+    const master = resolveShipAccessoryProduceBom(row)
+    const bom = master.bom
+    let status = '待下达'
+    let designTaskId = ''
+    let snapshot = { materials: [] }
+    let bomId = ''
+    let bomName = ''
+    let bomVersion = ''
+
+    if (bom) {
+      snapshot = buildEbomSnapshotFromBom(bom, planQty)
+      bomId = bom.id || ''
+      bomName = bom.bomName || ''
+      bomVersion = bom.version || ''
+    } else {
+      status = '待BOM'
+      // 运行时再取，避免 productionPlanStore ↔ designTaskStore 循环依赖
+      // eslint-disable-next-line global-require
+      const { createBomOnlyDesignTaskFromShipAccessory } = require('@/store/designTaskStore')
+      const task = createBomOnlyDesignTaskFromShipAccessory(salesOrder, row, {
+        productId: master.productId,
+        productCode: master.productCode,
+        productName: master.productName,
+        itemType: master.itemType,
+      })
+      designTaskId = task?.id || ''
+      if (task) designTasks.push(task)
+    }
+
     return enrichWorkItem(
       {
         id: `wi-acc-${row.id || row.materialCode || index}-${Date.now()}-${index}`,
         salesLineId: row.salesLineId || '',
         shipAccessoryLineId: row.id || '',
         fromShipAccessory: true,
-        status: '待下达',
+        designTaskId,
+        status,
         expanded: index === 0,
         salesQty: planQty,
         orderQty: planQty,
         planQty,
         stockQty,
-        productName: row.materialName || row.materialCode || '',
-        productCode: row.materialCode || row.itemCode || '',
-        productId: row.productId || '',
+        productName: master.productName || row.materialName || row.materialCode || '',
+        productCode: master.productCode || row.materialCode || row.itemCode || '',
+        productId: master.productId || '',
         productAttr: '随货配件',
         productType: '随货配件',
         model: row.specModel || '',
@@ -336,13 +415,17 @@ export function appendOrCreateProductionPlanForShipAccessories(salesOrder, acces
         unit: row.unit || '件',
         deliveryDate: row.deliveryDate || deliveryDate,
         topLevelSupplyType,
-        bomId: '',
-        bomName: '',
-        bomVersion: '',
-        ebomSnapshot: { materials: [] },
-        materials: [],
-        matchingRequirements: `随货配件缺口转生产（供应型态：${supplyForm}）`,
-        remark: `随货配件缺口转生产（供应型态：${supplyForm}）`,
+        bomId,
+        bomName,
+        bomVersion,
+        ebomSnapshot: snapshot,
+        materials: snapshot.materials || [],
+        matchingRequirements: bom
+          ? `随货配件缺口转生产（供应型态：${supplyForm}）`
+          : `随货配件待BOM，请完成补BOM设计任务（供应型态：${supplyForm}）`,
+        remark: bom
+          ? `随货配件缺口转生产（供应型态：${supplyForm}）`
+          : `随货配件待BOM（供应型态：${supplyForm}）`,
       },
       null,
       index,
@@ -360,7 +443,7 @@ export function appendOrCreateProductionPlanForShipAccessories(salesOrder, acces
       return !key || !known.has(key)
     })
     if (!toAdd.length) {
-      return { plan: existing, workItems: [], created: false, appended: false }
+      return { plan: existing, workItems: [], created: false, appended: false, designTasks: [] }
     }
     existing.workItems = [...(existing.workItems || []), ...toAdd]
     const addQty = toAdd.reduce((s, w) => s + (Number(w.planQty) || 0), 0)
@@ -371,12 +454,21 @@ export function appendOrCreateProductionPlanForShipAccessories(salesOrder, acces
         : '含随货配件自制/组装'
     }
     if (!Array.isArray(existing.tags)) existing.tags = []
-    if (!existing.tags.includes('待下达')) existing.tags.push('待下达')
-    return { plan: existing, workItems: toAdd, created: false, appended: true }
+    if (toAdd.some((w) => w.status === '待BOM') && !existing.tags.includes('待BOM')) {
+      existing.tags.push('待BOM')
+    }
+    if (toAdd.some((w) => w.status === '待下达') && !existing.tags.includes('待下达')) {
+      existing.tags.push('待下达')
+    }
+    designTasks.forEach((t) => {
+      t.productionPlanId = existing.id
+    })
+    return { plan: existing, workItems: toAdd, created: false, appended: true, designTasks }
   }
 
   const totalQty = newWorkItems.reduce((s, w) => s + (Number(w.planQty) || 0), 0)
   const daysToDelivery = Math.max(0, dayjs(deliveryDate).diff(dayjs(), 'day'))
+  const hasPendingBom = newWorkItems.some((w) => w.status === '待BOM')
   const plan = {
     id: `pp-${Date.now()}`,
     planSource: PLAN_SOURCE.SALES_ORDER,
@@ -386,14 +478,14 @@ export function appendOrCreateProductionPlanForShipAccessories(salesOrder, acces
     productQty: totalQty,
     salesperson: salesOrder.salesperson || '',
     urgency: mapUrgencyToPlan(salesOrder.urgency),
-    orderStatus: '待下达',
+    orderStatus: hasPendingBom ? '待BOM' : '待下达',
     orderDate: salesOrder.documentDate || dayjs().format('YYYY-MM-DD'),
     deliveryDate,
     region: salesOrder.region || '',
     settlementType: salesOrder.settlementType || '',
     deliveryMethod: salesOrder.deliveryMethod || '',
     remark: `由销售订单 ${salesOrder.orderNo} 随货配件自制/组装缺口生成`,
-    tags: ['待下达'],
+    tags: hasPendingBom ? ['待BOM'] : ['待下达'],
     daysToDelivery,
     planAssemblyDate: '',
     planCompleteDate: deliveryDate,
@@ -401,7 +493,10 @@ export function appendOrCreateProductionPlanForShipAccessories(salesOrder, acces
     workItems: newWorkItems,
   }
   addProductionPlan(plan)
-  return { plan, workItems: newWorkItems, created: true, appended: false }
+  designTasks.forEach((t) => {
+    t.productionPlanId = plan.id
+  })
+  return { plan, workItems: newWorkItems, created: true, appended: false, designTasks }
 }
 
 let replenishPlanSeq = 1

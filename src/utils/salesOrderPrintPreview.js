@@ -59,7 +59,7 @@ export function buildSalesOrderPrintPayload(order, options = {}) {
     totalPriceExTax: formatPrintMoney(line.totalPriceExTax),
     totalPriceInTax: formatPrintMoney(line.totalPriceInTax ?? line.amountInTax),
     deliveryDate: formatPrintFieldValue(line.deliveryDate),
-    deliveryMode: formatPrintFieldValue(line.deliveryMode || '整机'),
+    deliveryMode: formatPrintFieldValue(line.deliveryMode || '整件'),
     remark: formatPrintFieldValue(line.supplementDesc || line.remark || line.lineRemark),
   }))
 

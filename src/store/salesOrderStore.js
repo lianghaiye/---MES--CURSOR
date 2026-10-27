@@ -71,6 +71,7 @@ import { ensureDedicatedShipDemoSalesOrders } from '@/mock/dedicatedShipDemoSeed
 import { ensureScatterEbomShipDemoSalesOrders } from '@/mock/scatterEbomShipDemoSeed'
 import { ensureSalesLineShipInfoDemoSalesOrders } from '@/mock/salesLineShipInfoDemoSeed'
 import { ensureShipAccessoryDemoSalesOrders } from '@/mock/shipAccessoryDemoSeed'
+import { ensureShipAccessoryProduceDemoSalesOrders } from '@/mock/shipAccessoryProduceDemoSeed'
 import { ensureSalesApprovalDemoSalesOrders } from '@/mock/salesApprovalDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
 
@@ -129,11 +130,13 @@ function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
   return ensureSalesApprovalDemoSalesOrders(
-    ensureShipAccessoryDemoSalesOrders(
-      ensureIndustrialLabelDemoSalesOrder(
-        ensureScatterEbomShipDemoSalesOrders(
-          ensureDedicatedShipDemoSalesOrders(
-            ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+    ensureShipAccessoryProduceDemoSalesOrders(
+      ensureShipAccessoryDemoSalesOrders(
+        ensureIndustrialLabelDemoSalesOrder(
+          ensureScatterEbomShipDemoSalesOrders(
+            ensureDedicatedShipDemoSalesOrders(
+              ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+            ),
           ),
         ),
       ),
@@ -174,7 +177,7 @@ function ensureIndustrialLabelDemoSalesOrder(orders) {
             salesQty: 4,
             needIndustrialLabel: true,
             stockFulfillmentMode: 'prefer_stock',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
             unit: p0.inventoryUnit || '台',
             businessType: '自产销售',
           }),
@@ -187,7 +190,7 @@ function ensureIndustrialLabelDemoSalesOrder(orders) {
             salesQty: 2,
             needIndustrialLabel: true,
             stockFulfillmentMode: 'force_mto',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
             unit: p1.inventoryUnit || '台',
             businessType: '自产销售',
           }),
@@ -201,7 +204,7 @@ function ensureIndustrialLabelDemoSalesOrder(orders) {
                   productAttr: p3.productAttribute,
                   salesQty: 1,
                   needIndustrialLabel: false,
-                  deliveryMode: '整机',
+                  deliveryMode: '整件',
                   unit: p3.inventoryUnit || '台',
                   businessType: '自产销售',
                 }),
@@ -253,7 +256,7 @@ function ensureIndustrialLabelDemoSalesOrder(orders) {
             industrialLabelFailCount: 0,
             industrialLabelRequestNo: 'GYHLBS260903001',
             stockFulfillmentMode: 'prefer_stock',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
             unit: p0.inventoryUnit || '台',
             businessType: '自产销售',
           }),
@@ -272,7 +275,7 @@ function ensureIndustrialLabelDemoSalesOrder(orders) {
             industrialLabelFailCount: 0,
             industrialLabelRequestNo: 'GYHLBS260903001',
             stockFulfillmentMode: 'force_mto',
-            deliveryMode: '整机',
+            deliveryMode: '整件',
             unit: p1.inventoryUnit || '台',
             businessType: '自产销售',
           }),

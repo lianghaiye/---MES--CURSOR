@@ -188,7 +188,7 @@
     </div>
 
     <div v-if="form.lineItems.length" class="section-block section-block--lines">
-      <div class="section-title">整机发货</div>
+      <div class="section-title">整件发货</div>
       <a-divider class="section-divider" />
       <div
         ref="lineTablePanelRef"
@@ -272,7 +272,7 @@
               </template>
               <template v-else-if="column.key === 'deliveryMode'">
                 <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
-                  {{ record.deliveryMode || '整机' }}
+                  {{ record.deliveryMode || '整件' }}
                 </a-tag>
               </template>
               <template v-else-if="column.key === 'variantAttr'">

@@ -12,6 +12,17 @@ export const DESIGN_TASK_STATUS = {
 export const DESIGN_TASK_SOURCE = {
   SALES_ORDER: '销售订单',
   MANUAL: '手工新增',
+  SHIP_ACCESSORY: '随货配件',
+}
+
+/**
+ * 任务类型
+ * - full：整机/定制设计（出图、审 EBOM）
+ * - bom_only：轻类型，仅为配件/SKU 补齐并启用产品 BOM
+ */
+export const DESIGN_TASK_KIND = {
+  FULL: 'full',
+  BOM_ONLY: 'bom_only',
 }
 
 /** 需自动生成设计任务的产品属性 */
@@ -19,6 +30,10 @@ export const CUSTOM_PRODUCT_ATTRIBUTES = ['定制产品', '定制-成品零部�
 
 export function isCustomProductAttribute(attr) {
   return CUSTOM_PRODUCT_ATTRIBUTES.includes(attr)
+}
+
+export function isBomOnlyDesignTask(task) {
+  return task?.taskKind === DESIGN_TASK_KIND.BOM_ONLY
 }
 
 export function designTaskStatusColor(status) {
@@ -37,5 +52,11 @@ export function designTaskStatusColor(status) {
 export function designTaskSourceLabel(source) {
   if (source === DESIGN_TASK_SOURCE.SALES_ORDER) return '销售订单'
   if (source === DESIGN_TASK_SOURCE.MANUAL) return '新增'
+  if (source === DESIGN_TASK_SOURCE.SHIP_ACCESSORY) return '随货配件'
   return source || '—'
+}
+
+export function designTaskKindLabel(kind) {
+  if (kind === DESIGN_TASK_KIND.BOM_ONLY) return '补BOM'
+  return '设计'
 }

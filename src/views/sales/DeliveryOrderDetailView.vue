@@ -35,7 +35,7 @@
               <DeliveryOrderBasicInfoSection :order="record" @go-sales="goSalesOrder" />
             </DetailSectionCard>
 
-            <DetailSectionCard v-if="record.lineItems?.length" title="整机发货明细">
+            <DetailSectionCard v-if="record.lineItems?.length" title="整件发货明细">
               <a-table
                 class="delivery-line-table"
                 :columns="wholeColumns"

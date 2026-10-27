@@ -278,6 +278,7 @@ function withWorkItemBomIdentity(material, wi, extra = {}) {
 export function getSelfMadeMaterialsForPlan(order) {
   const all = []
   order?.workItems?.forEach((wi) => {
+    if (wi?.status === '设计中' || wi?.status === '待BOM') return
     resolveWorkItemMaterials(wi)
     const top = wi._topMaterial || buildTopLevelPlanMaterial(wi)
     if (top && isTopLevelSelfMade(top.supplyType)) {
@@ -303,6 +304,7 @@ export function isTopLevelSelfMade(supplyType) {
 export function getAssemblyMaterialsForPlan(order) {
   const all = []
   order?.workItems?.forEach((wi) => {
+    if (wi?.status === '设计中' || wi?.status === '待BOM') return
     resolveWorkItemMaterials(wi)
     const top = wi._topMaterial || buildTopLevelPlanMaterial(wi)
     if (top?.supplyType === '组装') {

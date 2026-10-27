@@ -282,7 +282,7 @@
                   </template>
                   <template v-else-if="column.key === 'deliveryMode'">
                     <a-tag :color="line.deliveryMode === '散件' ? 'orange' : 'blue'">
-                      {{ line.deliveryMode || '整机' }}
+                      {{ line.deliveryMode || '整件' }}
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'stockFulfillmentMode'">

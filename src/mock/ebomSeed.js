@@ -35,7 +35,7 @@ export function buildMockEbomRecords() {
       id: 'ebom-seed-002',
       ebomNo: 'EBOM-2026-0202',
       ebomName: '潜水电泵 QJ200-40/3 EBOM',
-      status: EBOM_STATUS.DRAFT,
+      status: EBOM_STATUS.FINALIZED,
       version: 'V1.0',
       designTaskId: 'dt-seed-003',
       designTaskNo: 'SJ-2026-0003',
@@ -55,7 +55,7 @@ export function buildMockEbomRecords() {
       designer: '赵设计',
       createdAt: now.subtract(5, 'day').format('YYYY-MM-DD HH:mm:ss'),
       updatedAt: now.subtract(2, 'day').format('YYYY-MM-DD HH:mm:ss'),
-      finalizedAt: '',
+      finalizedAt: now.subtract(1, 'day').format('YYYY-MM-DD HH:mm:ss'),
     },
   ]
 }

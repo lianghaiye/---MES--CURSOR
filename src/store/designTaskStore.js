@@ -2,7 +2,12 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { mockProducts } from '@/mock/productInfo'
 import { buildMockDesignTasks } from '@/mock/designTaskSeed'
-import { DESIGN_TASK_SOURCE, DESIGN_TASK_STATUS } from '@/constants/designTask'
+import {
+  DESIGN_TASK_KIND,
+  DESIGN_TASK_SOURCE,
+  DESIGN_TASK_STATUS,
+  isBomOnlyDesignTask,
+} from '@/constants/designTask'
 import { EBOM_STATUS } from '@/constants/ebom'
 import { addProductionPlan, findPlanBySalesOrderNo } from '@/store/productionPlanStore'
 import { findEbomById, revertEbomToDraft } from '@/store/ebomStore'
@@ -13,7 +18,8 @@ import { publishEbomToProductBom } from '@/utils/publishEbomToProductBom'
 import { designTaskCanPublishProductBom } from '@/utils/designTaskProductMaster'
 
 const STORAGE_KEY = 'i_doms_design_tasks'
-const DATA_VERSION = 3
+/** v4：种子含「待审核」任务，列表操作列可点审核 */
+const DATA_VERSION = 4
 let taskSeq = 100
 
 function loadFromStorage() {
@@ -39,8 +45,17 @@ function persist() {
   )
 }
 
+function loadInitialDesignTasks() {
+  // eslint-disable-next-line global-require
+  const {
+    ensureShipAccessoryProduceDemoDesignTasks,
+  } = require('@/mock/shipAccessoryProduceDemoSeed')
+  const base = loadFromStorage() || buildMockDesignTasks(mockProducts)
+  return ensureShipAccessoryProduceDemoDesignTasks(base)
+}
+
 export const designTaskState = reactive({
-  tasks: loadFromStorage() || buildMockDesignTasks(mockProducts),
+  tasks: loadInitialDesignTasks(),
 })
 
 watch(
@@ -77,25 +92,28 @@ function syncTaskFromEbom(task, ebom) {
   task.baselineBomId = ebom.baselineBomId || task.baselineBomId || ''
 }
 
-function buildTaskBase(salesOrder, line, product, source) {
+function buildTaskBase(salesOrder, line, product, source, extras = {}) {
   return {
     status: DESIGN_TASK_STATUS.PENDING,
     source,
+    taskKind: extras.taskKind || DESIGN_TASK_KIND.FULL,
     salesOrderNo: line?.salesOrderNo || salesOrder?.orderNo || '',
     salesLineId: line?.id || '',
+    shipAccessoryLineId: extras.shipAccessoryLineId || '',
+    fromShipAccessory: !!extras.fromShipAccessory,
     customerName: line?.customerName || salesOrder?.customerName || '',
     contractNo: line?.contractNo || salesOrder?.contractNo || '',
-    remark: line?.remark || '',
-    quantity: Number(line?.quantity ?? line?.salesQty) || 1,
+    remark: line?.remark || extras.remark || '',
+    quantity: Number(line?.quantity ?? line?.salesQty ?? extras.quantity) || 1,
     orderType: salesOrder?.orderType || line?.orderType || '标准订单',
     orderDate: salesOrder?.documentDate || line?.orderDate || dayjs().format('YYYY-MM-DD'),
     urgency: salesOrder?.urgency || line?.urgency || '普通',
     deliveryDate: line?.deliveryDate || salesOrder?.documentDate || '',
-    productId: line?.productId || product?.id || '',
-    productCode: line?.productCode || product?.code || '',
-    productName: line?.productName || product?.name || '',
-    productAttr: line?.productAttr || product?.productAttribute || '',
-    specModel: line?.specModel || product?.specModel || '',
+    productId: line?.productId || product?.id || extras.productId || '',
+    productCode: line?.productCode || product?.code || extras.productCode || '',
+    productName: line?.productName || product?.name || extras.productName || '',
+    productAttr: line?.productAttr || product?.productAttribute || extras.productAttr || '',
+    specModel: line?.specModel || product?.specModel || extras.specModel || '',
     specAttr: line?.specAttr || product?.standardSpec || '',
     material: line?.material || product?.material || '',
     techParams: line?.techParams || product?.techParams || '',
@@ -125,7 +143,72 @@ export function createDesignTaskFromSalesLine(salesOrder, line) {
   const task = {
     id: `dt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     taskNo: generateDesignTaskNo(),
-    ...buildTaskBase(salesOrder, line, product, DESIGN_TASK_SOURCE.SALES_ORDER),
+    ...buildTaskBase(salesOrder, line, product, DESIGN_TASK_SOURCE.SALES_ORDER, {
+      taskKind: DESIGN_TASK_KIND.FULL,
+    }),
+  }
+  designTaskState.tasks.unshift(task)
+  return task
+}
+
+export function findDesignTaskByShipAccessoryLine(salesOrderNo, shipAccessoryLineId) {
+  const accId = String(shipAccessoryLineId || '')
+  if (!salesOrderNo || !accId) return null
+  return (
+    designTaskState.tasks.find(
+      (t) =>
+        t.salesOrderNo === salesOrderNo &&
+        String(t.shipAccessoryLineId || '') === accId &&
+        t.status !== DESIGN_TASK_STATUS.VOIDED,
+    ) || null
+  )
+}
+
+/**
+ * 随货配件无产品 BOM：创建补 BOM 轻类型设计任务
+ * @param {object} salesOrder
+ * @param {object} accessoryRow
+ * @param {{ productId?: string, productCode?: string, productName?: string, itemType?: string }} master
+ */
+export function createBomOnlyDesignTaskFromShipAccessory(salesOrder, accessoryRow, master = {}) {
+  const accId = accessoryRow?.id || ''
+  if (accId) {
+    const existing = findDesignTaskByShipAccessoryLine(salesOrder?.orderNo, accId)
+    if (existing) return existing
+  }
+
+  const product = master.productId ? resolveProduct(master.productId) : null
+  const qty = Number(accessoryRow?.planQty ?? accessoryRow?.shipQty ?? accessoryRow?.qty) || 1
+  const task = {
+    id: `dt-acc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    taskNo: generateDesignTaskNo(),
+    ...buildTaskBase(
+      salesOrder,
+      {
+        id: '',
+        salesQty: qty,
+        productId: master.productId || '',
+        productCode: master.productCode || accessoryRow?.materialCode || '',
+        productName: master.productName || accessoryRow?.materialName || '',
+        productAttr: '随货配件',
+        specModel: accessoryRow?.specModel || '',
+        deliveryDate: accessoryRow?.deliveryDate || '',
+      },
+      product,
+      DESIGN_TASK_SOURCE.SHIP_ACCESSORY,
+      {
+        taskKind: DESIGN_TASK_KIND.BOM_ONLY,
+        shipAccessoryLineId: accId,
+        fromShipAccessory: true,
+        quantity: qty,
+        productId: master.productId || '',
+        productCode: master.productCode || accessoryRow?.materialCode || '',
+        productName: master.productName || accessoryRow?.materialName || '',
+        productAttr: '随货配件',
+        specModel: accessoryRow?.specModel || '',
+        remark: `随货配件补BOM（供应型态：${accessoryRow?.supplyForm || '自制件'}）`,
+      },
+    ),
   }
   designTaskState.tasks.unshift(task)
   return task
@@ -234,10 +317,20 @@ function onDesignTaskApproved(task, checker = 'admin1', options = {}) {
   task.checkTime = dayjs().format('YYYY-MM-DD HH:mm')
   syncTaskFromEbom(task, ebom)
 
-  if (task.source === DESIGN_TASK_SOURCE.SALES_ORDER && task.salesOrderNo) {
+  if (
+    (task.source === DESIGN_TASK_SOURCE.SALES_ORDER ||
+      task.source === DESIGN_TASK_SOURCE.SHIP_ACCESSORY) &&
+    task.salesOrderNo
+  ) {
     const plan = findPlanBySalesOrderNo(task.salesOrderNo)
     if (plan) {
-      const wi = plan.workItems?.find((w) => w.salesLineId === task.salesLineId)
+      const accId = String(task.shipAccessoryLineId || '')
+      const wi =
+        plan.workItems?.find((w) => w.designTaskId && w.designTaskId === task.id) ||
+        (accId
+          ? plan.workItems?.find((w) => String(w.shipAccessoryLineId || '') === accId)
+          : null) ||
+        (task.salesLineId ? plan.workItems?.find((w) => w.salesLineId === task.salesLineId) : null)
       if (wi) {
         wi.status = '待下达'
         wi.designTaskId = task.id
@@ -245,9 +338,10 @@ function onDesignTaskApproved(task, checker = 'admin1', options = {}) {
       }
       task.productionPlanId = plan.id
     }
+    const kindTip = isBomOnlyDesignTask(task) ? '（补BOM）' : ''
     return {
       ok: true,
-      message: `设计任务「${task.taskNo}」审核通过，生产计划已关联 EBOM${publishSuffix}`,
+      message: `设计任务「${task.taskNo}」${kindTip}审核通过，生产计划已关联 EBOM${publishSuffix}`,
       task,
     }
   }
@@ -339,6 +433,11 @@ export function voidIncompleteDesignTasksForPlan(plan) {
     if (wi?.salesLineId) lineIds.add(wi.salesLineId)
   })
 
+  const accessoryLineIds = new Set()
+  ;(plan.workItems || []).forEach((wi) => {
+    if (wi?.shipAccessoryLineId) accessoryLineIds.add(String(wi.shipAccessoryLineId))
+  })
+
   const tasks = designTaskState.tasks.filter((task) => {
     if (task.status === DESIGN_TASK_STATUS.APPROVED || task.status === DESIGN_TASK_STATUS.VOIDED) {
       return false
@@ -350,6 +449,14 @@ export function voidIncompleteDesignTasksForPlan(plan) {
       task.salesOrderNo === plan.salesOrderNo &&
       task.salesLineId &&
       lineIds.has(task.salesLineId)
+    ) {
+      return true
+    }
+    if (
+      plan.salesOrderNo &&
+      task.salesOrderNo === plan.salesOrderNo &&
+      task.shipAccessoryLineId &&
+      accessoryLineIds.has(String(task.shipAccessoryLineId))
     ) {
       return true
     }

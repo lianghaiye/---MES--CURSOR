@@ -9,7 +9,8 @@ import { buildMockEbomRecords } from '@/mock/ebomSeed'
 import { ensureScatterEbomRecord } from '@/mock/scatterEbomShipDemoSeed'
 
 const STORAGE_KEY = 'i_doms_ebom'
-const DATA_VERSION = 2
+/** v3：种子 EBOM-002 定稿，供设计任务待审核演示 */
+const DATA_VERSION = 3
 let ebomSeq = 200
 
 function loadFromStorage() {

@@ -55,7 +55,7 @@ export function buildDedicatedShipDemoSalesOrder() {
         unitPriceExTax: 1000,
         totalPriceExTax: 10000,
         totalPriceInTax: 11300,
-        deliveryMode: '整机',
+        deliveryMode: '整件',
       }),
     ],
   })

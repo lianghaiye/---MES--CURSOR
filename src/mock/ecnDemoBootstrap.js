@@ -263,7 +263,7 @@ export function buildEcnDemoSalesOrder() {
     return buildEcnBoundLine(product, {
       id: `line-ecn-demo-${index + 1}`,
       salesQty: [5, 3, 2][index] ?? 1,
-      deliveryMode: index === 1 ? '散件' : '整机',
+      deliveryMode: index === 1 ? '散件' : '整件',
       techParams: `ECN 演示行 · 关联 ${scenario.ecnNo}`,
       supplementDesc: `订单绑定 ${scenario.ecnNo} 执行前的 BOM 版本，可在详情「BOM版本」Tab 查看 EBOM 差异`,
     })

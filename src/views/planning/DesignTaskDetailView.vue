@@ -6,6 +6,7 @@
           <div class="header-left">
             <span class="order-no">{{ task.taskNo }}</span>
             <a-tag :color="designTaskStatusColor(task.status)">{{ task.status }}</a-tag>
+            <a-tag v-if="isBomOnly" color="cyan">补BOM</a-tag>
           </div>
           <a-space :size="8" class="header-actions">
             <a-button
@@ -14,7 +15,7 @@
               size="small"
               @click="openEbomDesign"
             >
-              {{ canOpenDraft ? '打开草稿' : '设计' }}
+              {{ canOpenDraft ? '打开草稿' : isBomOnly ? '补BOM' : '设计' }}
             </a-button>
             <a-button size="small" @click="handleBack">返回列表</a-button>
           </a-space>
@@ -33,7 +34,13 @@
               @select-node="selectedNodeId = $event"
             />
             <div v-else class="empty-tree">
-              <a-empty description="暂无 EBOM 树数据，请先进入设计生成草稿" />
+              <a-empty
+                :description="
+                  isBomOnly
+                    ? '暂无 BOM 树，请点「补BOM」维护并定稿'
+                    : '暂无 EBOM 树数据，请先进入设计生成草稿'
+                "
+              />
             </div>
           </aside>
           <div class="panel-resizer" @mousedown.prevent="onResizeMouseDown" />
@@ -44,6 +51,10 @@
                   <div class="meta-item">
                     <span class="field-label">来源</span>
                     <span class="field-value">{{ designTaskSourceLabel(task.source) }}</span>
+                  </div>
+                  <div class="meta-item">
+                    <span class="field-label">类型</span>
+                    <span class="field-value">{{ isBomOnly ? '补BOM（轻类型）' : '设计' }}</span>
                   </div>
                   <div class="meta-item">
                     <span class="field-label">设计人</span>
@@ -176,6 +187,7 @@ import {
   DESIGN_TASK_STATUS,
   designTaskSourceLabel,
   designTaskStatusColor,
+  isBomOnlyDesignTask,
 } from '@/constants/designTask'
 import { canOpenEbomDesign, findDesignTaskById } from '@/store/designTaskStore'
 import { findEbomByDesignTaskId, findEbomById } from '@/store/ebomStore'
@@ -255,6 +267,8 @@ const detailRootMeta = computed(() => {
     subItemCount: lineItems.value.filter((l) => l.parentTreeId === rootId).length,
   }
 })
+
+const isBomOnly = computed(() => isBomOnlyDesignTask(task.value))
 
 const canStartDesign = computed(
   () => task.value?.status === DESIGN_TASK_STATUS.PENDING && canOpenEbomDesign(task.value),

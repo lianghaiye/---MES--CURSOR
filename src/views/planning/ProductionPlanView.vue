@@ -249,7 +249,7 @@
                   </template>
                   <template v-else-if="column.key === 'deliveryMode'">
                     <a-tag :color="record.deliveryMode === '散件' ? 'orange' : 'blue'">
-                      {{ record.deliveryMode || '整机' }}
+                      {{ record.deliveryMode || '整件' }}
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'stockQty'">
@@ -1430,7 +1430,11 @@ function openAssemblyWorkOrderModal() {
     return
   }
   if (activeWorkItem.value?.status === '待BOM') {
-    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑')
+    message.warning(
+      activeWorkItem.value?.fromShipAccessory
+        ? '当前随货配件工作项「待BOM」，请先完成补BOM设计任务'
+        : '当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑',
+    )
     return
   }
   if (!assemblyMaterialsForPlan.value.length) {
@@ -1450,7 +1454,11 @@ function openWorkOrderModal() {
     return
   }
   if (activeWorkItem.value?.status === '待BOM') {
-    message.warning('当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑')
+    message.warning(
+      activeWorkItem.value?.fromShipAccessory
+        ? '当前随货配件工作项「待BOM」，请先完成补BOM设计任务'
+        : '当前工作项处于「待BOM」，请先维护产品 BOM 或改选 BOM 来源后补绑',
+    )
     return
   }
   if (!selfMadeMaterials.value.length) {

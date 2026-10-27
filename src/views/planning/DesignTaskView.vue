@@ -111,6 +111,7 @@
     <a-tabs v-model:activeKey="listTab" size="small" class="list-status-tabs" @change="onTabChange">
       <a-tab-pane key="all" tab="全部" />
       <a-tab-pane key="pending" tab="待设计" />
+      <a-tab-pane key="pendingAudit" tab="待审核" />
       <a-tab-pane key="approved" tab="审核通过" />
       <a-tab-pane key="voided" tab="已作废" />
     </a-tabs>
@@ -133,6 +134,11 @@
           <template v-else-if="column.key === 'source'">
             <span>{{ designTaskSourceLabel(record.source) }}</span>
           </template>
+          <template v-else-if="column.key === 'taskKind'">
+            <a-tag :color="isBomOnlyDesignTask(record) ? 'cyan' : 'default'">
+              {{ designTaskKindLabel(record.taskKind) }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'taskNo'">
             <a class="link-code" @click.prevent="openDetail(record)">{{ record.taskNo }}</a>
           </template>
@@ -145,7 +151,7 @@
                 size="small"
                 @click="openEbomDesign(record)"
               >
-                设计
+                {{ isBomOnlyDesignTask(record) ? '补BOM' : '设计' }}
               </a-button>
               <a-button
                 v-if="canOpenDraft(record)"
@@ -159,9 +165,18 @@
                 v-if="canApproveRow(record)"
                 type="link"
                 size="small"
+                class="action-approve"
                 @click="handleApproveRow(record)"
               >
                 审核
+              </a-button>
+              <a-button
+                v-if="canWithdrawRow(record)"
+                type="link"
+                size="small"
+                @click="handleWithdrawRow(record)"
+              >
+                撤回
               </a-button>
             </a-space>
           </template>
@@ -213,6 +228,8 @@ import {
   DESIGN_TASK_STATUS,
   designTaskStatusColor,
   designTaskSourceLabel,
+  designTaskKindLabel,
+  isBomOnlyDesignTask,
 } from '@/constants/designTask'
 import {
   designTaskState,
@@ -252,6 +269,7 @@ const allColumns = [
   { title: '状态', key: 'status', dataIndex: 'status', width: 88, fixed: 'left' },
   { title: '设计任务编号', key: 'taskNo', dataIndex: 'taskNo', width: 130 },
   { title: '来源', key: 'source', dataIndex: 'source', width: 88 },
+  { title: '类型', key: 'taskKind', dataIndex: 'taskKind', width: 72 },
   { title: '产品名称', key: 'productName', dataIndex: 'productName', width: 160, ellipsis: true },
   { title: '型号规格', key: 'specModel', dataIndex: 'specModel', width: 110 },
   { title: '规格属性', key: 'specAttr', dataIndex: 'specAttr', width: 90 },
@@ -268,7 +286,7 @@ const allColumns = [
   { title: '校核时间', key: 'checkTime', dataIndex: 'checkTime', width: 130 },
   { title: '工单创建时间', key: 'createdAt', dataIndex: 'createdAt', width: 130 },
   { title: '业务员', key: 'salesperson', dataIndex: 'salesperson', width: 80 },
-  { title: '操作', key: 'action', width: 180, fixed: 'right' },
+  { title: '操作', key: 'action', width: 220, fixed: 'right' },
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
@@ -282,6 +300,7 @@ const filteredList = computed(() => {
     f.orderDateRange = null
   }
   if (listTab.value === 'pending') f.status = DESIGN_TASK_STATUS.PENDING
+  else if (listTab.value === 'pendingAudit') f.status = DESIGN_TASK_STATUS.PENDING_AUDIT
   else if (listTab.value === 'approved') f.status = DESIGN_TASK_STATUS.APPROVED
   else if (listTab.value === 'voided') f.status = DESIGN_TASK_STATUS.VOIDED
   const rows = filterDesignTasks(designTaskState.tasks, f)
@@ -343,6 +362,10 @@ function canOpenDraft(record) {
 }
 
 function canApproveRow(record) {
+  return record.status === DESIGN_TASK_STATUS.PENDING_AUDIT
+}
+
+function canWithdrawRow(record) {
   return record.status === DESIGN_TASK_STATUS.PENDING_AUDIT
 }
 
@@ -428,6 +451,12 @@ function handleApproveRow(record) {
   confirmApprove([record.id])
 }
 
+function handleWithdrawRow(record) {
+  const result = withdrawDesignTaskAudit(record.id)
+  if (result.ok) message.success(result.message)
+  else message.warning(result.message)
+}
+
 function handleWithdraw() {
   if (!selectedRowKeys.value.length) {
     message.warning('请先选择要撤回的设计任务')
@@ -487,6 +516,11 @@ function handleWithdraw() {
 
 .list-status-tabs + .table-card {
   border-radius: 0 0 6px 6px;
+}
+
+.action-approve {
+  color: #1677ff;
+  font-weight: 500;
 }
 
 .table-card {

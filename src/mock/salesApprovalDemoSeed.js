@@ -25,7 +25,7 @@ function pumpLine(id, extra = {}) {
     taxRate: 13,
     totalPriceExTax: 19600,
     totalPriceInTax: 22148,
-    deliveryMode: '整机',
+    deliveryMode: '整件',
     businessType: '自产销售',
     ...extra,
   })

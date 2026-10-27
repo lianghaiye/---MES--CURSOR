@@ -8,7 +8,8 @@ import {
 } from '@/utils/supplierMaster'
 
 const STORAGE_KEY = 'i_doms_suppliers'
-const DATA_VERSION = 1
+/** v2：补结算账期字段；标准件改为周结便于结算规则演示 */
+const DATA_VERSION = 2
 
 const LEGACY_SUPPLIER_SEED = [
   {
@@ -23,6 +24,8 @@ const LEGACY_SUPPLIER_SEED = [
     settlementMethod: '银行转账',
     settlementCycle: '月结',
     settlementType: '先货后款',
+    paymentTermStart: '开票日',
+    paymentTermDays: 30,
     paymentMethod: '银行转账',
     quoteMethod: '询价议价',
     contacts: [{ name: '张采购', phone: '021-66001101', title: '采购经理' }],
@@ -39,6 +42,8 @@ const LEGACY_SUPPLIER_SEED = [
     settlementMethod: '银行转账',
     settlementCycle: '月结',
     settlementType: '先货后款',
+    paymentTermStart: '开票日',
+    paymentTermDays: 30,
     paymentMethod: '银行转账',
   },
   {
@@ -53,6 +58,8 @@ const LEGACY_SUPPLIER_SEED = [
     settlementMethod: '银行转账',
     settlementCycle: '月结',
     settlementType: '先货后款',
+    paymentTermStart: '开票日',
+    paymentTermDays: 60,
     paymentMethod: '银行转账',
   },
   {
@@ -67,6 +74,8 @@ const LEGACY_SUPPLIER_SEED = [
     settlementMethod: '承兑汇票',
     settlementCycle: '季结',
     settlementType: '先款后货',
+    paymentTermStart: '对账日',
+    paymentTermDays: 30,
     paymentMethod: '承兑汇票',
   },
   {
@@ -94,8 +103,10 @@ const LEGACY_SUPPLIER_SEED = [
     enterpriseScale: '小型',
     supplyCycleDays: 3,
     settlementMethod: '银行转账',
-    settlementCycle: '月结',
+    settlementCycle: '周结',
     settlementType: '先货后款',
+    paymentTermStart: '开票日',
+    paymentTermDays: 15,
     paymentMethod: '银行转账',
   },
   {
