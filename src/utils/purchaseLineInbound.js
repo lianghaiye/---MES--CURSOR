@@ -239,6 +239,36 @@ export function calcPoHeaderInboundStatus(po) {
   return '部分入库'
 }
 
+/**
+ * 明细入账状态：已完全入库（含退货结清）→ 已入账；否则未入账。
+ * （行上仅两种：已入账 / 未入账）
+ */
+export function calcPoLineAccountStatus(po, line) {
+  return calcPoLineInboundStatus(po, line) === '已入库' ? '已入账' : '未入账'
+}
+
+/**
+ * 整单入账状态：全部已入账 / 全部未入账 / 部分入账
+ * （任一行部分入库，或行间状态不一致 → 部分入账）
+ */
+export function calcPoHeaderAccountStatus(po) {
+  const lines = (po?.lineItems || []).filter((l) => !l.cancelled)
+  if (!lines.length) return '已入账'
+  const inboundStatuses = lines.map((l) => calcPoLineInboundStatus(po, l))
+  if (inboundStatuses.every((s) => s === '已入库')) return '已入账'
+  if (inboundStatuses.every((s) => s === '待入库')) return '未入账'
+  return '部分入账'
+}
+
+export function poLineAccountStatusColor(status) {
+  const map = {
+    未入账: 'default',
+    已入账: 'success',
+    部分入账: 'processing',
+  }
+  return map[status] || 'default'
+}
+
 /** 入库进度：已入库 / 待入占用 / 采购数量 */
 export function formatInboundProgress(receivedQty, appliedQty, purchaseQty) {
   return `${formatNumber(receivedQty, 4, { empty: '-' })} / ${formatNumber(appliedQty, 4, { empty: '-' })} / ${formatNumber(purchaseQty, 4, { empty: '-' })}`

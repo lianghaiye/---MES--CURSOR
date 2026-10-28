@@ -1,7 +1,7 @@
 <template>
   <a-modal
     :open="open"
-    title="从采购单生成结算"
+    title="从采购单生成对账"
     :width="960"
     destroy-on-close
     @cancel="handleCancel"
@@ -20,18 +20,22 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="6">
-          <a-form-item label="结算日期">
+        <a-col :span="12">
+          <a-form-item label="会计期间" required>
             <a-date-picker
-              v-model:value="form.settleDate"
-              value-format="YYYY-MM-DD"
+              v-model:value="form.yearMonth"
+              picker="month"
+              value-format="YYYY-MM"
               style="width: 100%"
+              placeholder="选择年月"
             />
           </a-form-item>
         </a-col>
-        <a-col :span="6">
+      </a-row>
+      <a-row :gutter="12">
+        <a-col :span="24">
           <a-form-item label="备注">
-            <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
+            <a-input v-model:value="form.remark" allow-clear placeholder="选填，写入对账单备注" />
           </a-form-item>
         </a-col>
       </a-row>
@@ -41,7 +45,7 @@
       type="info"
       show-icon
       style="margin-bottom: 12px"
-      message="可选已入库且仍有剩余结算量的明细。有结算单位的行按结算数量（如实重）计价；否则按入库件数。"
+      message="点选已完成采购单后勾选明细生成对账单，并挂到所选会计期间（不按日期窗过滤单据）。有结算单位的行按结算数量计价；否则按入库件数。"
     />
 
     <a-table
@@ -52,6 +56,7 @@
       :pagination="false"
       :row-selection="rowSelection"
       :scroll="{ x: 880, y: 360 }"
+      :locale="{ emptyText: '请选择采购订单，或该单暂无可对账入库明细' }"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'settleQty'">
@@ -78,7 +83,7 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleConfirm">生成结算单</a-button>
+      <a-button type="primary" :loading="saving" @click="handleConfirm">生成对账单</a-button>
     </template>
   </a-modal>
 </template>
@@ -93,7 +98,9 @@ import {
   createSettleFromPurchaseOrder,
   listSettleableInboundLines,
 } from '@/store/purchaseSettleStore'
+import { PERIOD_SETTLE_DEMO } from '@/mock/periodSettleDemoSeed'
 import { formatNumber, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
+import { parseYearMonth } from '@/utils/purchaseSettlePeriod'
 
 function formatSettleQtyInput(value) {
   return inputNumberFormatter(value)
@@ -101,6 +108,12 @@ function formatSettleQtyInput(value) {
 
 function parseSettleQtyInput(value) {
   return inputNumberParser(value)
+}
+
+function defaultRangeForMonth(yearMonth) {
+  const parsed = parseYearMonth(yearMonth)
+  if (!parsed.ok) return []
+  return [parsed.monthStart, parsed.monthEnd]
 }
 
 const props = defineProps({
@@ -112,7 +125,7 @@ const emit = defineEmits(['update:open', 'confirmed'])
 
 const form = reactive({
   purchaseOrderId: undefined,
-  settleDate: dayjs().format('YYYY-MM-DD'),
+  yearMonth: PERIOD_SETTLE_DEMO.yearMonth,
   remark: '',
 })
 const settleLines = ref([])
@@ -135,13 +148,13 @@ const columns = [
   { title: '编码', dataIndex: 'itemCode', key: 'itemCode', width: 110 },
   { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
   {
-    title: '可结算',
+    title: '可对账',
     dataIndex: 'remainSettleQty',
     key: 'remainSettleQty',
     width: 90,
     align: 'right',
   },
-  { title: '本次结算', key: 'settleQty', width: 110 },
+  { title: '本次对账', key: 'settleQty', width: 110 },
   { title: '单价', dataIndex: 'unitPrice', key: 'unitPrice', width: 90, align: 'right' },
   { title: '金额', key: 'amount', width: 100, align: 'right' },
 ]
@@ -158,7 +171,7 @@ watch(
   (val) => {
     if (!val) return
     form.purchaseOrderId = props.purchaseOrderId || undefined
-    form.settleDate = dayjs().format('YYYY-MM-DD')
+    form.yearMonth = PERIOD_SETTLE_DEMO.yearMonth
     form.remark = ''
     if (form.purchaseOrderId) {
       onPoChange(form.purchaseOrderId)
@@ -201,20 +214,32 @@ function handleConfirm() {
     message.warning('请选择采购订单')
     return
   }
-  const block = getPendingPurchasePriceChangeBlock(form.purchaseOrderId, '生成结算')
+  if (!form.yearMonth) {
+    message.warning('请选择会计期间')
+    return
+  }
+  const monthRange = defaultRangeForMonth(form.yearMonth)
+  if (monthRange.length !== 2) {
+    message.warning('会计期间无效')
+    return
+  }
+  const block = getPendingPurchasePriceChangeBlock(form.purchaseOrderId, '生成对账')
   if (block) {
     message.warning(block)
     return
   }
   const selected = settleLines.value.filter((r) => selectedKeys.value.includes(r.key))
   if (!selected.length) {
-    message.warning('请勾选结算明细')
+    message.warning('请勾选对账明细')
     return
   }
   saving.value = true
   const res = createSettleFromPurchaseOrder(form.purchaseOrderId, {
-    settleDate: form.settleDate,
+    settleDate: dayjs().format('YYYY-MM-DD'),
     remark: form.remark,
+    periodKey: form.yearMonth,
+    periodStart: monthRange[0],
+    periodEnd: monthRange[1],
     lineItems: selected,
   })
   saving.value = false

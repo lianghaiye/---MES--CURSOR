@@ -36,13 +36,18 @@ export const settlementTypeOptions = [
   { label: '预付款+发货付', value: '预付款+发货付' },
 ]
 
-/** 账期起算：与客户主数据同源口径 */
+/**
+ * 账期起算（采购供应商）
+ * - 开票日：供应商开票时间，系统无票时需人工补录后再算付款日
+ * - 到货日：确认收货时间（取对账单关联收货单最晚时间）
+ * - 验收日：入库时间（取对账单关联入库最晚一天）
+ * - 对账日：对账单确认时间
+ */
 export const paymentTermStartOptions = [
   { label: '开票日', value: '开票日' },
   { label: '到货日', value: '到货日' },
   { label: '验收日', value: '验收日' },
   { label: '对账日', value: '对账日' },
-  { label: '合同签订日', value: '合同签订日' },
 ]
 
 /**

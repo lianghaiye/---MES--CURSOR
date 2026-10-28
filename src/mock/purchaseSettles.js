@@ -45,6 +45,12 @@ export function createPurchaseSettle(partial = {}) {
           lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0),
           4,
         )
+  const bookAmount = rest.bookAmount != null ? Number(rest.bookAmount) : totalAmount
+  const disputeAmount = rest.disputeAmount != null ? Number(rest.disputeAmount) : 0
+  const confirmedAmount =
+    rest.confirmedAmount != null
+      ? Number(rest.confirmedAmount)
+      : roundNumber(Math.max(0, bookAmount - disputeAmount), 4)
   return {
     id: '',
     settleNo: '',
@@ -60,6 +66,10 @@ export function createPurchaseSettle(partial = {}) {
     periodStart: '',
     periodEnd: '',
     settleDate: dayjs().format('YYYY-MM-DD'),
+    settleTarget: '',
+    paymentTermStart: '',
+    paymentTermDays: null,
+    plannedPaymentDate: '',
     remark: '',
     creator: 'admin1',
     createdAt: now,
@@ -68,6 +78,9 @@ export function createPurchaseSettle(partial = {}) {
     ...rest,
     lineItems,
     totalAmount,
+    bookAmount,
+    disputeAmount,
+    confirmedAmount,
   }
 }
 
@@ -87,6 +100,7 @@ export function seedPurchaseSettles() {
       settleNo: 'PS20261001001',
       status: PURCHASE_SETTLE_STATUS.DRAFT,
       generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
       supplierId: 'sup-1',
       supplier: '多功能供应商01',
       settlementCycle: '月结',
@@ -94,6 +108,10 @@ export function seedPurchaseSettles() {
       periodStart: '2026-09-01',
       periodEnd: '2026-09-30',
       settleDate: '2026-10-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
+      plannedPaymentDate: '',
+      disputeAmount: 200,
       purchaseOrderNos: ['CG20260804001', 'CG20260715001'],
       purchaseOrderNo: 'CG20260804001',
       remark: '演示：月初规则扫上月入库·月结供应商·草稿待确认',
@@ -135,6 +153,7 @@ export function seedPurchaseSettles() {
       settleNo: 'PS20261001002',
       status: PURCHASE_SETTLE_STATUS.CONFIRMED,
       generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
       supplierId: 'sup-3',
       supplier: '采购供应商A',
       settlementCycle: '月结',
@@ -142,6 +161,9 @@ export function seedPurchaseSettles() {
       periodStart: '2026-09-01',
       periodEnd: '2026-09-30',
       settleDate: '2026-10-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 60,
+      plannedPaymentDate: '',
       purchaseOrderNos: ['CG20260802001'],
       purchaseOrderNo: 'CG20260802001',
       remark: '演示：月结已确认（账期起算开票日+60天，付款在开票后）',
@@ -185,6 +207,7 @@ export function seedPurchaseSettles() {
       settleNo: 'PS20260929001',
       status: PURCHASE_SETTLE_STATUS.DRAFT,
       generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
       supplierId: 'sup-6',
       supplier: '标准件供应商',
       settlementCycle: '周结',
@@ -233,6 +256,7 @@ export function seedPurchaseSettles() {
       settleNo: 'PS20260920001',
       status: PURCHASE_SETTLE_STATUS.DRAFT,
       generateMode: PURCHASE_SETTLE_GENERATE_MODE.PO,
+      settleTarget: 'purchase_order',
       supplierId: 'sup-2',
       supplier: '多功能供应商02',
       settlementCycle: '月结',
@@ -269,6 +293,7 @@ export function seedPurchaseSettles() {
       settleNo: 'PS20261001003',
       status: PURCHASE_SETTLE_STATUS.DRAFT,
       generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
       supplierId: 'sup-2',
       supplier: '多功能供应商02',
       settlementCycle: '月结',

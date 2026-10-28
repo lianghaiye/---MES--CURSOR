@@ -5,6 +5,26 @@
         <a-form-item label="规则名称">
           <a-input v-model:value="filters.name" allow-clear size="small" placeholder="请输入" />
         </a-form-item>
+        <a-form-item label="业务场景">
+          <a-select
+            v-model:value="filters.bizScene"
+            allow-clear
+            size="small"
+            placeholder="全部"
+            style="width: 110px"
+            :options="sceneOpts"
+          />
+        </a-form-item>
+        <a-form-item label="规则层级">
+          <a-select
+            v-model:value="filters.ruleScope"
+            allow-clear
+            size="small"
+            placeholder="全部"
+            style="width: 130px"
+            :options="scopeOpts"
+          />
+        </a-form-item>
         <a-form-item label="状态">
           <a-select
             v-model:value="filters.enabled"
@@ -27,15 +47,24 @@
     <div class="table-card">
       <div class="table-toolbar">
         <a-space>
-          <a-button type="primary" size="small" @click="openCreate">新建规则</a-button>
+          <a-dropdown>
+            <a-button type="primary" size="small"> 新建规则 </a-button>
+            <template #overlay>
+              <a-menu @click="onCreateMenu">
+                <a-menu-item key="blank">空白规则</a-menu-item>
+                <a-menu-divider />
+                <a-menu-item v-for="t in templateMenuItems" :key="t.key">{{ t.label }}</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
           <a-button size="small" @click="logOpen = true">执行日志</a-button>
         </a-space>
       </div>
       <a-alert
         type="info"
         show-icon
-        style="margin-bottom: 12px"
-        message="前端模拟调度：启用规则后按执行时刻在浏览器内触发；关闭页面则不会执行。可用「立即试跑」验证。"
+        class="page-tip"
+        message="工厂默认作兜底，供应商规则覆盖同场景同生成维度下的指定供应商。启用后按时刻调度；草稿占量防重复出单。外协与采购规则相互独立。"
       />
       <a-table
         :columns="columns"
@@ -43,7 +72,7 @@
         row-key="id"
         size="small"
         :pagination="false"
-        :scroll="{ x: 1280 }"
+        :scroll="{ x: 1480 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'enabled'">
@@ -54,8 +83,16 @@
               @change="(v) => onToggle(record, v)"
             />
           </template>
+          <template v-else-if="column.key === 'bizScene'">
+            <a-tag>{{ sceneLabel(record.bizScene) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'ruleScope'">
+            <a-tag :color="record.ruleScope === 'supplier' ? 'orange' : 'blue'">
+              {{ scopeLabel(record.ruleScope) }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'settleTarget'">
-            {{ record.settleTarget === 'purchase_order' ? '按采购单' : '按入库' }}
+            {{ formatSettleTarget(record) }}
           </template>
           <template v-else-if="column.key === 'resultMode'">
             {{ record.resultMode === 'auto_confirm' ? '自动确认' : '生成草稿' }}
@@ -90,7 +127,12 @@
       </div>
     </div>
 
-    <SettleRuleFormModal v-model:open="formOpen" :rule="editing" @saved="onSaved" />
+    <SettleRuleFormModal
+      v-model:open="formOpen"
+      :rule="editing"
+      :template-key="createTemplateKey"
+      @saved="onSaved"
+    />
     <SettleRuleLogDrawer v-model:open="logOpen" :rule-id="logRuleId" />
   </div>
 </template>
@@ -100,35 +142,64 @@ export default { name: 'PurchaseSettleRuleView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, h, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import {
   purchaseSettleRuleState,
+  listPurchaseSettleRules,
   setPurchaseSettleRuleEnabled,
   deletePurchaseSettleRule,
   executePurchaseSettleRule,
 } from '@/store/purchaseSettleRuleStore'
 import { SCAN_WINDOW_TYPES } from '@/utils/purchaseSettleRuleWindow'
+import {
+  SETTLE_RULE_TEMPLATES,
+  findConflictingSettleRules,
+  formatSettleRuleGuardMessages,
+} from '@/utils/purchaseSettleRuleGuard'
+import {
+  SETTLE_RULE_SCENE,
+  SETTLE_RULE_SCOPE,
+  SETTLE_RULE_SCENE_LABEL,
+  SETTLE_RULE_SCOPE_LABEL,
+} from '@/mock/purchaseSettleRules'
 import SettleRuleFormModal from './components/SettleRuleFormModal.vue'
 import SettleRuleLogDrawer from './components/SettleRuleLogDrawer.vue'
 
-const filters = reactive({ name: '', enabled: undefined })
+const filters = reactive({
+  name: '',
+  enabled: undefined,
+  bizScene: undefined,
+  ruleScope: undefined,
+})
 const applied = reactive({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const formOpen = ref(false)
 const editing = ref(null)
+const createTemplateKey = ref('')
 const logOpen = ref(false)
 const logRuleId = ref('')
+const templateMenuItems = SETTLE_RULE_TEMPLATES
 
 const enabledOpts = [
   { label: '启用', value: true },
   { label: '停用', value: false },
 ]
+const sceneOpts = [
+  { label: '采购', value: SETTLE_RULE_SCENE.PURCHASE },
+  { label: '外协', value: SETTLE_RULE_SCENE.OUTSOURCING },
+]
+const scopeOpts = [
+  { label: '工厂默认', value: SETTLE_RULE_SCOPE.FACTORY },
+  { label: '供应商规则', value: SETTLE_RULE_SCOPE.SUPPLIER },
+]
 
 const columns = [
-  { title: '规则名称', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
+  { title: '规则名称', dataIndex: 'name', key: 'name', width: 220, ellipsis: true },
   { title: '启用', key: 'enabled', width: 80 },
-  { title: '结算对象', key: 'settleTarget', width: 100 },
+  { title: '业务场景', key: 'bizScene', width: 90 },
+  { title: '规则层级', key: 'ruleScope', width: 110 },
+  { title: '生成维度', key: 'settleTarget', width: 120 },
   { title: '执行结果', key: 'resultMode', width: 100 },
   { title: '执行计划', key: 'schedule', width: 160 },
   { title: '扫描窗口', key: 'scan', width: 160, ellipsis: true },
@@ -148,6 +219,12 @@ const filteredList = computed(() => {
     ) {
       return false
     }
+    if (applied.bizScene && (row.bizScene || SETTLE_RULE_SCENE.PURCHASE) !== applied.bizScene) {
+      return false
+    }
+    if (applied.ruleScope && (row.ruleScope || SETTLE_RULE_SCOPE.FACTORY) !== applied.ruleScope) {
+      return false
+    }
     return true
   })
 })
@@ -156,6 +233,20 @@ const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
   return filteredList.value.slice(start, start + pagination.pageSize)
 })
+
+function sceneLabel(scene) {
+  return SETTLE_RULE_SCENE_LABEL[scene] || SETTLE_RULE_SCENE_LABEL[SETTLE_RULE_SCENE.PURCHASE]
+}
+
+function scopeLabel(scope) {
+  return SETTLE_RULE_SCOPE_LABEL[scope] || SETTLE_RULE_SCOPE_LABEL[SETTLE_RULE_SCOPE.FACTORY]
+}
+
+function formatSettleTarget(row) {
+  const isOut = (row.bizScene || SETTLE_RULE_SCENE.PURCHASE) === SETTLE_RULE_SCENE.OUTSOURCING
+  if (row.settleTarget === 'purchase_order') return isOut ? '按外协订单' : '按采购单'
+  return isOut ? '按回货入库' : '按入库'
+}
 
 function formatSchedule(row) {
   const time = row.executeTime || '—'
@@ -184,16 +275,25 @@ function handleSearch() {
 function handleReset() {
   filters.name = ''
   filters.enabled = undefined
+  filters.bizScene = undefined
+  filters.ruleScope = undefined
   handleSearch()
 }
 
-function openCreate() {
+function openCreate(templateKey = '') {
   editing.value = null
+  createTemplateKey.value = templateKey || ''
   formOpen.value = true
+}
+
+function onCreateMenu({ key }) {
+  if (key === 'blank') openCreate('')
+  else openCreate(key)
 }
 
 function openEdit(record) {
   editing.value = { ...record }
+  createTemplateKey.value = ''
   formOpen.value = true
 }
 
@@ -206,10 +306,38 @@ function openLogs(record) {
   logOpen.value = true
 }
 
-function onToggle(record, checked) {
+function applyToggle(record, checked) {
   const res = setPurchaseSettleRuleEnabled(record.id, checked)
   if (!res.ok) message.warning(res.message)
   else message.success(res.message)
+}
+
+function onToggle(record, checked) {
+  if (!checked) {
+    applyToggle(record, false)
+    return
+  }
+  const probe = { ...record, enabled: true }
+  const conflicts = findConflictingSettleRules(probe, listPurchaseSettleRules())
+  const msgs = formatSettleRuleGuardMessages([], conflicts)
+  if (!msgs.length) {
+    applyToggle(record, true)
+    return
+  }
+  Modal.confirm({
+    title: `启用「${record.name}」存在冲突风险`,
+    width: 560,
+    content: () =>
+      h(
+        'div',
+        msgs.map((m, i) =>
+          h('p', { key: i, style: 'margin: 0 0 8px; line-height: 1.5' }, `${i + 1}. ${m}`),
+        ),
+      ),
+    okText: '仍要启用',
+    cancelText: '取消',
+    onOk: () => applyToggle(record, true),
+  })
 }
 
 function onRun(record) {
@@ -256,6 +384,9 @@ function onDelete(record) {
 }
 .table-toolbar {
   margin-bottom: 8px;
+}
+.page-tip {
+  margin-bottom: 12px;
 }
 .pagination-wrap {
   margin-top: 12px;

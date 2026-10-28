@@ -11,6 +11,9 @@
                 {{ changeStatusLabel }}
               </a-tag>
               <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
+              <a-tag :color="poLineAccountStatusColor(record.accountStatus || '未入账')">
+                {{ record.accountStatus || '未入账' }}
+              </a-tag>
               <a-tag :color="overdueColor(overdueStatusOf(record))">
                 {{ overdueStatusOf(record) }}
               </a-tag>
@@ -159,6 +162,11 @@
                       "
                     >
                       {{ line.inboundStatus || lineInboundStatus(line) }}
+                    </a-tag>
+                  </template>
+                  <template v-else-if="column.key === 'lineAccountStatus'">
+                    <a-tag :color="poLineAccountStatusColor(lineAccountStatus(line))">
+                      {{ lineAccountStatus(line) }}
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'productName'">
@@ -533,6 +541,7 @@ import {
   formatInboundProgress,
   INBOUND_PROGRESS_TOOLTIP,
   poLineInboundStatusColor,
+  poLineAccountStatusColor,
   resolvePoLineSettleUnit,
 } from '@/utils/purchaseLineInbound'
 import {
@@ -651,6 +660,7 @@ const priceChangeApprovalGroups = computed(() =>
 const lineColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '入库状态', key: 'lineInboundStatus', width: 90 },
+  { title: '入账状态', key: 'lineAccountStatus', width: 90 },
   { title: '入库进度', key: 'inboundProgress', width: 180, ellipsis: true },
   { title: '产品名称', key: 'productName', width: 140, ellipsis: true },
   { title: '产品编号', key: 'productCode', width: 120, ellipsis: true },
@@ -786,9 +796,9 @@ const relatedQcRecords = computed(() => {
 
 function openSettleDetail(row) {
   if (!row?.id) return
-  const path = `/procurement/purchase-settles/${row.id}`
-  openTab(path, `采购结算 ${row.settleNo || ''}`)
-  router.push({ name: 'procurement-purchase-settles-detail', params: { id: row.id } })
+  const path = `/settlement/purchase-settles/${row.id}`
+  openTab(path, `采购对账 ${row.settleNo || ''}`)
+  router.push({ name: 'settlement-purchase-settles-detail', params: { id: row.id } })
 }
 
 function openSettleCreate() {
@@ -916,6 +926,11 @@ function lineProductCode(line) {
 
 function lineInboundStatus(line) {
   return calcPoLineInboundStatus(record.value, line)
+}
+
+function lineAccountStatus(line) {
+  if (line?.accountStatus) return line.accountStatus
+  return calcPoLineInboundStatus(record.value, line) === '已入库' ? '已入账' : '未入账'
 }
 
 function lineInboundProgress(line) {

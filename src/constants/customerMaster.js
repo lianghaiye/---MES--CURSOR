@@ -10,6 +10,17 @@ export const customerGradeOptions = [
   { label: CUSTOMER_GRADE.CORE, value: CUSTOMER_GRADE.CORE },
 ]
 
+/** 客户所属销售区域（与销售订单区域取值对齐） */
+export const customerRegionOptions = [
+  { label: '华北', value: '华北' },
+  { label: '华东', value: '华东' },
+  { label: '华南', value: '华南' },
+  { label: '华中', value: '华中' },
+  { label: '西南', value: '西南' },
+  { label: '西北', value: '西北' },
+  { label: '东北', value: '东北' },
+]
+
 export const enterpriseScaleOptions = [
   { label: '大型', value: '大型' },
   { label: '中型', value: '中型' },

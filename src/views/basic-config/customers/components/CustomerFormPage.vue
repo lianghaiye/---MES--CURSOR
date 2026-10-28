@@ -10,19 +10,19 @@
   >
     <div class="entity-header">
       <a-row :gutter="[12, 12]">
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">客户编码</div>
           <a-input v-model:value="form.code" size="small" placeholder="留空按系统规则生成" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label required">客户名称</div>
           <a-input v-model:value="form.name" size="small" placeholder="请输入客户名称" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">客户简称</div>
           <a-input v-model:value="form.shortName" size="small" placeholder="请输入客户简称" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">客户类型</div>
           <a-select
             v-model:value="form.customerTypeId"
@@ -33,7 +33,7 @@
             style="width: 100%"
           />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">客户分级</div>
           <a-select
             v-model:value="form.customerGrade"
@@ -42,15 +42,26 @@
             style="width: 100%"
           />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">外部编号</div>
           <a-input v-model:value="form.externalCode" size="small" placeholder="外部系统编号" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">业务员</div>
           <a-input v-model:value="form.salesperson" size="small" placeholder="负责业务员" />
         </a-col>
-        <a-col :span="16">
+        <a-col :span="6">
+          <div class="field-label">所属区域</div>
+          <a-select
+            v-model:value="form.region"
+            size="small"
+            allow-clear
+            placeholder="请选择所属区域"
+            :options="customerRegionOptions"
+            style="width: 100%"
+          />
+        </a-col>
+        <a-col :span="24">
           <div class="field-label">备注</div>
           <a-input v-model:value="form.remark" size="small" placeholder="备注" />
         </a-col>
@@ -60,7 +71,7 @@
     <a-tabs v-model:active-key="activeTab" class="form-tabs detail-tabs detail-tabs-pill">
       <a-tab-pane key="org" tab="组织与资质">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">统一社会信用代码</div>
             <a-input
               v-model:value="form.unifiedSocialCreditCode"
@@ -68,15 +79,15 @@
               placeholder="营业执照号/税号"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">法定代表人</div>
             <a-input v-model:value="form.legalRepresentative" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">注册资本</div>
             <a-input v-model:value="form.registeredCapital" size="small" placeholder="如 5000万" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">成立日期</div>
             <a-date-picker
               v-model:value="establishedDateValue"
@@ -85,11 +96,11 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">所属行业</div>
             <a-input v-model:value="form.industry" size="small" placeholder="国民经济行业分类" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">企业规模</div>
             <a-select
               v-model:value="form.enterpriseScale"
@@ -116,7 +127,7 @@
 
       <a-tab-pane key="business" tab="商务与交易">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">币种</div>
             <a-select
               v-model:value="form.currency"
@@ -125,7 +136,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算方式</div>
             <a-select
               v-model:value="form.settlementMethod"
@@ -135,7 +146,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算周期</div>
             <a-select
               v-model:value="form.settlementCycle"
@@ -146,7 +157,7 @@
               placeholder="存量对账频率，可继续使用"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">账期起算</div>
             <a-select
               v-model:value="form.paymentTermStart"
@@ -157,7 +168,7 @@
               placeholder="从哪一天起算"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">账期天数</div>
             <a-input-number
               v-model:value="form.paymentTermDays"
@@ -168,7 +179,7 @@
               placeholder="如 30、60"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算类型</div>
             <a-select
               v-model:value="form.settlementType"
@@ -178,7 +189,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">信用额度</div>
             <a-input-number
               v-model:value="form.creditLimit"
@@ -187,7 +198,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">信用可用余额</div>
             <a-input-number
               v-model:value="form.creditAvailableBalance"
@@ -196,7 +207,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">信用警戒线(%)</div>
             <a-input-number
               v-model:value="form.creditWarningPercent"
@@ -206,7 +217,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">税率(%)</div>
             <a-input-number
               v-model:value="form.taxRate"
@@ -221,7 +232,7 @@
 
       <a-tab-pane key="discount" tab="折扣设置">
         <a-row :gutter="[12, 12]" class="discount-header">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">价目等级</div>
             <a-select
               v-model:value="form.priceLevel"
@@ -230,7 +241,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">默认折扣率(%)</div>
             <a-input-number
               v-model:value="form.defaultDiscountPercent"
@@ -242,7 +253,7 @@
               placeholder="100 表示无折扣"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">启用状态</div>
             <a-select
               v-model:value="form.status"
@@ -261,7 +272,7 @@
 
       <a-tab-pane key="logistics" tab="物流与交付">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">默认交货方式</div>
             <a-select
               v-model:value="form.defaultDeliveryMethod"
@@ -271,11 +282,11 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">默认承运商</div>
             <a-input v-model:value="form.defaultCarrier" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">运费承担方</div>
             <a-select
               v-model:value="form.freightBearer"
@@ -285,7 +296,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">交货提前期(天)</div>
             <a-input-number
               v-model:value="form.deliveryLeadTimeDays"
@@ -294,7 +305,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">包装要求</div>
             <a-input v-model:value="form.packagingRequirements" size="small" />
           </a-col>
@@ -307,27 +318,27 @@
 
       <a-tab-pane key="finance" tab="财务信息">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开户银行</div>
             <a-input v-model:value="form.openingBank" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">银行账号</div>
             <a-input v-model:value="form.bankAccount" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票名称</div>
             <a-input v-model:value="form.invoiceName" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票税号</div>
             <a-input v-model:value="form.invoiceTaxNo" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票地址/电话</div>
             <a-input v-model:value="form.invoiceAddressPhone" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">默认发票类型</div>
             <a-select
               v-model:value="form.defaultInvoiceType"
@@ -370,6 +381,7 @@ import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import { useTabs } from '@/composables/useTabs'
 import {
   customerGradeOptions,
+  customerRegionOptions,
   enterpriseScaleOptions,
   currencyOptions,
   settlementMethodOptions,

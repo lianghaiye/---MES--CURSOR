@@ -66,6 +66,11 @@ const fields = computed(() => [
   { key: 'contractNo', label: '合同编号' },
   { key: 'orderSource', label: '订单来源' },
   { key: 'applyType', label: '采购类型' },
+  {
+    key: 'accountStatus',
+    label: '入账状态',
+    format: (o) => o.accountStatus || '未入账',
+  },
   { key: 'settlementType', label: '结算类型' },
   { key: 'settlementCycle', label: '结算周期' },
   { key: 'settlementMethod', label: '结算方式' },

@@ -69,6 +69,17 @@
               />
             </a-form-item>
           </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="入账状态">
+              <a-select
+                v-model:value="filters.accountStatus"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="accountStatusOpts"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :xs="24" :sm="12" :md="8">
             <a-form-item label="单据日期">
               <a-range-picker
@@ -198,6 +209,11 @@
           </template>
           <template v-else-if="column.key === 'inboundStatus'">
             <a-tag :color="inboundColor(record.inboundStatus)">{{ record.inboundStatus }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'accountStatus'">
+            <a-tag :color="poLineAccountStatusColor(record.accountStatus || '未入账')">
+              {{ record.accountStatus || '未入账' }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'overdueStatus'">
             <a-tag :color="overdueColor(overdueStatusOf(record))">
@@ -402,7 +418,9 @@ import {
   poSourceOptions,
   supplierOptions,
   overdueStatusOptions,
+  accountStatusOptions,
 } from '@/mock/purchaseOrderOptions'
+import { poLineAccountStatusColor } from '@/utils/purchaseLineInbound'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
 import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vue'
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
@@ -436,6 +454,7 @@ const filters = reactive({
   status: undefined,
   orderSource: undefined,
   overdueStatus: undefined,
+  accountStatus: undefined,
   documentDateRange: null,
 })
 const appliedFilters = ref({ ...filters })
@@ -469,6 +488,7 @@ const supplierOpts = supplierOptions
 const statusOpts = poStatusOptions.map((v) => ({ label: v, value: v }))
 const sourceOpts = poSourceOptions.map((v) => ({ label: v, value: v }))
 const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
+const accountStatusOpts = accountStatusOptions.map((v) => ({ label: v, value: v }))
 
 const baseColumns = [
   { title: '#', key: 'index', width: 48, align: 'center', fixed: 'left' },
@@ -476,6 +496,7 @@ const baseColumns = [
   { title: '变更状态', key: 'changeStatus', width: 100 },
   { title: '采购单号', key: 'orderNo', dataIndex: 'orderNo', width: 140, fixed: 'left' },
   { title: '入库状态', key: 'inboundStatus', width: 90 },
+  { title: '入账状态', key: 'accountStatus', width: 90 },
   { title: '逾期状态', key: 'overdueStatus', width: 90 },
   { title: '采购申请单号', dataIndex: 'reqNo', width: 150, ellipsis: true },
   { title: '采购类型', dataIndex: 'applyType', width: 100 },
@@ -501,7 +522,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-list-v10', baseColumns)
+  useTableColumnSettings('purchase-order-list-v11', baseColumns)
 
 const filteredList = computed(() => {
   const f = { ...appliedFilters.value }
@@ -643,6 +664,7 @@ function handleReset() {
   filters.status = undefined
   filters.orderSource = undefined
   filters.overdueStatus = undefined
+  filters.accountStatus = undefined
   filters.documentDateRange = null
   appliedFilters.value = { ...filters }
   pagination.current = 1

@@ -14,6 +14,8 @@ import { roundNumber } from '@/utils/numberFormat'
 import {
   calcPoHeaderInboundStatus,
   calcPoLineInboundStatus,
+  calcPoHeaderAccountStatus,
+  calcPoLineAccountStatus,
   calcPoLineRemainInboundQty,
 } from '@/utils/purchaseLineInbound'
 import { addPurchaseReceipt, purchaseReceiptState } from '@/store/purchaseReceiptStore'
@@ -38,8 +40,8 @@ export function registerPurchaseRequisitionDraftBind(api = {}) {
 
 const STORAGE_KEY = 'i_doms_purchase_orders'
 const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
-/** v7：结算单位演示采购订单（铸件/三口径/无单重） */
-const CURRENT_SEED_VERSION = '8'
+/** v9：采购订单/明细入账状态 */
+const CURRENT_SEED_VERSION = '9'
 let poSeq = 20
 
 function loadFromStorage() {
@@ -71,10 +73,20 @@ function initPurchaseOrders() {
   )
   orders.forEach((order) => {
     if (!order || order.status === '草稿') {
-      if (order) order.overdueStatus = order.overdueStatus || '未逾期'
+      if (order) {
+        order.overdueStatus = order.overdueStatus || '未逾期'
+        order.accountStatus = order.accountStatus || '未入账'
+        ;(order.lineItems || []).forEach((line) => {
+          if (!line.accountStatus) line.accountStatus = '未入账'
+        })
+      }
       return
     }
     order.overdueStatus = computePurchaseOrderOverdueStatus(order)
+    ;(order.lineItems || []).forEach((line) => {
+      line.accountStatus = calcPoLineAccountStatus(order, line)
+    })
+    order.accountStatus = calcPoHeaderAccountStatus(order)
   })
   return orders
 }
@@ -443,8 +455,10 @@ export function syncPurchaseOrderInboundStatus(orderOrId) {
   if (!order || order.status === '草稿') return order
   ;(order.lineItems || []).forEach((line) => {
     line.inboundStatus = calcPoLineInboundStatus(order, line)
+    line.accountStatus = calcPoLineAccountStatus(order, line)
   })
   order.inboundStatus = calcPoHeaderInboundStatus(order)
+  order.accountStatus = calcPoHeaderAccountStatus(order)
   order.overdueStatus = computePurchaseOrderOverdueStatus(order)
   tryAutoCompletePurchaseOrder(order)
   return order
@@ -690,6 +704,7 @@ export function createPurchaseOrdersFromMergedLines(mergedLines, options = {}) {
       status,
       approvalResult: status === '草稿' ? '—' : '待审核',
       inboundStatus: status === '草稿' ? '—' : '待入库',
+      accountStatus: status === '草稿' ? '—' : '未入账',
       overdueStatus: '未逾期',
       documentDate: dayjs().format('YYYY-MM-DD'),
       createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
@@ -748,6 +763,7 @@ export function saveGeneratePurchaseOrderDraft({ rows, draftId, sourceReqIds }) 
     status: '草稿',
     approvalResult: '—',
     inboundStatus: '—',
+    accountStatus: '—',
     documentDate: dayjs().format('YYYY-MM-DD'),
     createdAt: now,
     updatedAt: now,

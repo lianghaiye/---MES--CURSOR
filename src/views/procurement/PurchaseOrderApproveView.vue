@@ -12,6 +12,9 @@
             <a-tag :color="inboundColor(record.inboundStatus)">{{
               record.inboundStatus || '待入库'
             }}</a-tag>
+            <a-tag :color="poLineAccountStatusColor(record.accountStatus || '未入账')">
+              {{ record.accountStatus || '未入账' }}
+            </a-tag>
           </div>
         </div>
 
@@ -42,6 +45,11 @@
                     :color="poLineInboundStatusColor(line.inboundStatus || lineInboundStatus(line))"
                   >
                     {{ line.inboundStatus || lineInboundStatus(line) }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'lineAccountStatus'">
+                  <a-tag :color="poLineAccountStatusColor(lineAccountStatus(line))">
+                    {{ lineAccountStatus(line) }}
                   </a-tag>
                 </template>
                 <template v-else-if="column.key === 'productName'">
@@ -150,7 +158,12 @@ import {
   approvePurchaseOrder,
   rejectPurchaseOrder,
 } from '@/store/purchaseOrderStore'
-import { calcPoLineInboundStatus, poLineInboundStatusColor } from '@/utils/purchaseLineInbound'
+import {
+  calcPoLineInboundStatus,
+  calcPoLineAccountStatus,
+  poLineInboundStatusColor,
+  poLineAccountStatusColor,
+} from '@/utils/purchaseLineInbound'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
 
@@ -180,6 +193,7 @@ const summary = computed(() => {
 const lineColumns = [
   { title: '#', key: 'index', width: 48, align: 'center' },
   { title: '入库状态', key: 'lineInboundStatus', width: 90 },
+  { title: '入账状态', key: 'lineAccountStatus', width: 90 },
   { title: '产品名称', key: 'productName', width: 140, ellipsis: true },
   { title: '产品编号', key: 'productCode', width: 120, ellipsis: true },
   { title: '规格型号', dataIndex: 'specModel', width: 110, ellipsis: true },
@@ -228,6 +242,10 @@ const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 10
 
 function lineInboundStatus(line) {
   return calcPoLineInboundStatus(record.value, line)
+}
+
+function lineAccountStatus(line) {
+  return line?.accountStatus || calcPoLineAccountStatus(record.value, line)
 }
 
 function statusColor(status) {

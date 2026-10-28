@@ -10,23 +10,23 @@
   >
     <div class="entity-header">
       <a-row :gutter="[12, 12]">
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">供应商编码</div>
           <a-input v-model:value="form.code" size="small" placeholder="留空按系统规则生成" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label required">供应商名称</div>
           <a-input v-model:value="form.name" size="small" placeholder="请输入供应商名称" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">供应商简称</div>
           <a-input v-model:value="form.shortName" size="small" placeholder="请输入供应商简称" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">供应商类型</div>
           <a-checkbox-group v-model:value="form.supplierRoles" :options="supplierRoleOptions" />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">供应商分类</div>
           <a-select
             v-model:value="form.supplierCategoryId"
@@ -37,7 +37,7 @@
             style="width: 100%"
           />
         </a-col>
-        <a-col :span="8">
+        <a-col :span="6">
           <div class="field-label">规模</div>
           <a-select
             v-model:value="form.enterpriseScale"
@@ -57,7 +57,7 @@
     <a-tabs v-model:active-key="activeTab" class="form-tabs detail-tabs detail-tabs-pill">
       <a-tab-pane key="business" tab="商务/采购">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算方式</div>
             <a-select
               v-model:value="form.settlementMethod"
@@ -67,7 +67,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算类型</div>
             <a-select
               v-model:value="form.settlementType"
@@ -77,7 +77,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">结算周期</div>
             <a-select
               v-model:value="form.settlementCycle"
@@ -88,7 +88,7 @@
               placeholder="存量对账频率，可继续使用"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">账期起算</div>
             <a-select
               v-model:value="form.paymentTermStart"
@@ -99,7 +99,7 @@
               placeholder="从哪一天起算"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">账期天数</div>
             <a-input-number
               v-model:value="form.paymentTermDays"
@@ -110,7 +110,7 @@
               placeholder="如 30、60"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">供货周期(天)</div>
             <a-input-number
               v-model:value="form.supplyCycleDays"
@@ -119,7 +119,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">最小起订量</div>
             <a-input-number
               v-model:value="form.minOrderQty"
@@ -129,7 +129,7 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">报价方式</div>
             <a-select
               v-model:value="form.quoteMethod"
@@ -146,7 +146,7 @@
 
       <a-tab-pane key="org" tab="组织与资质">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">统一社会信用代码</div>
             <a-input
               v-model:value="form.unifiedSocialCreditCode"
@@ -154,15 +154,15 @@
               placeholder="营业执照号/税号"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">法定代表人</div>
             <a-input v-model:value="form.legalRepresentative" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">注册资本</div>
             <a-input v-model:value="form.registeredCapital" size="small" placeholder="如 5000万" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">成立日期</div>
             <a-date-picker
               v-model:value="establishedDateValue"
@@ -171,11 +171,11 @@
               style="width: 100%"
             />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">所属行业</div>
             <a-input v-model:value="form.industry" size="small" placeholder="国民经济行业分类" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">企业规模</div>
             <a-select
               v-model:value="form.enterpriseScale"
@@ -198,27 +198,27 @@
 
       <a-tab-pane key="finance" tab="财务信息">
         <a-row :gutter="[12, 12]">
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开户银行</div>
             <a-input v-model:value="form.openingBank" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">银行账号</div>
             <a-input v-model:value="form.bankAccount" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票名称</div>
             <a-input v-model:value="form.invoiceName" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票税号</div>
             <a-input v-model:value="form.invoiceTaxNo" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">开票地址/电话</div>
             <a-input v-model:value="form.invoiceAddressPhone" size="small" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <div class="field-label">默认发票类型</div>
             <a-select
               v-model:value="form.defaultInvoiceType"

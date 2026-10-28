@@ -143,6 +143,7 @@ const columns = [
   { title: '默认折扣', key: 'defaultDiscountRate', width: 90 },
   { title: '协议价条目', key: 'priceListCount', width: 100, align: 'right' },
   { title: '业务员', dataIndex: 'salesperson', width: 90 },
+  { title: '所属区域', dataIndex: 'region', width: 90 },
   { title: '状态', key: 'status', width: 80 },
   { title: '更新时间', dataIndex: 'updatedAt', width: 150 },
   { title: '操作', key: 'actions', width: 120, fixed: 'right' },

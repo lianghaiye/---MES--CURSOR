@@ -67,6 +67,7 @@ export function createPoLineItem(partial = {}) {
     receivingMode: '正常收货',
     receivingWarehouse: '',
     receivedQty: 0,
+    accountStatus: '未入账',
     inboundQcRequirement: '',
     productionDate: '',
     expiryDate: '',
@@ -101,6 +102,7 @@ export function createPurchaseOrder(partial) {
     orderSource: '新增',
     applyType: '日常采购',
     inboundStatus: '待入库',
+    accountStatus: '未入账',
     overdueStatus: '未逾期',
     approvalResult: '',
     approverName: '',
@@ -347,6 +349,7 @@ export const mockPurchaseOrders = [
     approverName: '张三',
     approvedAt: '2026-08-02 15:00',
     inboundStatus: '部分入库',
+    accountStatus: '部分入账',
     deliveryDate: '2026-08-15',
     documentDate: '2026-08-02',
     shippingDate: '2026-08-12',
@@ -361,6 +364,7 @@ export const mockPurchaseOrders = [
         unit: '张',
         unitPriceExTax: 680,
         receivedQty: 20,
+        accountStatus: '未入账',
         orderSizeText: '长 2000 mm × 宽 1000 mm',
       }),
       line({
@@ -372,6 +376,7 @@ export const mockPurchaseOrders = [
         unit: '张',
         unitPriceExTax: 980,
         receivedQty: 10,
+        accountStatus: '未入账',
         orderSizeText: '长 2000 mm × 宽 1250 mm',
       }),
       line({
@@ -383,6 +388,7 @@ export const mockPurchaseOrders = [
         unit: '根',
         unitPriceExTax: 55,
         receivedQty: 100,
+        accountStatus: '已入账',
         orderSizeText: '长 6000 mm',
       }),
       line({
@@ -394,6 +400,7 @@ export const mockPurchaseOrders = [
         unit: '根',
         unitPriceExTax: 145,
         receivedQty: 0,
+        accountStatus: '未入账',
         orderSizeText: '长 6000 mm',
       }),
     ],
@@ -456,6 +463,7 @@ export const mockPurchaseOrders = [
     approverName: 'admin1',
     approvedAt: '2026-07-20 11:00',
     inboundStatus: '已入库',
+    accountStatus: '已入账',
     deliveryDate: '2026-07-25',
     documentDate: '2026-07-20',
     shippingDate: '2026-07-24',
@@ -469,6 +477,7 @@ export const mockPurchaseOrders = [
         unit: '台',
         unitPriceExTax: 1850,
         receivedQty: 4,
+        accountStatus: '已入账',
       }),
       line({
         itemCode: 'MAT-COUPL-01',
@@ -478,6 +487,7 @@ export const mockPurchaseOrders = [
         unit: '套',
         unitPriceExTax: 260,
         receivedQty: 4,
+        accountStatus: '已入账',
       }),
       line({
         itemCode: 'MAT-BASE-01',
@@ -487,6 +497,7 @@ export const mockPurchaseOrders = [
         unit: '件',
         unitPriceExTax: 420,
         receivedQty: 4,
+        accountStatus: '已入账',
       }),
     ],
   }),
@@ -604,6 +615,7 @@ export function filterPurchaseOrders(list, filters) {
     if (filters.reqNo && !item.reqNo?.includes(filters.reqNo)) return false
     if (filters.salesOrderNo && !item.salesOrderNo?.includes(filters.salesOrderNo)) return false
     if (filters.status && item.status !== filters.status) return false
+    if (filters.accountStatus && item.accountStatus !== filters.accountStatus) return false
     if (filters.orderSource && item.orderSource !== filters.orderSource) return false
     if (filters.overdueStatus) {
       const overdue = item.overdueStatus || computePurchaseOrderOverdueStatus(item)

@@ -49,6 +49,7 @@
               <a-descriptions-item label="业务员">{{
                 record.salesperson || '—'
               }}</a-descriptions-item>
+              <a-descriptions-item label="所属区域">{{ record.region || '—' }}</a-descriptions-item>
               <a-descriptions-item label="启用状态">{{ record.status || '—' }}</a-descriptions-item>
               <a-descriptions-item label="备注" :span="3">{{
                 record.remark || '—'

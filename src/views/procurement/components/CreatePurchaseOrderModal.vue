@@ -292,6 +292,9 @@
                   <template v-else-if="column.key === 'stockQty'">
                     {{ formatQty(record.stockQty) }}
                   </template>
+                  <template v-else-if="column.key === 'accountStatus'">
+                    {{ record.accountStatus || '未入账' }}
+                  </template>
                   <template v-else-if="column.key === 'purchaseQty'">
                     <InventoryLineEditableCell
                       :active="isLineCellEditing(record.id, 'purchaseQty')"
@@ -990,8 +993,8 @@ function filterUnitOption(input, option) {
 }
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-order-form-lines-v7', purchaseOrderFormLineColumns, {
-    minScrollX: 2360,
+  useTableColumnSettings('purchase-order-form-lines-v8', purchaseOrderFormLineColumns, {
+    minScrollX: 2450,
     pinEdgeColumns: false,
     pinActionColumn: true,
   })

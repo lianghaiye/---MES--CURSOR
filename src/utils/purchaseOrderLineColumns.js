@@ -18,6 +18,7 @@ export const purchaseOrderFormLineColumns = [
   { title: '库存数量', dataIndex: 'stockQty', key: 'stockQty', width: 90, align: 'right' },
   { title: '收货仓库', key: 'receivingWarehouse', width: 110 },
   { title: '采购数量', key: 'purchaseQty', width: 100 },
+  { title: '入账状态', dataIndex: 'accountStatus', key: 'accountStatus', width: 90 },
   { title: '采购单位', dataIndex: 'unit', key: 'unit', width: 90 },
   { title: '结算单位', dataIndex: 'settleUnit', key: 'settleUnit', width: 80 },
   { title: '预计结算数量', key: 'settleQty', width: 110 },

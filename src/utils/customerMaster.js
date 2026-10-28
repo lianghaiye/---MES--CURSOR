@@ -90,6 +90,7 @@ export function createDefaultCustomerForm(partial = {}) {
     customerGrade: CUSTOMER_GRADE.NORMAL,
     externalCode: '',
     salesperson: '',
+    region: '',
     remark: '',
     unifiedSocialCreditCode: '',
     legalRepresentative: '',

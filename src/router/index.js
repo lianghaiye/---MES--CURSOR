@@ -1075,22 +1075,38 @@ const routes = [
         meta: { title: '采购收货详情' },
       },
       {
-        path: 'procurement/purchase-settles',
-        name: 'procurement-purchase-settles',
+        path: 'settlement/purchase-settles',
+        name: 'settlement-purchase-settles',
         component: () => import('@/views/procurement/PurchaseSettleView.vue'),
-        meta: { title: '采购结算' },
+        meta: { title: '采购对账' },
+      },
+      {
+        path: 'settlement/purchase-settles/:id',
+        name: 'settlement-purchase-settles-detail',
+        component: () => import('@/views/procurement/PurchaseSettleDetailView.vue'),
+        meta: { title: '采购对账详情', listPath: '/settlement/purchase-settles' },
+      },
+      {
+        path: 'settlement/settle-rules',
+        name: 'settlement-settle-rules',
+        component: () => import('@/views/procurement/PurchaseSettleRuleView.vue'),
+        meta: { title: '结算规则' },
+      },
+      {
+        path: 'procurement/purchase-settles',
+        redirect: '/settlement/purchase-settles',
       },
       {
         path: 'procurement/purchase-settles/:id',
-        name: 'procurement-purchase-settles-detail',
-        component: () => import('@/views/procurement/PurchaseSettleDetailView.vue'),
-        meta: { title: '采购结算详情', listPath: '/procurement/purchase-settles' },
+        redirect: (to) => `/settlement/purchase-settles/${to.params.id}`,
+      },
+      {
+        path: 'basic-config/settle-rules',
+        redirect: '/settlement/settle-rules',
       },
       {
         path: 'procurement/purchase-settle-rules',
-        name: 'procurement-purchase-settle-rules',
-        component: () => import('@/views/procurement/PurchaseSettleRuleView.vue'),
-        meta: { title: '结算规则' },
+        redirect: '/settlement/settle-rules',
       },
       {
         path: 'procurement/purchase-returns',

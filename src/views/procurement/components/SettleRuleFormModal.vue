@@ -7,6 +7,20 @@
     @cancel="handleCancel"
   >
     <a-form layout="vertical" :model="form">
+      <a-row v-if="!rule?.id" :gutter="12">
+        <a-col :span="24">
+          <a-form-item label="从推荐模板填入">
+            <a-select
+              v-model:value="selectedTemplate"
+              allow-clear
+              placeholder="可选：采购/外协 · 工厂默认/供应商覆盖"
+              :options="templateOpts"
+              @change="applyTemplate"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
       <a-row :gutter="12">
         <a-col :span="16">
           <a-form-item label="规则名称" required>
@@ -22,7 +36,34 @@
 
       <a-row :gutter="12">
         <a-col :span="12">
-          <a-form-item label="结算对象" required>
+          <a-form-item label="业务场景" required>
+            <a-select v-model:value="form.bizScene" :options="sceneOpts" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="规则层级" required>
+            <a-radio-group v-model:value="form.ruleScope" button-style="solid">
+              <a-radio-button value="factory">工厂默认（兜底）</a-radio-button>
+              <a-radio-button value="supplier">供应商规则（覆盖）</a-radio-button>
+            </a-radio-group>
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-alert
+        type="info"
+        show-icon
+        class="rule-scope-tip"
+        :message="
+          form.ruleScope === 'supplier'
+            ? '供应商规则：仅作用于勾选供应商，并覆盖同场景同生成维度的工厂默认规则。'
+            : '工厂默认：兜底全部未覆盖供应商；已被供应商规则覆盖的不会再进本规则。'
+        "
+      />
+
+      <a-row :gutter="12">
+        <a-col :span="12">
+          <a-form-item label="生成维度" required>
             <a-select v-model:value="form.settleTarget" :options="targetOpts" />
           </a-form-item>
         </a-col>
@@ -106,20 +147,20 @@
       </a-row>
 
       <a-row :gutter="12">
-        <a-col :span="12">
-          <a-form-item label="供应商范围">
+        <a-col v-if="form.ruleScope === 'supplier'" :span="12">
+          <a-form-item label="覆盖供应商" required>
             <a-select
               v-model:value="form.supplierIds"
               mode="multiple"
               allow-clear
               show-search
-              placeholder="空=全部（有可结算数据的供应商）"
+              placeholder="必选：本规则覆盖的供应商"
               :options="supplierOpts"
               :filter-option="filterOption"
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="form.ruleScope === 'supplier' ? 12 : 24">
           <a-form-item label="适用结算周期">
             <a-select
               v-model:value="form.settlementCycles"
@@ -131,6 +172,15 @@
           </a-form-item>
         </a-col>
       </a-row>
+
+      <a-alert
+        v-if="liveGuardMessages.length"
+        type="warning"
+        show-icon
+        class="rule-guard-alert"
+        message="配置风险提示"
+        :description="liveGuardMessages.join('\n')"
+      />
 
       <a-form-item label="备注">
         <a-textarea v-model:value="form.remark" :rows="2" allow-clear />
@@ -145,30 +195,52 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, computed } from 'vue'
-import { message } from 'ant-design-vue'
-import { savePurchaseSettleRule } from '@/store/purchaseSettleRuleStore'
+import { reactive, ref, watch, computed, h } from 'vue'
+import { message, Modal } from 'ant-design-vue'
+import { savePurchaseSettleRule, listPurchaseSettleRules } from '@/store/purchaseSettleRuleStore'
 import { supplierState } from '@/store/supplierStore'
 import { SCAN_WINDOW_TYPES } from '@/utils/purchaseSettleRuleWindow'
+import {
+  SETTLE_RULE_TEMPLATES,
+  collectSettleRuleSaveWarnings,
+  findConflictingSettleRules,
+  formatSettleRuleGuardMessages,
+} from '@/utils/purchaseSettleRuleGuard'
 import {
   SETTLE_RULE_TARGET,
   SETTLE_RULE_RESULT,
   SETTLE_RULE_FREQ,
+  SETTLE_RULE_SCENE,
+  SETTLE_RULE_SCOPE,
 } from '@/mock/purchaseSettleRules'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   rule: { type: Object, default: null },
+  /** 打开时预填的模板 key */
+  templateKey: { type: String, default: '' },
 })
 const emit = defineEmits(['update:open', 'saved'])
 
 const saving = ref(false)
+const selectedTemplate = ref(undefined)
 const form = reactive(emptyForm())
 
-const targetOpts = [
-  { label: '按入库', value: SETTLE_RULE_TARGET.INBOUND },
-  { label: '按采购单（已完成）', value: SETTLE_RULE_TARGET.PURCHASE_ORDER },
+const sceneOpts = [
+  { label: '采购', value: SETTLE_RULE_SCENE.PURCHASE },
+  { label: '外协', value: SETTLE_RULE_SCENE.OUTSOURCING },
 ]
+const targetOpts = computed(() =>
+  form.bizScene === SETTLE_RULE_SCENE.OUTSOURCING
+    ? [
+        { label: '按回货入库', value: SETTLE_RULE_TARGET.INBOUND },
+        { label: '按外协订单（已完成）', value: SETTLE_RULE_TARGET.PURCHASE_ORDER },
+      ]
+    : [
+        { label: '按入库', value: SETTLE_RULE_TARGET.INBOUND },
+        { label: '按采购单（已完成）', value: SETTLE_RULE_TARGET.PURCHASE_ORDER },
+      ],
+)
 const resultOpts = [
   { label: '生成草稿', value: SETTLE_RULE_RESULT.DRAFT },
   { label: '自动确认', value: SETTLE_RULE_RESULT.AUTO_CONFIRM },
@@ -199,6 +271,7 @@ const cycleOpts = [
   { label: '周结', value: '周结' },
   { label: '季结', value: '季结' },
 ]
+const templateOpts = SETTLE_RULE_TEMPLATES.map((t) => ({ label: t.label, value: t.key }))
 
 const supplierOpts = computed(() =>
   supplierState.suppliers
@@ -210,12 +283,31 @@ const supplierOpts = computed(() =>
     })),
 )
 
+const liveGuardMessages = computed(() => {
+  const warnings = collectSettleRuleSaveWarnings(form)
+  const conflicts = findConflictingSettleRules(form, listPurchaseSettleRules())
+  return formatSettleRuleGuardMessages(warnings, conflicts)
+})
+
 watch(
   () => props.open,
   (val) => {
     if (!val) return
+    selectedTemplate.value = props.templateKey || undefined
     Object.assign(form, emptyForm(), props.rule || {})
     if (!form.executeTime) form.executeTime = '02:00'
+    if (!form.bizScene) form.bizScene = SETTLE_RULE_SCENE.PURCHASE
+    if (!form.ruleScope) form.ruleScope = SETTLE_RULE_SCOPE.FACTORY
+    if (!props.rule?.id && props.templateKey) {
+      applyTemplate(props.templateKey)
+    }
+  },
+)
+
+watch(
+  () => form.ruleScope,
+  (scope) => {
+    if (scope === SETTLE_RULE_SCOPE.FACTORY) form.supplierIds = []
   },
 )
 
@@ -224,6 +316,8 @@ function emptyForm() {
     id: '',
     name: '',
     enabled: true,
+    bizScene: SETTLE_RULE_SCENE.PURCHASE,
+    ruleScope: SETTLE_RULE_SCOPE.FACTORY,
     settleTarget: SETTLE_RULE_TARGET.INBOUND,
     resultMode: SETTLE_RULE_RESULT.DRAFT,
     executeFreq: SETTLE_RULE_FREQ.DAILY,
@@ -240,6 +334,13 @@ function emptyForm() {
   }
 }
 
+function applyTemplate(key) {
+  const tpl = SETTLE_RULE_TEMPLATES.find((t) => t.key === key)
+  if (!tpl) return
+  Object.assign(form, emptyForm(), tpl.partial, { id: form.id || '' })
+  selectedTemplate.value = key
+}
+
 function filterOption(input, option) {
   return String(option?.searchText || option?.label || '')
     .toLowerCase()
@@ -250,7 +351,7 @@ function handleCancel() {
   emit('update:open', false)
 }
 
-function handleSave() {
+function doSave() {
   saving.value = true
   const res = savePurchaseSettleRule({ ...form })
   saving.value = false
@@ -262,4 +363,49 @@ function handleSave() {
   emit('saved', res.rule)
   emit('update:open', false)
 }
+
+function handleSave() {
+  const msgs = liveGuardMessages.value
+  if (!msgs.length) {
+    doSave()
+    return
+  }
+  Modal.confirm({
+    title: '配置存在风险，仍要保存？',
+    width: 560,
+    content: () =>
+      h(
+        'div',
+        msgs.map((m, i) =>
+          h('p', { key: i, style: 'margin: 0 0 8px; line-height: 1.5' }, `${i + 1}. ${m}`),
+        ),
+      ),
+    okText: '仍要保存',
+    cancelText: '返回修改',
+    onOk: () => doSave(),
+  })
+}
 </script>
+
+<style scoped>
+.rule-guard-alert {
+  margin-bottom: 12px;
+  white-space: pre-line;
+}
+.rule-scope-tip {
+  margin-bottom: 12px;
+  padding: 4px 10px;
+
+  :deep(.ant-alert-icon) {
+    font-size: 12px;
+    margin-inline-end: 6px;
+  }
+
+  :deep(.ant-alert-message) {
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.5;
+    color: rgba(0, 0, 0, 0.65);
+  }
+}
+</style>

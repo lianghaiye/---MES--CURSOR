@@ -40,8 +40,109 @@ function resolveSupplierCycle(supplierName, po, supplierRecord) {
   return ''
 }
 
+function latestDateOf(dates = []) {
+  const list = dates
+    .filter(Boolean)
+    .map((d) => String(d).slice(0, 10))
+    .sort()
+  return list.length ? list[list.length - 1] : ''
+}
+
+/**
+ * 账期起算 + 账期天数 → 计划付款日（整单一个付款日）
+ * - 开票日：供应商开票日，系统取不到则需人工补录，未补录时付款日为空
+ * - 到货日：关联收货单确认/收货时间的最晚一天
+ * - 验收日：关联入库日的最晚一天
+ * - 对账日：对账单确认日（未确认时暂用对账单据日，确认后再刷新）
+ */
+function resolvePaymentMeta(
+  supplierName,
+  { settleDate, confirmedAt, invoiceDate, lineItems } = {},
+) {
+  const supplier = getSupplierByName(supplierName)
+  const days = Number(supplier?.paymentTermDays)
+  const paymentTermDays = Number.isFinite(days) && days > 0 ? days : 30
+  const paymentTermStart = supplier?.paymentTermStart || '对账日'
+
+  let baseDate = ''
+  if (paymentTermStart === '开票日') {
+    baseDate = invoiceDate ? String(invoiceDate).slice(0, 10) : ''
+  } else if (paymentTermStart === '验收日') {
+    baseDate = latestDateOf(
+      (lineItems || []).map((row) => {
+        const order = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
+        return order?.inboundDate || order?.createdAt || ''
+      }),
+    )
+  } else if (paymentTermStart === '到货日') {
+    let purchaseReceiptState
+    try {
+      // 避免循环依赖：按需取收货 store
+      purchaseReceiptState = require('@/store/purchaseReceiptStore').purchaseReceiptState
+    } catch {
+      purchaseReceiptState = null
+    }
+    baseDate = latestDateOf(
+      (lineItems || []).map((row) => {
+        const inbound = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
+        const receiptId = inbound?.purchaseReceiptId
+        const receipt = receiptId
+          ? purchaseReceiptState?.receipts?.find((r) => r.id === receiptId)
+          : null
+        // 收货确认时间优先；无收货链路时回退入库日，避免完全算不出
+        return (
+          receipt?.receivedAt ||
+          receipt?.updatedAt ||
+          receipt?.createdAt ||
+          inbound?.inboundDate ||
+          inbound?.createdAt ||
+          ''
+        )
+      }),
+    )
+  } else {
+    // 对账日
+    baseDate = confirmedAt
+      ? String(confirmedAt).slice(0, 10)
+      : settleDate || dayjs().format('YYYY-MM-DD')
+  }
+
+  return {
+    paymentTermStart,
+    paymentTermDays,
+    plannedPaymentDate: baseDate
+      ? dayjs(baseDate).add(paymentTermDays, 'day').format('YYYY-MM-DD')
+      : '',
+  }
+}
+
+/**
+ * 草稿结算单已占用的可结算量（确认前即占量，避免跨规则重复出单）
+ */
+export function getDraftOccupiedSettleQty(inboundOrderId, inboundLineId, excludeSettleId = '') {
+  if (!inboundOrderId || !inboundLineId) return 0
+  let occupied = 0
+  purchaseSettleState.settles.forEach((settle) => {
+    if (settle.status !== PURCHASE_SETTLE_STATUS.DRAFT) return
+    if (excludeSettleId && settle.id === excludeSettleId) return
+    ;(settle.lineItems || []).forEach((row) => {
+      if (row.inboundOrderId === inboundOrderId && row.inboundLineId === inboundLineId) {
+        occupied += Number(row.settleQty) || 0
+      }
+    })
+  })
+  return round2(occupied)
+}
+
+/** 剩余可结算量 = 总量 − 已确认 − 草稿占用 */
+export function getEffectiveRemainSettleQty(line, inboundOrderId, excludeSettleId = '') {
+  const base = getRemainSettleQty(line)
+  const occupied = getDraftOccupiedSettleQty(inboundOrderId, line?.id, excludeSettleId)
+  return Math.max(0, round2(base - occupied))
+}
+
 function buildSettleableRow(order, line, po) {
-  const remain = getRemainSettleQty(line)
+  const remain = getEffectiveRemainSettleQty(line, order.id)
   if (!(remain > 0)) return null
   if ((line.lineStatus || '待入库') !== '已入库') return null
   const poLine = (po?.lineItems || []).find((l) => l.id === line.poLineId) || null
@@ -143,30 +244,71 @@ export function listSettleableInboundLinesByPeriod({
 }
 
 /**
- * 预览账期结算：按供应商 + 子窗口聚合
- * @param {{ yearMonth: string, supplierIds?: string[], supplierNames?: string[], halfParts?: ('H1'|'H2')[], allowAppend?: boolean }} params
+ * 预览账期对账：按供应商聚合
+ * - 传入 periodStart/periodEnd 时：一律用该固定窗扫描（手工「按账期生成」）
+ * - 未传起止时：按供应商结算周期把会计月切窗（规则调度等内部仍可用）
+ * @param {{
+ *   yearMonth: string,
+ *   periodStart?: string,
+ *   periodEnd?: string,
+ *   supplierIds?: string[],
+ *   supplierNames?: string[],
+ *   halfParts?: ('H1'|'H2')[],
+ *   allowAppend?: boolean
+ * }} params
  */
 export function previewPeriodSettles(params = {}) {
-  const { yearMonth, supplierIds, supplierNames, halfParts, allowAppend = false } = params
+  const {
+    yearMonth,
+    periodStart: fixedStart,
+    periodEnd: fixedEnd,
+    supplierIds,
+    supplierNames,
+    halfParts,
+    allowAppend = false,
+  } = params
   if (!yearMonth) return { ok: false, message: '请选择会计期间', groups: [] }
+  if (fixedStart || fixedEnd) {
+    if (!fixedStart || !fixedEnd) {
+      return { ok: false, message: '请选择期间起止', groups: [] }
+    }
+    if (dayjs(fixedStart).isAfter(dayjs(fixedEnd), 'day')) {
+      return { ok: false, message: '期间开始不能晚于结束', groups: [] }
+    }
+  }
 
   const suppliers = collectCandidateSuppliers(supplierIds, supplierNames)
-  if (!suppliers.length) return { ok: false, message: '没有可参与账期结算的供应商', groups: [] }
+  if (!suppliers.length) return { ok: false, message: '没有可参与账期对账的供应商', groups: [] }
 
   const groups = []
   const messages = []
+  const useFixed = !!(fixedStart && fixedEnd)
 
   for (const supplier of suppliers) {
     const cycle = resolveSupplierCycle(supplier.name, null, supplier)
     if (!isPeriodSettleCycle(cycle)) continue
 
-    const winRes = resolvePeriodWindows(cycle, yearMonth, { halfParts })
-    if (!winRes.ok) {
-      if (cycle === '季结') messages.push(`${supplier.name}：${winRes.message}`)
-      continue
+    let windows
+    if (useFixed) {
+      windows = [
+        {
+          periodKey: yearMonth,
+          periodStart: fixedStart,
+          periodEnd: fixedEnd,
+          label: `${yearMonth}（${fixedStart}~${fixedEnd}）`,
+          settlementCycle: cycle,
+        },
+      ]
+    } else {
+      const winRes = resolvePeriodWindows(cycle, yearMonth, { halfParts })
+      if (!winRes.ok) {
+        if (cycle === '季结') messages.push(`${supplier.name}：${winRes.message}`)
+        continue
+      }
+      windows = winRes.windows
     }
 
-    for (const win of winRes.windows) {
+    for (const win of windows) {
       const lines = listSettleableInboundLinesByPeriod({
         supplierId: supplier.id,
         supplierName: supplier.name,
@@ -378,11 +520,11 @@ export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
       if (!line) {
         return { ok: false, message: '入库明细不存在', settles: created }
       }
-      const remain = getRemainSettleQty(line)
+      const remain = getEffectiveRemainSettleQty(line, row.inboundOrderId)
       if (qty > remain + 1e-9) {
         return {
           ok: false,
-          message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}）`,
+          message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}，含草稿占用）`,
           settles: created,
         }
       }
@@ -406,6 +548,9 @@ export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
     }
 
     const poNos = [...new Set(lineItems.map((l) => l.purchaseOrderNo).filter(Boolean))]
+    const settleDate = options.settleDate || dayjs().format('YYYY-MM-DD')
+    const totalAmount = round2(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0))
+    const payMeta = resolvePaymentMeta(group.supplier, { settleDate, lineItems })
     const settle = createPurchaseSettle({
       id: `ps-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       settleNo: nextSettleNo(),
@@ -420,11 +565,16 @@ export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
       periodKey: group.periodKey,
       periodStart: group.periodStart,
       periodEnd: group.periodEnd,
-      settleDate: options.settleDate || dayjs().format('YYYY-MM-DD'),
+      settleDate,
+      settleTarget: 'inbound',
+      bookAmount: totalAmount,
+      disputeAmount: 0,
+      confirmedAmount: totalAmount,
+      ...payMeta,
       remark:
         options.remark || `账期生成 ${group.periodKey}（${group.periodStart}~${group.periodEnd}）`,
       lineItems,
-      totalAmount: round2(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0)),
+      totalAmount,
     })
     purchaseSettleState.settles.unshift(settle)
     created.push(settle)
@@ -443,13 +593,151 @@ export function createSettlesFromPeriod(selectedGroups = [], options = {}) {
   return { ok: true, settles: created, skipped, message: msg }
 }
 
+function getPoCompletedAt(po) {
+  if (!po) return ''
+  if (po.completedAt) return String(po.completedAt).slice(0, 10)
+  if (po.status === '已完成' && po.updatedAt) return String(po.updatedAt).slice(0, 10)
+  return ''
+}
+
+export function findSettleByPeriodKey(periodKey) {
+  if (!periodKey) return null
+  return purchaseSettleState.settles.find((s) => s.periodKey === periodKey) || null
+}
+
+/**
+ * 按账期预览（按已完成采购单）：完成日落在期间窗内的采购单各一组
+ * @param {{
+ *   yearMonth: string,
+ *   periodStart: string,
+ *   periodEnd: string,
+ *   supplierIds?: string[],
+ *   allowAppend?: boolean
+ * }} params
+ */
+export function previewPeriodSettlesByPurchaseOrder(params = {}) {
+  const { yearMonth, periodStart, periodEnd, supplierIds, allowAppend = false } = params
+  if (!yearMonth) return { ok: false, message: '请选择会计期间', groups: [] }
+  if (!periodStart || !periodEnd) return { ok: false, message: '请选择期间起止', groups: [] }
+  if (dayjs(periodStart).isAfter(dayjs(periodEnd), 'day')) {
+    return { ok: false, message: '期间开始不能晚于结束', groups: [] }
+  }
+
+  const supplierIdSet = supplierIds?.length ? new Set(supplierIds) : null
+  const groups = []
+
+  purchaseOrderState.orders.forEach((po) => {
+    if (po.status !== '已完成') return
+    const completed = getPoCompletedAt(po)
+    if (!completed) return
+    if (completed < periodStart || completed > periodEnd) return
+
+    const supplier = getSupplierByName(po.supplier)
+    if (supplierIdSet) {
+      if (!supplier || !supplierIdSet.has(supplier.id)) return
+    } else {
+      const cycle = resolveSupplierCycle(po.supplier, po, supplier)
+      if (!isPeriodSettleCycle(cycle)) return
+    }
+
+    const lines = listSettleableInboundLines(po.id)
+    const periodKey = `${yearMonth}:po:${po.id}`
+    const existing = findSettleByPeriodKey(periodKey)
+    const totalAmount = round2(lines.reduce((s, l) => s + (Number(l.amount) || 0), 0))
+    const cycle = resolveSupplierCycle(po.supplier, po, supplier)
+    groups.push({
+      key: periodKey,
+      kind: 'po',
+      purchaseOrderId: po.id,
+      purchaseOrderNo: po.orderNo,
+      supplierId: supplier?.id || '',
+      supplier: po.supplier,
+      settlementCycle: cycle,
+      periodKey,
+      periodStart,
+      periodEnd,
+      periodLabel: `${yearMonth}（完成日 ${completed}）`,
+      createdAt: po.createdAt || '',
+      completedAt: po.completedAt || completed,
+      lineCount: lines.length,
+      totalAmount,
+      lineItems: lines,
+      exists: !!existing,
+      existingSettleNo: existing?.settleNo || '',
+      existingStatus: existing?.status || '',
+      skipByDefault: !!existing && !allowAppend,
+      selectable: lines.length > 0 && (!existing || allowAppend),
+    })
+  })
+
+  return { ok: true, groups, message: '' }
+}
+
+/**
+ * 按账期勾选的采购单组批量生成对账单
+ */
+export function createSettlesFromPeriodPurchaseOrders(selectedGroups = [], options = {}) {
+  if (!selectedGroups.length) {
+    return { ok: false, message: '请至少勾选一张采购单', settles: [] }
+  }
+
+  const created = []
+  const skipped = []
+
+  for (const group of selectedGroups) {
+    const existing = findSettleByPeriodKey(group.periodKey)
+    if (existing && !options.allowAppend) {
+      skipped.push(`${group.purchaseOrderNo || group.supplier} 已有对账单「${existing.settleNo}」`)
+      continue
+    }
+    const lines = (group.lineItems || []).filter((l) => (Number(l.settleQty) || 0) > 0)
+    if (!lines.length) {
+      skipped.push(`${group.purchaseOrderNo || group.supplier} 无可结算入库`)
+      continue
+    }
+    const res = createSettleFromPurchaseOrder(group.purchaseOrderId, {
+      settleDate: options.settleDate || dayjs().format('YYYY-MM-DD'),
+      remark:
+        options.remark ||
+        `账期按采购单生成 ${group.periodKey}（${group.periodStart}~${group.periodEnd}）`,
+      lineItems: lines,
+    })
+    if (!res.ok) {
+      skipped.push(`${group.purchaseOrderNo}：${res.message}`)
+      continue
+    }
+    res.settle.periodKey = group.periodKey
+    res.settle.periodStart = group.periodStart
+    res.settle.periodEnd = group.periodEnd
+    res.settle.generateMode = PURCHASE_SETTLE_GENERATE_MODE.PERIOD
+    res.settle.settleTarget = 'purchase_order'
+    created.push(res.settle)
+  }
+
+  if (!created.length) {
+    return {
+      ok: false,
+      message: skipped.length ? skipped.join('；') : '未生成任何对账单',
+      settles: [],
+      skipped,
+    }
+  }
+
+  return {
+    ok: true,
+    settles: created,
+    skipped,
+    message: `已生成 ${created.length} 张对账单${skipped.length ? `；跳过：${skipped.join('；')}` : ''}`,
+  }
+}
+
 export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
   const po = purchaseOrderState.orders.find((o) => o.id === purchaseOrderId)
   if (!po) return { ok: false, message: '采购单不存在' }
   if (po.status !== '已完成') {
     return {
       ok: false,
-      message: po.status === '已终结' ? '已终结的采购单不进入结算' : '仅已完成的采购单可生成结算单',
+      message: po.status === '已终结' ? '已终结的采购单不进入对账' : '仅已完成的采购单可生成对账单',
     }
   }
   const selected = payload.lineItems || []
@@ -463,11 +751,11 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
     const inbound = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
     const line = inbound?.lineItems?.find((l) => l.id === row.inboundLineId)
     if (!line) return { ok: false, message: '入库明细不存在' }
-    const remain = getRemainSettleQty(line)
+    const remain = getEffectiveRemainSettleQty(line, row.inboundOrderId)
     if (qty > remain + 1e-9) {
       return {
         ok: false,
-        message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}）`,
+        message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}，含草稿占用）`,
       }
     }
     const unitPrice = Number(row.unitPrice) || 0
@@ -489,6 +777,9 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
     )
   }
 
+  const settleDate = payload.settleDate || dayjs().format('YYYY-MM-DD')
+  const totalAmount = round2(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0))
+  const payMeta = resolvePaymentMeta(po.supplier, { settleDate, lineItems })
   const settle = createPurchaseSettle({
     id: `ps-${Date.now()}`,
     settleNo: payload.settleNo || nextSettleNo(),
@@ -500,13 +791,21 @@ export function createSettleFromPurchaseOrder(purchaseOrderId, payload = {}) {
     supplierId: supplier?.id || '',
     supplier: po.supplier,
     settlementCycle: resolveSupplierCycle(po.supplier, po),
-    settleDate: payload.settleDate || dayjs().format('YYYY-MM-DD'),
+    periodKey: payload.periodKey || '',
+    periodStart: payload.periodStart || '',
+    periodEnd: payload.periodEnd || '',
+    settleDate,
+    settleTarget: 'purchase_order',
+    bookAmount: totalAmount,
+    disputeAmount: 0,
+    confirmedAmount: totalAmount,
+    ...payMeta,
     remark: payload.remark || '',
     lineItems,
-    totalAmount: round2(lineItems.reduce((s, l) => s + (Number(l.amount) || 0), 0)),
+    totalAmount,
   })
   purchaseSettleState.settles.unshift(settle)
-  return { ok: true, settle, message: `已生成结算单「${settle.settleNo}」` }
+  return { ok: true, settle, message: `已生成对账单「${settle.settleNo}」` }
 }
 
 export function confirmPurchaseSettle(settleId) {
@@ -519,12 +818,13 @@ export function confirmPurchaseSettle(settleId) {
     const inbound = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
     const line = inbound?.lineItems?.find((l) => l.id === row.inboundLineId)
     if (!line) return { ok: false, message: '关联入库明细不存在' }
-    const remain = getRemainSettleQty(line)
+    // 确认本单时排除自身草稿占用
+    const remain = getEffectiveRemainSettleQty(line, row.inboundOrderId, settle.id)
     const qty = Number(row.settleQty) || 0
     if (qty > remain + 1e-9) {
       return {
         ok: false,
-        message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}）`,
+        message: `「${line.itemName || line.itemCode}」可结算数量不足（剩余 ${remain}，含其它草稿占用）`,
       }
     }
   }
@@ -538,6 +838,16 @@ export function confirmPurchaseSettle(settleId) {
   settle.status = PURCHASE_SETTLE_STATUS.CONFIRMED
   settle.confirmer = 'admin1'
   settle.confirmedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  // 对账日起算：确认后重算计划付款日
+  if ((settle.paymentTermStart || '对账日') === '对账日') {
+    const payMeta = resolvePaymentMeta(settle.supplier, {
+      settleDate: settle.settleDate,
+      confirmedAt: settle.confirmedAt,
+      lineItems: settle.lineItems,
+    })
+    settle.paymentTermDays = payMeta.paymentTermDays
+    settle.plannedPaymentDate = payMeta.plannedPaymentDate
+  }
   return { ok: true, settle, message: '结算单已确认' }
 }
 

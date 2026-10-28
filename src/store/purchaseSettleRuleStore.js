@@ -6,6 +6,8 @@ import {
   seedPurchaseSettleRules,
   SETTLE_RULE_TARGET,
   SETTLE_RULE_RESULT,
+  SETTLE_RULE_SCENE,
+  SETTLE_RULE_SCOPE,
 } from '@/mock/purchaseSettleRules'
 import { resolveScanWindow, calcNextRunAt } from '@/utils/purchaseSettleRuleWindow'
 import {
@@ -21,14 +23,20 @@ import { getSupplierByName } from '@/store/supplierStore'
 
 const STORAGE_KEY = 'i_doms_purchase_settle_rules'
 const LOG_STORAGE_KEY = 'i_doms_purchase_settle_rule_logs'
+const SEED_VERSION_KEY = 'i_doms_purchase_settle_rules_seed_v'
+/** v2：业务场景（采购/外协）+ 工厂默认/供应商覆盖 */
+const CURRENT_SEED_VERSION = '2'
 
 function loadRules() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed?.rules) && parsed.rules.length) {
-        return parsed.rules.map((r) => createPurchaseSettleRule(r))
+    const ver = localStorage.getItem(SEED_VERSION_KEY)
+    if (ver === CURRENT_SEED_VERSION) {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed?.rules) && parsed.rules.length) {
+          return parsed.rules.map((r) => createPurchaseSettleRule(r))
+        }
       }
     }
   } catch {
@@ -55,6 +63,7 @@ function loadLogs() {
 
 function persistRules() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ rules: purchaseSettleRuleState.rules }))
+  localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
 }
 
 function persistLogs() {
@@ -99,6 +108,37 @@ function refreshNextRun(rule) {
   rule.nextRunAt = next ? next.format('YYYY-MM-DD HH:mm:ss') : ''
 }
 
+function normalizeRulePayload(payload = {}) {
+  const ruleScope = payload.ruleScope || SETTLE_RULE_SCOPE.FACTORY
+  const bizScene = payload.bizScene || SETTLE_RULE_SCENE.PURCHASE
+  let supplierIds = Array.isArray(payload.supplierIds) ? [...payload.supplierIds] : []
+  if (ruleScope === SETTLE_RULE_SCOPE.FACTORY) {
+    supplierIds = []
+  }
+  return { ...payload, ruleScope, bizScene, supplierIds }
+}
+
+/**
+ * 已被「同场景 + 同结算对象」的供应商覆盖规则命中的供应商 id
+ * （工厂兜底规则执行时应排除）
+ */
+export function listSupplierIdsCoveredByOverrides(bizScene, settleTarget, excludeRuleId = '') {
+  const scene = bizScene || SETTLE_RULE_SCENE.PURCHASE
+  const target = settleTarget || SETTLE_RULE_TARGET.INBOUND
+  const ids = new Set()
+  purchaseSettleRuleState.rules.forEach((r) => {
+    if (!r?.enabled) return
+    if (excludeRuleId && r.id === excludeRuleId) return
+    if ((r.ruleScope || SETTLE_RULE_SCOPE.FACTORY) !== SETTLE_RULE_SCOPE.SUPPLIER) return
+    if ((r.bizScene || SETTLE_RULE_SCENE.PURCHASE) !== scene) return
+    if ((r.settleTarget || SETTLE_RULE_TARGET.INBOUND) !== target) return
+    ;(r.supplierIds || []).forEach((id) => {
+      if (id) ids.add(id)
+    })
+  })
+  return ids
+}
+
 export function savePurchaseSettleRule(payload = {}) {
   const name = String(payload.name || '').trim()
   if (!name) return { ok: false, message: '请填写规则名称' }
@@ -106,15 +146,22 @@ export function savePurchaseSettleRule(payload = {}) {
   if (payload.scanWindowType === 'fixed' && (!payload.scanStart || !payload.scanEnd)) {
     return { ok: false, message: '固定时间段须填写起止日期' }
   }
+  const normalized = normalizeRulePayload(payload)
+  if (
+    normalized.ruleScope === SETTLE_RULE_SCOPE.SUPPLIER &&
+    !(normalized.supplierIds || []).length
+  ) {
+    return { ok: false, message: '供应商规则须指定至少一个供应商（用于覆盖工厂默认）' }
+  }
 
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   let rule
-  if (payload.id) {
-    const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === payload.id)
+  if (normalized.id) {
+    const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === normalized.id)
     if (idx < 0) return { ok: false, message: '规则不存在' }
     rule = createPurchaseSettleRule({
       ...purchaseSettleRuleState.rules[idx],
-      ...payload,
+      ...normalized,
       name,
       updatedAt: now,
     })
@@ -125,7 +172,7 @@ export function savePurchaseSettleRule(payload = {}) {
   }
 
   rule = createPurchaseSettleRule({
-    ...payload,
+    ...normalized,
     id: `psr-${Date.now()}`,
     name,
     createdAt: now,
@@ -170,26 +217,64 @@ function getPoCompletedAt(po) {
   return ''
 }
 
+function isFactoryScope(rule) {
+  return (rule.ruleScope || SETTLE_RULE_SCOPE.FACTORY) !== SETTLE_RULE_SCOPE.SUPPLIER
+}
+
+function filterGroupsByFactoryOverride(rule, groups = []) {
+  if (!isFactoryScope(rule)) return { groups, skippedCovered: [] }
+  const covered = listSupplierIdsCoveredByOverrides(rule.bizScene, rule.settleTarget, rule.id)
+  if (!covered.size) return { groups, skippedCovered: [] }
+  const kept = []
+  const skippedCovered = []
+  groups.forEach((g) => {
+    const sid = g.supplierId || getSupplierByName(g.supplier)?.id || ''
+    if (sid && covered.has(sid)) {
+      skippedCovered.push(`${g.supplier} 已由供应商规则覆盖，跳过工厂默认`)
+      return
+    }
+    kept.push(g)
+  })
+  return { groups: kept, skippedCovered }
+}
+
 function runInboundRule(rule, windowInfo) {
+  const supplierIds = isFactoryScope(rule)
+    ? undefined
+    : rule.supplierIds?.length
+      ? rule.supplierIds
+      : undefined
+  if (!isFactoryScope(rule) && !supplierIds?.length) {
+    return { ok: false, message: '供应商规则未指定供应商', settles: [], skipped: [] }
+  }
   const preview = previewSettlesByFixedWindow({
     periodStart: windowInfo.periodStart,
     periodEnd: windowInfo.periodEnd,
     periodKey: `${rule.id}:${windowInfo.periodKey}`,
     periodLabel: windowInfo.label,
-    supplierIds: rule.supplierIds?.length ? rule.supplierIds : undefined,
+    supplierIds,
     settlementCycles: rule.settlementCycles?.length ? rule.settlementCycles : undefined,
     allowAppend: false,
   })
   if (!preview.ok) {
     return { ok: false, message: preview.message, settles: [], skipped: [] }
   }
-  const selectable = (preview.groups || []).filter((g) => g.selectable)
+  const { groups: scopedGroups, skippedCovered } = filterGroupsByFactoryOverride(
+    rule,
+    preview.groups || [],
+  )
+  const selectable = scopedGroups.filter((g) => g.selectable)
   if (!selectable.length) {
-    const skipped = (preview.groups || [])
-      .filter((g) => g.exists || !g.lineCount)
-      .map((g) =>
-        g.exists ? `${g.supplier} 已有结算「${g.existingSettleNo}」` : `${g.supplier} 无可结算明细`,
-      )
+    const skipped = [
+      ...skippedCovered,
+      ...scopedGroups
+        .filter((g) => g.exists || !g.lineCount)
+        .map((g) =>
+          g.exists
+            ? `${g.supplier} 已有结算「${g.existingSettleNo}」`
+            : `${g.supplier} 无可结算明细`,
+        ),
+    ]
     return {
       ok: true,
       message: skipped.length ? `无可新建结算；${skipped.join('；')}` : '扫描窗口内无可结算入库',
@@ -223,14 +308,25 @@ function runInboundRule(rule, windowInfo) {
     ok: true,
     message: createdRes.message,
     settles,
-    skipped: createdRes.skipped || [],
+    skipped: [...skippedCovered, ...(createdRes.skipped || [])],
   }
 }
 
 function runPurchaseOrderRule(rule, windowInfo) {
   const created = []
   const skipped = []
-  const supplierIdSet = rule.supplierIds?.length ? new Set(rule.supplierIds) : null
+  const isFactory = isFactoryScope(rule)
+  const supplierIdSet = isFactory
+    ? null
+    : rule.supplierIds?.length
+      ? new Set(rule.supplierIds)
+      : null
+  if (!isFactory && !supplierIdSet?.size) {
+    return { ok: false, message: '供应商规则未指定供应商', settles: [], skipped: [] }
+  }
+  const covered = isFactory
+    ? listSupplierIdsCoveredByOverrides(rule.bizScene, rule.settleTarget, rule.id)
+    : new Set()
   const cycleSet = rule.settlementCycles?.length ? new Set(rule.settlementCycles) : null
 
   const candidates = purchaseOrderState.orders.filter((po) => {
@@ -238,12 +334,16 @@ function runPurchaseOrderRule(rule, windowInfo) {
     const completed = getPoCompletedAt(po)
     if (!completed) return false
     if (completed < windowInfo.periodStart || completed > windowInfo.periodEnd) return false
+    const supplier = getSupplierByName(po.supplier)
     if (supplierIdSet) {
-      const supplier = getSupplierByName(po.supplier)
       if (!supplier || !supplierIdSet.has(supplier.id)) return false
     }
+    if (covered.size && supplier?.id && covered.has(supplier.id)) {
+      skipped.push(`${po.orderNo}（${po.supplier}）已由供应商规则覆盖，跳过工厂默认`)
+      return false
+    }
     if (cycleSet) {
-      const cycle = getSupplierByName(po.supplier)?.settlementCycle || po.settlementCycle
+      const cycle = supplier?.settlementCycle || po.settlementCycle
       if (!cycleSet.has(cycle)) return false
     }
     return true
@@ -335,7 +435,18 @@ export function executePurchaseSettleRule(ruleId, options = {}) {
   }
 
   let result
-  if (rule.settleTarget === SETTLE_RULE_TARGET.PURCHASE_ORDER) {
+  const scene = rule.bizScene || SETTLE_RULE_SCENE.PURCHASE
+  if (
+    scene === SETTLE_RULE_SCENE.OUTSOURCING &&
+    rule.settleTarget === SETTLE_RULE_TARGET.PURCHASE_ORDER
+  ) {
+    result = {
+      ok: true,
+      message: '外协「按外协订单」结算执行待对接外协结算单，本次未生成单据',
+      settles: [],
+      skipped: ['外协按订单结算待对接'],
+    }
+  } else if (rule.settleTarget === SETTLE_RULE_TARGET.PURCHASE_ORDER) {
     result = runPurchaseOrderRule(rule, windowInfo)
   } else {
     result = runInboundRule(rule, windowInfo)
