@@ -111,6 +111,12 @@ const routes = [
     meta: { title: '销售订单预览', standalone: true },
   },
   {
+    path: '/settlement/purchase-settles/preview',
+    name: 'settlement-purchase-settle-preview',
+    component: () => import('@/views/procurement/PurchaseSettlePrintPreviewView.vue'),
+    meta: { title: '采购对账单预览', standalone: true },
+  },
+  {
     path: '/sales/delivery/preview',
     name: 'sales-delivery-preview',
     component: () => import('@/views/sales/DeliveryOrderPrintPreviewView.vue'),
@@ -498,6 +504,12 @@ const routes = [
         name: 'sales-payments',
         component: () => import('@/views/sales/SalesPaymentView.vue'),
         meta: { title: '回款管理' },
+      },
+      {
+        path: 'sales/customer-ledger',
+        name: 'sales-customer-ledger',
+        component: () => import('@/views/sales/CustomerLedgerView.vue'),
+        meta: { title: '客户往来' },
       },
       {
         path: 'sales/framework-contracts',
@@ -1087,6 +1099,18 @@ const routes = [
         meta: { title: '采购对账详情', listPath: '/settlement/purchase-settles' },
       },
       {
+        path: 'settlement/dispute-accruals',
+        name: 'settlement-dispute-accruals',
+        component: () => import('@/views/settlement/DisputeAccrualView.vue'),
+        meta: { title: '争议挂账' },
+      },
+      {
+        path: 'settlement/supplier-ledger',
+        name: 'settlement-supplier-ledger',
+        component: () => import('@/views/settlement/SupplierLedgerView.vue'),
+        meta: { title: '供应商往来' },
+      },
+      {
         path: 'settlement/settle-rules',
         name: 'settlement-settle-rules',
         component: () => import('@/views/procurement/PurchaseSettleRuleView.vue'),
@@ -1424,6 +1448,12 @@ const routes = [
         component: () => import('@/views/report/ReportQueryView.vue'),
         props: { reportKey: 'qc-task-stats' },
         meta: { title: '质检任务统计表' },
+      },
+      {
+        path: 'basic-config/company-profile',
+        name: 'basic-config-company-profile',
+        component: () => import('@/views/basic-config/CompanyProfileView.vue'),
+        meta: { title: '企业信息' },
       },
       {
         path: 'basic-config/employee-groups',

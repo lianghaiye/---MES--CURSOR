@@ -4,12 +4,21 @@ import {
   createPurchaseSettleRule,
   createSettleRuleLog,
   seedPurchaseSettleRules,
+  mergeBuiltinSettleRules,
+  isBuiltinSettleRule,
+  generateSettleRuleCode,
   SETTLE_RULE_TARGET,
   SETTLE_RULE_RESULT,
   SETTLE_RULE_SCENE,
   SETTLE_RULE_SCOPE,
 } from '@/mock/purchaseSettleRules'
 import { resolveScanWindow, calcNextRunAt } from '@/utils/purchaseSettleRuleWindow'
+import {
+  findSettleRuleSupplierConflicts,
+  applySettleRuleConflictResolution,
+  disableSettleTargetMutexRules,
+  findSettleTargetMutexRules,
+} from '@/utils/purchaseSettleRuleGuard'
 import {
   previewSettlesByFixedWindow,
   createSettlesFromPeriod,
@@ -24,28 +33,40 @@ import { getSupplierByName } from '@/store/supplierStore'
 const STORAGE_KEY = 'i_doms_purchase_settle_rules'
 const LOG_STORAGE_KEY = 'i_doms_purchase_settle_rule_logs'
 const SEED_VERSION_KEY = 'i_doms_purchase_settle_rules_seed_v'
-/** v2：业务场景（采购/外协）+ 工厂默认/供应商覆盖 */
-const CURRENT_SEED_VERSION = '2'
+/** v6：演示供应商规则 + 内置无创建人/时间 */
+const CURRENT_SEED_VERSION = '6'
+
+function withNextRun(rule) {
+  const next = calcNextRunAt(rule)
+  return { ...rule, nextRunAt: next ? next.format('YYYY-MM-DD HH:mm:ss') : '' }
+}
 
 function loadRules() {
   try {
     const ver = localStorage.getItem(SEED_VERSION_KEY)
-    if (ver === CURRENT_SEED_VERSION) {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed?.rules) && parsed.rules.length) {
-          return parsed.rules.map((r) => createPurchaseSettleRule(r))
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed?.rules) && parsed.rules.length) {
+        let rules = parsed.rules.map((r) => createPurchaseSettleRule(r))
+        rules = mergeBuiltinSettleRules(rules)
+        // 补齐历史数据缺失的规则编码
+        rules.forEach((r) => {
+          if (!r.code) r.code = generateSettleRuleCode(rules)
+        })
+        // 升级：纠正「入库 + 采购单」同时启用
+        if (ver !== CURRENT_SEED_VERSION) {
+          normalizeSettleTargetMutex(rules)
+          localStorage.setItem(SEED_VERSION_KEY, CURRENT_SEED_VERSION)
         }
+        rules = rules.map(withNextRun)
+        return rules
       }
     }
   } catch {
     /* ignore */
   }
-  return seedPurchaseSettleRules().map((r) => {
-    const next = calcNextRunAt(r)
-    return { ...r, nextRunAt: next ? next.format('YYYY-MM-DD HH:mm:ss') : '' }
-  })
+  return mergeBuiltinSettleRules(seedPurchaseSettleRules()).map(withNextRun)
 }
 
 function loadLogs() {
@@ -74,6 +95,9 @@ export const purchaseSettleRuleState = reactive({
   rules: loadRules(),
   logs: loadLogs(),
 })
+
+// 启动时落盘，确保内置四条已写入本地
+persistRules()
 
 watch(
   () => purchaseSettleRuleState.rules,
@@ -108,6 +132,38 @@ function refreshNextRun(rule) {
   rule.nextRunAt = next ? next.format('YYYY-MM-DD HH:mm:ss') : ''
 }
 
+/** 加载/升级时：同场景不同生成维度若同时启用，保留「按入库」，停用互斥的「按采购单」等 */
+function normalizeSettleTargetMutex(rules = []) {
+  const enabled = rules.filter((r) => r?.enabled)
+  // 优先保留按入库
+  const ordered = [
+    ...enabled.filter(
+      (r) => (r.settleTarget || SETTLE_RULE_TARGET.INBOUND) === SETTLE_RULE_TARGET.INBOUND,
+    ),
+    ...enabled.filter(
+      (r) => (r.settleTarget || SETTLE_RULE_TARGET.INBOUND) !== SETTLE_RULE_TARGET.INBOUND,
+    ),
+  ]
+  const kept = []
+  ordered.forEach((r) => {
+    const hit = findSettleTargetMutexRules({ ...r, enabled: true }, kept)
+    if (hit.length) {
+      r.enabled = false
+      return
+    }
+    kept.push(r)
+  })
+}
+
+function applyMutexAfterEnable(rule) {
+  const { disabled, message } = disableSettleTargetMutexRules(
+    { ...rule, enabled: true },
+    purchaseSettleRuleState.rules,
+  )
+  disabled.forEach((other) => refreshNextRun(other))
+  return message
+}
+
 function normalizeRulePayload(payload = {}) {
   const ruleScope = payload.ruleScope || SETTLE_RULE_SCOPE.FACTORY
   const bizScene = payload.bizScene || SETTLE_RULE_SCENE.PURCHASE
@@ -139,67 +195,232 @@ export function listSupplierIdsCoveredByOverrides(bizScene, settleTarget, exclud
   return ids
 }
 
-export function savePurchaseSettleRule(payload = {}) {
+/** 内置规则允许用户改的字段 */
+const BUILTIN_EDITABLE_KEYS = [
+  'enabled',
+  'resultMode',
+  'executeFreq',
+  'executeTime',
+  'executeWeekday',
+  'executeMonthDay',
+  'scanWindowType',
+  'scanLastNDays',
+  'scanStart',
+  'scanEnd',
+  'remark',
+]
+
+/**
+ * @param {object} payload
+ * @param {{ conflictResolution?: object }} [options]
+ */
+export function savePurchaseSettleRule(payload = {}, options = {}) {
+  const { conflictResolution } = options
   const name = String(payload.name || '').trim()
   if (!name) return { ok: false, message: '请填写规则名称' }
   if (!payload.executeTime) return { ok: false, message: '请填写执行时刻' }
   if (payload.scanWindowType === 'fixed' && (!payload.scanStart || !payload.scanEnd)) {
     return { ok: false, message: '固定时间段须填写起止日期' }
   }
-  const normalized = normalizeRulePayload(payload)
-  if (
-    normalized.ruleScope === SETTLE_RULE_SCOPE.SUPPLIER &&
-    !(normalized.supplierIds || []).length
-  ) {
-    return { ok: false, message: '供应商规则须指定至少一个供应商（用于覆盖工厂默认）' }
-  }
 
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   let rule
-  if (normalized.id) {
-    const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === normalized.id)
+
+  if (payload.id && isBuiltinSettleRule(payload)) {
+    const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === payload.id)
     if (idx < 0) return { ok: false, message: '规则不存在' }
+    const prev = purchaseSettleRuleState.rules[idx]
+    const patch = {}
+    BUILTIN_EDITABLE_KEYS.forEach((k) => {
+      if (payload[k] !== undefined) patch[k] = payload[k]
+    })
+    if (patch.scanWindowType === 'fixed' && prev.scanWindowType !== 'fixed') {
+      patch.lastScheduleRunAt = ''
+    }
     rule = createPurchaseSettleRule({
-      ...purchaseSettleRuleState.rules[idx],
-      ...normalized,
-      name,
+      ...prev,
+      ...patch,
+      builtin: true,
+      name: prev.name,
+      bizScene: prev.bizScene,
+      ruleScope: SETTLE_RULE_SCOPE.FACTORY,
+      settleTarget: prev.settleTarget,
+      settlementCycles: [...(prev.settlementCycles || [])],
+      supplierIds: [],
+      creator: '',
+      createdAt: '',
+      updater: 'admin1',
       updatedAt: now,
     })
     refreshNextRun(rule)
     purchaseSettleRuleState.rules.splice(idx, 1, rule)
+    let message = '内置规则已保存'
+    if (rule.enabled) {
+      const mutexMsg = applyMutexAfterEnable(rule)
+      if (mutexMsg) message = `${message}；${mutexMsg}`
+    }
     queueReschedule()
-    return { ok: true, rule, message: '规则已保存' }
+    return { ok: true, rule, message }
+  }
+
+  const normalized = normalizeRulePayload({
+    ...payload,
+    ruleScope: payload.id
+      ? payload.ruleScope || SETTLE_RULE_SCOPE.SUPPLIER
+      : SETTLE_RULE_SCOPE.SUPPLIER,
+    builtin: false,
+  })
+  if (normalized.ruleScope !== SETTLE_RULE_SCOPE.SUPPLIER) {
+    return { ok: false, message: '仅支持新建/维护供应商自定义规则；工厂默认请用内置规则' }
+  }
+  if (!(normalized.supplierIds || []).length) {
+    return { ok: false, message: '供应商规则须指定至少一个供应商（用于覆盖工厂默认）' }
+  }
+
+  if (normalized.enabled) {
+    const probe = {
+      ...normalized,
+      id: normalized.id || '',
+      name,
+      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+    }
+    const conflict = findSettleRuleSupplierConflicts(probe, purchaseSettleRuleState.rules)
+    if (conflict.hasConflict && !conflictResolution) {
+      return { ok: false, needConflict: true, conflict }
+    }
+    if (conflict.hasConflict && conflictResolution) {
+      const { supplierIdsToSave } = applySettleRuleConflictResolution(
+        purchaseSettleRuleState.rules,
+        normalized.supplierIds,
+        conflict.conflicts,
+        conflictResolution,
+      )
+      if (!supplierIdsToSave.length) {
+        return { ok: false, message: '跳过冲突后无剩余供应商，无法保存并启用' }
+      }
+      normalized.supplierIds = supplierIdsToSave
+    }
+  }
+
+  if (normalized.id) {
+    const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === normalized.id)
+    if (idx < 0) return { ok: false, message: '规则不存在' }
+    if (isBuiltinSettleRule(purchaseSettleRuleState.rules[idx])) {
+      return { ok: false, message: '内置规则不可按供应商规则保存' }
+    }
+    const prev = purchaseSettleRuleState.rules[idx]
+    const clearOneShot =
+      normalized.scanWindowType === 'fixed' &&
+      (prev.scanWindowType !== 'fixed' ||
+        prev.scanStart !== normalized.scanStart ||
+        prev.scanEnd !== normalized.scanEnd)
+    rule = createPurchaseSettleRule({
+      ...prev,
+      ...normalized,
+      name,
+      code: prev.code || generateSettleRuleCode(purchaseSettleRuleState.rules),
+      builtin: false,
+      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+      lastScheduleRunAt: clearOneShot ? '' : prev.lastScheduleRunAt,
+      updater: 'admin1',
+      updatedAt: now,
+    })
+    refreshNextRun(rule)
+    purchaseSettleRuleState.rules.splice(idx, 1, rule)
+    let message = '规则已保存'
+    if (rule.enabled) {
+      const mutexMsg = applyMutexAfterEnable(rule)
+      if (mutexMsg) message = `${message}；${mutexMsg}`
+    }
+    queueReschedule()
+    return { ok: true, rule, message }
   }
 
   rule = createPurchaseSettleRule({
     ...normalized,
     id: `psr-${Date.now()}`,
+    code: generateSettleRuleCode(purchaseSettleRuleState.rules),
     name,
+    builtin: false,
+    ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+    creator: 'admin1',
+    updater: 'admin1',
     createdAt: now,
     updatedAt: now,
   })
   refreshNextRun(rule)
   purchaseSettleRuleState.rules.unshift(rule)
+  let createMessage = '规则已创建'
+  if (rule.enabled) {
+    const mutexMsg = applyMutexAfterEnable(rule)
+    if (mutexMsg) createMessage = `${createMessage}；${mutexMsg}`
+  }
   queueReschedule()
-  return { ok: true, rule, message: '规则已创建' }
+  return { ok: true, rule, message: createMessage }
 }
 
 export function deletePurchaseSettleRule(id) {
   const idx = purchaseSettleRuleState.rules.findIndex((r) => r.id === id)
   if (idx < 0) return { ok: false, message: '规则不存在' }
+  if (isBuiltinSettleRule(purchaseSettleRuleState.rules[idx])) {
+    return { ok: false, message: '内置规则不可删除，可停用' }
+  }
   purchaseSettleRuleState.rules.splice(idx, 1)
   queueReschedule()
   return { ok: true, message: '规则已删除' }
 }
 
-export function setPurchaseSettleRuleEnabled(id, enabled) {
+/**
+ * @param {string} id
+ * @param {boolean} enabled
+ * @param {{ conflictResolution?: object }} [options]
+ */
+export function setPurchaseSettleRuleEnabled(id, enabled, options = {}) {
   const rule = getPurchaseSettleRuleById(id)
   if (!rule) return { ok: false, message: '规则不存在' }
-  rule.enabled = !!enabled
+
+  if (!enabled) {
+    rule.enabled = false
+    rule.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    refreshNextRun(rule)
+    queueReschedule()
+    return { ok: true, rule, message: '规则已停用' }
+  }
+
+  if (
+    (rule.ruleScope || SETTLE_RULE_SCOPE.FACTORY) === SETTLE_RULE_SCOPE.SUPPLIER &&
+    (rule.supplierIds || []).length
+  ) {
+    const probe = { ...rule, enabled: true }
+    const conflict = findSettleRuleSupplierConflicts(probe, purchaseSettleRuleState.rules)
+    if (conflict.hasConflict && !options.conflictResolution) {
+      return { ok: false, needConflict: true, conflict, rule }
+    }
+    if (conflict.hasConflict && options.conflictResolution) {
+      const { supplierIdsToSave } = applySettleRuleConflictResolution(
+        purchaseSettleRuleState.rules,
+        rule.supplierIds,
+        conflict.conflicts,
+        options.conflictResolution,
+      )
+      if (!supplierIdsToSave.length) {
+        return { ok: false, message: '跳过冲突后无剩余供应商，无法启用' }
+      }
+      rule.supplierIds = supplierIdsToSave
+    }
+  }
+
+  rule.enabled = true
+  rule.updater = 'admin1'
   rule.updatedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
   refreshNextRun(rule)
+  const mutexMsg = applyMutexAfterEnable(rule)
   queueReschedule()
-  return { ok: true, rule, message: enabled ? '规则已启用' : '规则已停用' }
+  return {
+    ok: true,
+    rule,
+    message: mutexMsg ? `规则已启用；${mutexMsg}` : '规则已启用',
+  }
 }
 
 function queueReschedule() {
@@ -453,6 +674,10 @@ export function executePurchaseSettleRule(ruleId, options = {}) {
   }
 
   rule.lastRunAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  // 固定窗口：仅调度触发计为「自动已跑一次」
+  if ((rule.scanWindowType || '') === 'fixed' && trigger === 'schedule') {
+    rule.lastScheduleRunAt = rule.lastRunAt
+  }
   refreshNextRun(rule)
 
   const settleNos = (result.settles || []).map((s) => s.settleNo)

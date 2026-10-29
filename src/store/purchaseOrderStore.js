@@ -15,7 +15,6 @@ import {
   calcPoHeaderInboundStatus,
   calcPoLineInboundStatus,
   calcPoHeaderAccountStatus,
-  calcPoLineAccountStatus,
   calcPoLineRemainInboundQty,
 } from '@/utils/purchaseLineInbound'
 import { addPurchaseReceipt, purchaseReceiptState } from '@/store/purchaseReceiptStore'
@@ -40,8 +39,8 @@ export function registerPurchaseRequisitionDraftBind(api = {}) {
 
 const STORAGE_KEY = 'i_doms_purchase_orders'
 const SEED_VERSION_KEY = 'i_doms_purchase_orders_seed_v'
-/** v9：采购订单/明细入账状态 */
-const CURRENT_SEED_VERSION = '9'
+/** v10：入账状态改为对账口径（未入账/入账待确认/已入账） */
+const CURRENT_SEED_VERSION = '10'
 let poSeq = 20
 
 function loadFromStorage() {
@@ -83,10 +82,11 @@ function initPurchaseOrders() {
       return
     }
     order.overdueStatus = computePurchaseOrderOverdueStatus(order)
+    // 入账状态由对账单回写；此处仅补默认，启动后 settle store 会全量刷新
     ;(order.lineItems || []).forEach((line) => {
-      line.accountStatus = calcPoLineAccountStatus(order, line)
+      if (!line.accountStatus) line.accountStatus = '未入账'
     })
-    order.accountStatus = calcPoHeaderAccountStatus(order)
+    order.accountStatus = order.accountStatus || calcPoHeaderAccountStatus(order)
   })
   return orders
 }
@@ -455,10 +455,9 @@ export function syncPurchaseOrderInboundStatus(orderOrId) {
   if (!order || order.status === '草稿') return order
   ;(order.lineItems || []).forEach((line) => {
     line.inboundStatus = calcPoLineInboundStatus(order, line)
-    line.accountStatus = calcPoLineAccountStatus(order, line)
+    // 入账状态不对入库改写，由对账单同步
   })
   order.inboundStatus = calcPoHeaderInboundStatus(order)
-  order.accountStatus = calcPoHeaderAccountStatus(order)
   order.overdueStatus = computePurchaseOrderOverdueStatus(order)
   tryAutoCompletePurchaseOrder(order)
   return order

@@ -160,7 +160,6 @@ import {
 } from '@/store/purchaseOrderStore'
 import {
   calcPoLineInboundStatus,
-  calcPoLineAccountStatus,
   poLineInboundStatusColor,
   poLineAccountStatusColor,
 } from '@/utils/purchaseLineInbound'
@@ -245,7 +244,7 @@ function lineInboundStatus(line) {
 }
 
 function lineAccountStatus(line) {
-  return line?.accountStatus || calcPoLineAccountStatus(record.value, line)
+  return line?.accountStatus || '未入账'
 }
 
 function statusColor(status) {

@@ -51,13 +51,11 @@
     <div v-if="kind !== 'global'" class="action-hint">
       <div>
         <strong>自动替换</strong>
-        ：将该{{ objectNoun }}的生效{{ entityLabel }}替换为当前{{ entityLabel }}。原{{
-          entityLabel
-        }}若关联了重叠工序，则只解除这些工序；未关联工序时解除该{{ objectNoun }}。绑定清空则停用。
+        ：{{ replaceHintText }}
       </div>
       <div>
         <strong>跳过冲突</strong>
-        ：当前{{ entityLabel }}不绑定该{{ objectNoun }}，维持原有生效{{ entityLabel }}不变。
+        ：{{ skipHintText }}
       </div>
     </div>
   </a-modal>
@@ -79,6 +77,12 @@ const props = defineProps({
   currentTemplateName: { type: String, default: '' },
   title: { type: String, default: '模板冲突' },
   entityLabel: { type: String, default: '模板' },
+  /** 覆盖默认「产品/类别」，如结算规则传「供应商」 */
+  objectNounOverride: { type: String, default: '' },
+  objectColumnTitle: { type: String, default: '' },
+  listHintText: { type: String, default: '' },
+  replaceHint: { type: String, default: '' },
+  skipHint: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:open', 'confirm', 'cancel'])
@@ -88,13 +92,17 @@ const rowModes = reactive({})
 
 const isCategory = computed(() => props.kind === QC_TEMPLATE_SCOPE_TYPE.CATEGORY)
 
-const objectNoun = computed(() => (isCategory.value ? '类别' : '产品'))
+const objectNoun = computed(() => {
+  if (props.objectNounOverride) return props.objectNounOverride
+  return isCategory.value ? '类别' : '产品'
+})
 
 const hasProcessOverlap = computed(() =>
   (props.conflicts || []).some((c) => String(c.processLabel || '').trim()),
 )
 
 const listHint = computed(() => {
+  if (props.listHintText) return props.listHintText
   const processBit = hasProcessOverlap.value ? '且关联工序有重叠' : ''
   if (isCategory.value) {
     return `本次${props.entityLabel}中，以下产品类别已关联其他生效的类别${props.entityLabel}${processBit}。`
@@ -119,7 +127,7 @@ const actionOptions = computed(() => [
 ])
 
 const columns = computed(() => {
-  const objectTitle = isCategory.value ? '产品类别' : '产品信息'
+  const objectTitle = props.objectColumnTitle || (isCategory.value ? '产品类别' : '产品信息')
   const cols = [
     { title: '序号', dataIndex: 'index', width: 56, align: 'center' },
     { title: objectTitle, dataIndex: 'objectLabel', ellipsis: true, width: 160 },
@@ -133,6 +141,16 @@ const columns = computed(() => {
     { title: '处理方式', key: 'action', width: 200 },
   )
   return cols
+})
+
+const replaceHintText = computed(() => {
+  if (props.replaceHint) return props.replaceHint
+  return `将该${objectNoun.value}的生效${props.entityLabel}替换为当前${props.entityLabel}。原${props.entityLabel}若关联了重叠工序，则只解除这些工序；未关联工序时解除该${objectNoun.value}。绑定清空则停用。`
+})
+
+const skipHintText = computed(() => {
+  if (props.skipHint) return props.skipHint
+  return `当前${props.entityLabel}不绑定该${objectNoun.value}，维持原有生效${props.entityLabel}不变。`
 })
 
 watch(

@@ -140,14 +140,6 @@
                       </a-tooltip>
                     </span>
                   </template>
-                  <template v-else-if="column.key === 'returnQty'">
-                    <span class="col-title-with-tip">
-                      退货数量
-                      <a-tooltip title="采购退货数量与质检退货数量之和">
-                        <InfoCircleOutlined class="col-tip-icon" />
-                      </a-tooltip>
-                    </span>
-                  </template>
                   <template v-else>{{ column.title }}</template>
                 </template>
                 <template #bodyCell="{ column, record: line, index }">
@@ -186,6 +178,9 @@
                   </template>
                   <template v-else-if="column.key === 'settleQty'">
                     {{ lineSettleQtyText(line) }}
+                  </template>
+                  <template v-else-if="column.key === 'accountedSettleQty'">
+                    {{ lineAccountedSettleQtyText(line) }}
                   </template>
                   <template v-else-if="column.key === 'returnQty'">
                     {{ formatQtyWithUnit(lineReturnQty(line), line.unit) }}
@@ -395,8 +390,24 @@
                       row.settleNo
                     }}</a>
                   </template>
-                  <template v-else-if="column.dataIndex === 'amount'">
-                    {{ formatMoney(row.amount) }}
+                  <template v-else-if="column.key === 'bookAmount'">
+                    {{ formatMoney(row.bookAmount) }}
+                  </template>
+                  <template v-else-if="column.key === 'confirmedAmount'">
+                    {{ formatMoney(row.confirmedAmount) }}
+                  </template>
+                  <template v-else-if="column.key === 'status'">
+                    <a-tag
+                      :color="
+                        row.status === '已确认'
+                          ? 'green'
+                          : row.status === '对账中'
+                            ? 'processing'
+                            : 'orange'
+                      "
+                    >
+                      {{ row.status || '—' }}
+                    </a-tag>
                   </template>
                   <template v-else>{{ row[column.dataIndex] || '—' }}</template>
                 </template>
@@ -564,6 +575,7 @@ import { listReturnLinesForPurchaseOrder, calcPoLineReturnQty } from '@/utils/or
 import { purchaseReceiptState } from '@/store/purchaseReceiptStore'
 import { purchaseReturnState } from '@/store/purchaseReturnStore'
 import { buildPoSettleTabRows, purchaseSettleState } from '@/store/purchaseSettleStore'
+import { calcPoLineAccountedSettleQty } from '@/utils/purchaseOrderSettleAccount'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
 import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
@@ -696,6 +708,12 @@ const lineColumns = [
   },
   { title: '入库数量', key: 'inboundQty', width: 120, align: 'right' },
   { title: '结算数量', key: 'settleQty', width: 120, align: 'right' },
+  {
+    title: '已入账/结算数量',
+    key: 'accountedSettleQty',
+    width: 130,
+    align: 'right',
+  },
   { title: '退货数量', key: 'returnQty', width: 120, align: 'right' },
   { title: '入库质检要求', key: 'inboundQcRequirement', width: 110 },
   { title: '质检结果', key: 'qcResult', width: 100 },
@@ -743,10 +761,18 @@ const returnColumns = [
 
 const settleColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
-  { title: '结算单号', dataIndex: 'settleNo', width: 150 },
-  { title: '结算金额', dataIndex: 'amount', width: 120, align: 'right' },
-  { title: '结算时间', dataIndex: 'settledAt', width: 160 },
-  { title: '状态', dataIndex: 'status', width: 100 },
+  { title: '结算单号', key: 'settleNo', dataIndex: 'settleNo', width: 150 },
+  { title: '账期', dataIndex: 'periodKey', width: 110 },
+  { title: '账面金额', key: 'bookAmount', dataIndex: 'bookAmount', width: 110, align: 'right' },
+  {
+    title: '确认金额',
+    key: 'confirmedAmount',
+    dataIndex: 'confirmedAmount',
+    width: 110,
+    align: 'right',
+  },
+  { title: '确认/创建时间', dataIndex: 'settledAt', width: 160 },
+  { title: '状态', key: 'status', dataIndex: 'status', width: 100 },
 ]
 
 const lineTableScrollX = lineColumns.reduce((sum, col) => sum + (col.width || 100), 0)
@@ -929,8 +955,7 @@ function lineInboundStatus(line) {
 }
 
 function lineAccountStatus(line) {
-  if (line?.accountStatus) return line.accountStatus
-  return calcPoLineInboundStatus(record.value, line) === '已入库' ? '已入账' : '未入账'
+  return line?.accountStatus || '未入账'
 }
 
 function lineInboundProgress(line) {
@@ -949,6 +974,14 @@ function lineInboundQty(line) {
 function lineSettleQtyText(line) {
   void relatedInboundOrders.value
   const qty = calcPoLineInboundSettleQty(record.value, line)
+  const unit = resolvePoLineSettleUnit(record.value, line)
+  if (!(qty > 0) && !unit) return '—'
+  return formatQtyWithUnit(qty, unit)
+}
+
+function lineAccountedSettleQtyText(line) {
+  void purchaseSettleState.settles
+  const qty = calcPoLineAccountedSettleQty(line?.id, purchaseSettleState.settles)
   const unit = resolvePoLineSettleUnit(record.value, line)
   if (!(qty > 0) && !unit) return '—'
   return formatQtyWithUnit(qty, unit)

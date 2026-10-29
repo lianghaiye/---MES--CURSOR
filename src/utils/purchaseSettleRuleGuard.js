@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import {
   SETTLE_RULE_TARGET,
   SETTLE_RULE_RESULT,
@@ -6,6 +7,8 @@ import {
   SETTLE_RULE_SCOPE,
 } from '@/mock/purchaseSettleRules'
 import { SCAN_WINDOW_TYPES } from '@/utils/purchaseSettleRuleWindow'
+import { getSupplierById } from '@/store/supplierStore'
+import { resolveConflictBuckets } from '@/utils/qcTemplateConflictService'
 
 /** 推荐模板：工厂兜底 / 供应商覆盖 */
 export const SETTLE_RULE_TEMPLATES = [
@@ -173,6 +176,49 @@ export function collectSettleRuleSaveWarnings(rule = {}) {
 }
 
 /**
+ * 同场景、不同生成维度（入库 ↔ 采购单）且供应商/周期有交集 → 互斥，不可同时启用
+ * （含工厂↔工厂、供应商↔供应商、工厂↔供应商）
+ */
+export function findSettleTargetMutexRules(rule = {}, allRules = []) {
+  if (!rule?.enabled) return []
+  const scene = rule.bizScene || SETTLE_RULE_SCENE.PURCHASE
+  const target = rule.settleTarget || SETTLE_RULE_TARGET.INBOUND
+  const list = []
+  for (const other of allRules) {
+    if (!other?.enabled) continue
+    if (rule.id && other.id && rule.id === other.id) continue
+    if ((other.bizScene || SETTLE_RULE_SCENE.PURCHASE) !== scene) continue
+    if ((other.settleTarget || SETTLE_RULE_TARGET.INBOUND) === target) continue
+    if (!supplierScopesOverlap(rule.supplierIds, other.supplierIds)) continue
+    if (!cycleScopesOverlap(rule.settlementCycles, other.settlementCycles)) continue
+    list.push(other)
+  }
+  return list
+}
+
+/**
+ * 启用当前规则时，停用互斥的其他已启用规则
+ * @returns {{ disabled: object[], message: string }}
+ */
+export function disableSettleTargetMutexRules(rule = {}, allRules = {}, now = '') {
+  const mutex = findSettleTargetMutexRules(rule, allRules)
+  const stamp = now || dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const disabled = []
+  mutex.forEach((other) => {
+    other.enabled = false
+    other.updatedAt = stamp
+    disabled.push(other)
+  })
+  const names = disabled.map((r) => r.name || r.code || r.id).filter(Boolean)
+  return {
+    disabled,
+    message: names.length
+      ? `已自动停用互斥规则：${names.join('、')}（同场景不同生成维度不可并行）`
+      : '',
+  }
+}
+
+/**
  * 与其它已启用规则的潜在冲突
  * 工厂默认 vs 供应商覆盖：设计上为覆盖关系，不判冲突
  */
@@ -222,4 +268,82 @@ export function formatSettleRuleGuardMessages(warnings = [], conflicts = []) {
   const lines = [...warnings]
   conflicts.forEach((c) => lines.push(c.message))
   return lines
+}
+
+/**
+ * 供应商规则：同场景、同生成维度下，供应商已被其他「已启用」供应商规则绑定 → 冲突（对齐质检模板）
+ * @returns {{ hasConflict: boolean, kind: 'supplier', conflicts: Array }}
+ */
+export function findSettleRuleSupplierConflicts(rule = {}, allRules = []) {
+  const empty = { hasConflict: false, kind: 'supplier', conflicts: [] }
+  if (!rule?.enabled) return empty
+  if ((rule.ruleScope || SETTLE_RULE_SCOPE.FACTORY) !== SETTLE_RULE_SCOPE.SUPPLIER) {
+    return empty
+  }
+  const supplierIds = (rule.supplierIds || []).filter(Boolean)
+  if (!supplierIds.length) return empty
+
+  const scene = rule.bizScene || SETTLE_RULE_SCENE.PURCHASE
+  const target = rule.settleTarget || SETTLE_RULE_TARGET.INBOUND
+  const conflicts = []
+  let index = 1
+
+  for (const sid of supplierIds) {
+    for (const other of allRules) {
+      if (!other?.enabled) continue
+      if (rule.id && other.id && rule.id === other.id) continue
+      if ((other.ruleScope || SETTLE_RULE_SCOPE.FACTORY) !== SETTLE_RULE_SCOPE.SUPPLIER) continue
+      if ((other.bizScene || SETTLE_RULE_SCENE.PURCHASE) !== scene) continue
+      if ((other.settleTarget || SETTLE_RULE_TARGET.INBOUND) !== target) continue
+      if (!(other.supplierIds || []).includes(sid)) continue
+
+      const supplier = getSupplierById(sid)
+      conflicts.push({
+        key: `${sid}@@${other.id}`,
+        index: index++,
+        object: { id: sid },
+        objectLabel: supplier
+          ? `${supplier.name}${supplier.code ? `（${supplier.code}）` : ''}`
+          : sid,
+        currentRuleId: other.id,
+        currentTemplateName: other.name,
+        currentTemplateCode: other.id,
+      })
+    }
+  }
+
+  return { hasConflict: conflicts.length > 0, kind: 'supplier', conflicts }
+}
+
+/**
+ * 按决议处理供应商冲突：替换=从原规则解绑；跳过=当前规则不绑定该供应商
+ */
+export function applySettleRuleConflictResolution(
+  allRules = [],
+  supplierIds = [],
+  conflicts = [],
+  resolution = {},
+) {
+  const { replaceConflicts, skipConflicts } = resolveConflictBuckets(conflicts, resolution)
+  const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
+
+  replaceConflicts.forEach((c) => {
+    const sid = c.object?.id
+    if (!sid) return
+    const other = (allRules || []).find((r) => r.id === c.currentRuleId)
+    if (!other) return
+    other.supplierIds = (other.supplierIds || []).filter((id) => id !== sid)
+    if (!other.supplierIds.length) {
+      other.enabled = false
+    }
+    other.updatedAt = now
+  })
+
+  let supplierIdsToSave = [...(supplierIds || [])]
+  if (skipConflicts.length) {
+    const skipIds = new Set(skipConflicts.map((c) => c.object?.id).filter(Boolean))
+    supplierIdsToSave = supplierIdsToSave.filter((id) => !skipIds.has(id))
+  }
+
+  return { supplierIdsToSave, replaceConflicts, skipConflicts }
 }

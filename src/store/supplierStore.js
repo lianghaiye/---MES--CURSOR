@@ -61,6 +61,12 @@ const LEGACY_SUPPLIER_SEED = [
     paymentTermStart: '开票日',
     paymentTermDays: 60,
     paymentMethod: '银行转账',
+    openingBank: '中国建设银行上海徐汇支行',
+    bankAccount: '3105012345678900123',
+    invoiceName: '采购供应商A',
+    invoiceTaxNo: '91310000MA1CG0003A',
+    invoiceAddressPhone: '上海市徐汇区漕溪路 100 号 021-64001122',
+    contacts: [{ name: '赵对账', phone: '13900002222', title: '财务对账' }],
   },
   {
     code: 'SUP-004',

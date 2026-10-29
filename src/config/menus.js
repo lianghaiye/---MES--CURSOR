@@ -77,6 +77,7 @@ export const sideMenus = {
     { key: 'sales-lines', label: '销售明细', path: '/sales/sales-lines' },
     { key: 'delivery', label: '发货管理', path: '/sales/delivery' },
     { key: 'payments', label: '回款管理', path: '/sales/payments' },
+    { key: 'customer-ledger', label: '客户往来', path: '/sales/customer-ledger' },
   ],
   contracts: [
     { key: 'contract-ledger', label: '合同台账', path: '/contracts' },
@@ -194,6 +195,7 @@ export const sideMenus = {
     },
   ],
   'basic-config': [
+    { key: 'company-profile', label: '企业信息', path: '/basic-config/company-profile' },
     { key: 'employee-groups', label: '员工组别', path: '/basic-config/employee-groups' },
     { key: 'defect-items', label: '不良品项', path: '/basic-config/defect-items' },
     { key: 'material-grades', label: '材质管理', path: '/basic-config/material-grades' },
@@ -240,6 +242,8 @@ export const sideMenus = {
   ],
   settlement: [
     { key: 'purchase-settles', label: '采购对账', path: '/settlement/purchase-settles' },
+    { key: 'dispute-accruals', label: '争议挂账', path: '/settlement/dispute-accruals' },
+    { key: 'supplier-ledger', label: '供应商往来', path: '/settlement/supplier-ledger' },
     { key: 'settle-rules', label: '结算规则', path: '/settlement/settle-rules' },
   ],
   system: [
@@ -460,6 +464,7 @@ export const routeTitles = {
   '/basic-config/suppliers': '供应商档案',
   '/basic-config/supplier-categories': '供应商分类',
   '/sales/payments': '回款管理',
+  '/sales/customer-ledger': '客户往来',
   '/sales/framework-contracts': '合同台账',
   '/contracts': '合同台账',
   '/contracts/:id/approve': '审核合同',
@@ -547,6 +552,8 @@ export const routeTitles = {
   '/procurement/purchase-receipts': '采购收货',
   '/settlement/purchase-settles': '采购对账',
   '/settlement/purchase-settles/:id': '采购对账详情',
+  '/settlement/dispute-accruals': '争议挂账',
+  '/settlement/supplier-ledger': '供应商往来',
   '/settlement/settle-rules': '结算规则',
   '/procurement/purchase-settles': '采购对账',
   '/procurement/purchase-settles/:id': '采购对账详情',
@@ -602,6 +609,7 @@ export const routeTitles = {
   '/board/work-order-monitor': '工单监管看板',
   '/board/work-order-monitor/screen': '工单监管看板',
   '/board/carousel/play': '看板轮播播放',
+  '/basic-config/company-profile': '企业信息',
   '/basic-config/employee-groups': '员工组别',
   '/basic-config/defect-items': '不良品项',
   '/basic-config/material-grades': '材质管理',

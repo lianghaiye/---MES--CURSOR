@@ -5,6 +5,7 @@ import { ensureCrossDemoInboundOrders } from '@/mock/crossModuleDemoSeed'
 import { ensureMultiUnitFlowInboundOrders } from '@/mock/multiUnitFlowDemoSeed'
 import { ensureOneItemOneCodeInventoryInboundOrders } from '@/mock/oneItemOneCodeInventoryDemoSeed'
 import { ensurePeriodSettleDemoInboundOrders } from '@/mock/periodSettleDemoSeed'
+import { ensurePurchaseSettleDemoInboundOrders } from '@/mock/purchaseSettleDemoInboundSeed'
 import {
   purchaseOrderState,
   syncPurchaseOrderInboundStatus,
@@ -130,7 +131,9 @@ function initOrders() {
       : stored.map(normalizeLegacyOrder)
   return ensureOneItemOneCodeInventoryInboundOrders(
     ensureMultiUnitFlowInboundOrders(
-      ensurePeriodSettleDemoInboundOrders(ensureCrossDemoInboundOrders(base)),
+      ensurePurchaseSettleDemoInboundOrders(
+        ensurePeriodSettleDemoInboundOrders(ensureCrossDemoInboundOrders(base)),
+      ),
     ),
   )
 }

@@ -1,30 +1,35 @@
 <template>
-  <a-modal
-    :open="open"
-    :title="rule?.id ? '编辑结算规则' : '新建结算规则'"
-    :width="720"
-    destroy-on-close
-    @cancel="handleCancel"
-  >
-    <a-form layout="vertical" :model="form">
-      <a-row v-if="!rule?.id" :gutter="12">
-        <a-col :span="24">
-          <a-form-item label="从推荐模板填入">
-            <a-select
-              v-model:value="selectedTemplate"
+  <a-modal :open="open" :title="modalTitle" :width="960" destroy-on-close @cancel="handleCancel">
+    <a-alert
+      v-if="isBuiltin"
+      type="info"
+      show-icon
+      class="rule-scope-tip"
+      message="内置工厂默认规则：可改执行结果、执行频率/时刻、扫描窗口与备注；可停用。场景、生成维度、结算周期不可改，且不可删除。"
+    />
+    <a-alert
+      v-else
+      type="info"
+      show-icon
+      class="rule-scope-tip"
+      message="供应商自定义规则：可多选供应商；仅作用于勾选供应商，并覆盖同场景、同生成维度的工厂默认规则。"
+    />
+
+    <a-form layout="vertical" :model="form" class="rule-form">
+      <a-row :gutter="12">
+        <a-col :span="8">
+          <a-form-item label="规则名称" required>
+            <a-input
+              v-model:value="form.name"
               allow-clear
-              placeholder="可选：采购/外协 · 工厂默认/供应商覆盖"
-              :options="templateOpts"
-              @change="applyTemplate"
+              placeholder="请输入"
+              :disabled="isBuiltin"
             />
           </a-form-item>
         </a-col>
-      </a-row>
-
-      <a-row :gutter="12">
-        <a-col :span="16">
-          <a-form-item label="规则名称" required>
-            <a-input v-model:value="form.name" allow-clear placeholder="请输入" />
+        <a-col :span="8">
+          <a-form-item label="业务场景" required>
+            <a-select v-model:value="form.bizScene" :options="sceneOpts" :disabled="isBuiltin" />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -35,51 +40,28 @@
       </a-row>
 
       <a-row :gutter="12">
-        <a-col :span="12">
-          <a-form-item label="业务场景" required>
-            <a-select v-model:value="form.bizScene" :options="sceneOpts" />
-          </a-form-item>
-        </a-col>
-        <a-col :span="12">
-          <a-form-item label="规则层级" required>
-            <a-radio-group v-model:value="form.ruleScope" button-style="solid">
-              <a-radio-button value="factory">工厂默认（兜底）</a-radio-button>
-              <a-radio-button value="supplier">供应商规则（覆盖）</a-radio-button>
-            </a-radio-group>
-          </a-form-item>
-        </a-col>
-      </a-row>
-
-      <a-alert
-        type="info"
-        show-icon
-        class="rule-scope-tip"
-        :message="
-          form.ruleScope === 'supplier'
-            ? '供应商规则：仅作用于勾选供应商，并覆盖同场景同生成维度的工厂默认规则。'
-            : '工厂默认：兜底全部未覆盖供应商；已被供应商规则覆盖的不会再进本规则。'
-        "
-      />
-
-      <a-row :gutter="12">
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="生成维度" required>
-            <a-select v-model:value="form.settleTarget" :options="targetOpts" />
+            <a-select
+              v-model:value="form.settleTarget"
+              :options="targetOpts"
+              :disabled="isBuiltin"
+            />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="执行结果" required>
             <a-select v-model:value="form.resultMode" :options="resultOpts" />
           </a-form-item>
         </a-col>
-      </a-row>
-
-      <a-row :gutter="12">
         <a-col :span="8">
           <a-form-item label="执行频率" required>
             <a-select v-model:value="form.executeFreq" :options="freqOpts" />
           </a-form-item>
         </a-col>
+      </a-row>
+
+      <a-row :gutter="12">
         <a-col :span="8">
           <a-form-item label="执行时刻" required>
             <a-time-picker
@@ -105,15 +87,37 @@
             />
           </a-form-item>
         </a-col>
-      </a-row>
-
-      <a-row :gutter="12">
-        <a-col :span="12">
+        <a-col :span="8">
           <a-form-item label="扫描窗口" required>
             <a-select v-model:value="form.scanWindowType" :options="scanOpts" />
           </a-form-item>
         </a-col>
-        <a-col v-if="form.scanWindowType === 'last_n_days'" :span="12">
+        <a-col v-if="form.executeFreq !== 'weekly' && form.executeFreq !== 'monthly'" :span="8">
+          <a-form-item label="适用结算周期">
+            <a-select
+              v-model:value="form.settlementCycles"
+              mode="multiple"
+              allow-clear
+              placeholder="空=不限"
+              :options="cycleOpts"
+              :disabled="isBuiltin"
+              :max-tag-count="1"
+              class="cycle-select"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row
+        v-if="
+          form.scanWindowType === 'last_n_days' ||
+          form.scanWindowType === 'fixed' ||
+          form.executeFreq === 'weekly' ||
+          form.executeFreq === 'monthly'
+        "
+        :gutter="12"
+      >
+        <a-col v-if="form.scanWindowType === 'last_n_days'" :span="8">
           <a-form-item label="近 N 天">
             <a-input-number
               v-model:value="form.scanLastNDays"
@@ -123,10 +127,7 @@
             />
           </a-form-item>
         </a-col>
-      </a-row>
-
-      <a-row v-if="form.scanWindowType === 'fixed'" :gutter="12">
-        <a-col :span="12">
+        <a-col v-if="form.scanWindowType === 'fixed'" :span="8">
           <a-form-item label="开始日期" required>
             <a-date-picker
               v-model:value="form.scanStart"
@@ -135,7 +136,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col :span="12">
+        <a-col v-if="form.scanWindowType === 'fixed'" :span="8">
           <a-form-item label="结束日期" required>
             <a-date-picker
               v-model:value="form.scanEnd"
@@ -144,87 +145,96 @@
             />
           </a-form-item>
         </a-col>
-      </a-row>
-
-      <a-row :gutter="12">
-        <a-col v-if="form.ruleScope === 'supplier'" :span="12">
-          <a-form-item label="覆盖供应商" required>
-            <a-select
-              v-model:value="form.supplierIds"
-              mode="multiple"
-              allow-clear
-              show-search
-              placeholder="必选：本规则覆盖的供应商"
-              :options="supplierOpts"
-              :filter-option="filterOption"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col :span="form.ruleScope === 'supplier' ? 12 : 24">
+        <a-col v-if="form.executeFreq === 'weekly' || form.executeFreq === 'monthly'" :span="8">
           <a-form-item label="适用结算周期">
             <a-select
               v-model:value="form.settlementCycles"
               mode="multiple"
               allow-clear
-              placeholder="空=不限（窗内有可结算数据的都扫）"
+              placeholder="空=不限"
               :options="cycleOpts"
+              :disabled="isBuiltin"
+              :max-tag-count="1"
+              class="cycle-select"
             />
           </a-form-item>
         </a-col>
       </a-row>
 
       <a-alert
-        v-if="liveGuardMessages.length"
-        type="warning"
+        v-if="form.scanWindowType === 'fixed'"
+        type="info"
         show-icon
-        class="rule-guard-alert"
-        message="配置风险提示"
-        :description="liveGuardMessages.join('\n')"
+        class="rule-scope-tip"
+        message="固定起止为一次性补扫：按执行频率只自动调度一次；手动试跑可重复。修改起止日期后可重新自动排一次。"
       />
 
       <a-form-item label="备注">
-        <a-textarea v-model:value="form.remark" :rows="2" allow-clear />
+        <a-textarea v-model:value="form.remark" :rows="4" allow-clear class="remark-textarea" />
+      </a-form-item>
+
+      <a-form-item v-if="!isBuiltin" label="覆盖供应商" required>
+        <SettleSupplierMultiSelect v-model="form.supplierIds" />
       </a-form-item>
     </a-form>
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
+      <a-button type="primary" :loading="saving" @click="handleSave()">保存</a-button>
     </template>
   </a-modal>
+
+  <QcTemplateConflictModal
+    v-model:open="conflictOpen"
+    kind="supplier"
+    title="结算规则冲突"
+    entity-label="规则"
+    object-noun-override="供应商"
+    object-column-title="供应商"
+    list-hint-text="本次规则中，以下供应商已绑定其他已启用的供应商结算规则。"
+    replace-hint="将该供应商从原规则解绑，改由当前规则覆盖；原规则若无剩余供应商则自动停用。"
+    skip-hint="当前规则不绑定该供应商，维持原有生效规则不变。"
+    :conflicts="conflictRows"
+    :current-template-name="form.name"
+    @confirm="onConflictConfirm"
+  />
 </template>
 
 <script setup>
-import { reactive, ref, watch, computed, h } from 'vue'
-import { message, Modal } from 'ant-design-vue'
-import { savePurchaseSettleRule, listPurchaseSettleRules } from '@/store/purchaseSettleRuleStore'
-import { supplierState } from '@/store/supplierStore'
+import { reactive, ref, watch, computed } from 'vue'
+import { message } from 'ant-design-vue'
+import { savePurchaseSettleRule } from '@/store/purchaseSettleRuleStore'
 import { SCAN_WINDOW_TYPES } from '@/utils/purchaseSettleRuleWindow'
-import {
-  SETTLE_RULE_TEMPLATES,
-  collectSettleRuleSaveWarnings,
-  findConflictingSettleRules,
-  formatSettleRuleGuardMessages,
-} from '@/utils/purchaseSettleRuleGuard'
 import {
   SETTLE_RULE_TARGET,
   SETTLE_RULE_RESULT,
   SETTLE_RULE_FREQ,
   SETTLE_RULE_SCENE,
   SETTLE_RULE_SCOPE,
+  isBuiltinSettleRule,
 } from '@/mock/purchaseSettleRules'
+import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
+import SettleSupplierMultiSelect from './SettleSupplierMultiSelect.vue'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
   rule: { type: Object, default: null },
-  /** 打开时预填的模板 key */
-  templateKey: { type: String, default: '' },
 })
 const emit = defineEmits(['update:open', 'saved'])
 
 const saving = ref(false)
-const selectedTemplate = ref(undefined)
 const form = reactive(emptyForm())
+const conflictOpen = ref(false)
+const conflictRows = ref([])
+const pendingConflictResolution = ref(null)
+
+const isBuiltin = computed(() => isBuiltinSettleRule(form) || isBuiltinSettleRule(props.rule))
+
+const modalTitle = computed(() => {
+  if (isBuiltin.value) return '编辑内置规则'
+  if (form.id || props.rule?.id) return '编辑供应商规则'
+  return '新建供应商规则'
+})
 
 const sceneOpts = [
   { label: '采购', value: SETTLE_RULE_SCENE.PURCHASE },
@@ -263,7 +273,7 @@ const scanOpts = [
   { label: '上月', value: SCAN_WINDOW_TYPES.LAST_MONTH },
   { label: '上周', value: SCAN_WINDOW_TYPES.LAST_WEEK },
   { label: '近 N 天', value: SCAN_WINDOW_TYPES.LAST_N_DAYS },
-  { label: '固定起止', value: SCAN_WINDOW_TYPES.FIXED },
+  { label: '固定起止（一次性）', value: SCAN_WINDOW_TYPES.FIXED },
 ]
 const cycleOpts = [
   { label: '月结', value: '月结' },
@@ -271,43 +281,20 @@ const cycleOpts = [
   { label: '周结', value: '周结' },
   { label: '季结', value: '季结' },
 ]
-const templateOpts = SETTLE_RULE_TEMPLATES.map((t) => ({ label: t.label, value: t.key }))
-
-const supplierOpts = computed(() =>
-  supplierState.suppliers
-    .filter((s) => s.status !== '停用')
-    .map((s) => ({
-      label: `${s.name}（${s.settlementCycle || '—'}）`,
-      value: s.id,
-      searchText: s.name,
-    })),
-)
-
-const liveGuardMessages = computed(() => {
-  const warnings = collectSettleRuleSaveWarnings(form)
-  const conflicts = findConflictingSettleRules(form, listPurchaseSettleRules())
-  return formatSettleRuleGuardMessages(warnings, conflicts)
-})
 
 watch(
   () => props.open,
   (val) => {
     if (!val) return
-    selectedTemplate.value = props.templateKey || undefined
     Object.assign(form, emptyForm(), props.rule || {})
     if (!form.executeTime) form.executeTime = '02:00'
     if (!form.bizScene) form.bizScene = SETTLE_RULE_SCENE.PURCHASE
-    if (!form.ruleScope) form.ruleScope = SETTLE_RULE_SCOPE.FACTORY
-    if (!props.rule?.id && props.templateKey) {
-      applyTemplate(props.templateKey)
+    if (!props.rule?.id) {
+      form.ruleScope = SETTLE_RULE_SCOPE.SUPPLIER
+      form.builtin = false
     }
-  },
-)
-
-watch(
-  () => form.ruleScope,
-  (scope) => {
-    if (scope === SETTLE_RULE_SCOPE.FACTORY) form.supplierIds = []
+    pendingConflictResolution.value = null
+    conflictRows.value = []
   },
 )
 
@@ -316,15 +303,16 @@ function emptyForm() {
     id: '',
     name: '',
     enabled: true,
+    builtin: false,
     bizScene: SETTLE_RULE_SCENE.PURCHASE,
-    ruleScope: SETTLE_RULE_SCOPE.FACTORY,
+    ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
     settleTarget: SETTLE_RULE_TARGET.INBOUND,
     resultMode: SETTLE_RULE_RESULT.DRAFT,
-    executeFreq: SETTLE_RULE_FREQ.DAILY,
+    executeFreq: SETTLE_RULE_FREQ.WEEKLY,
     executeTime: '02:00',
     executeWeekday: 1,
     executeMonthDay: 1,
-    scanWindowType: SCAN_WINDOW_TYPES.LAST_MONTH,
+    scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
     scanLastNDays: 7,
     scanStart: '',
     scanEnd: '',
@@ -334,64 +322,42 @@ function emptyForm() {
   }
 }
 
-function applyTemplate(key) {
-  const tpl = SETTLE_RULE_TEMPLATES.find((t) => t.key === key)
-  if (!tpl) return
-  Object.assign(form, emptyForm(), tpl.partial, { id: form.id || '' })
-  selectedTemplate.value = key
-}
-
-function filterOption(input, option) {
-  return String(option?.searchText || option?.label || '')
-    .toLowerCase()
-    .includes(String(input || '').toLowerCase())
-}
-
 function handleCancel() {
   emit('update:open', false)
 }
 
-function doSave() {
+function handleSave(conflictResolution) {
   saving.value = true
-  const res = savePurchaseSettleRule({ ...form })
-  saving.value = false
-  if (!res.ok) {
-    message.warning(res.message)
-    return
+  try {
+    const res = savePurchaseSettleRule(
+      { ...form },
+      { conflictResolution: conflictResolution || pendingConflictResolution.value || undefined },
+    )
+    if (res.needConflict) {
+      conflictRows.value = res.conflict.conflicts || []
+      conflictOpen.value = true
+      return
+    }
+    if (!res.ok) {
+      message.warning(res.message)
+      return
+    }
+    message.success(res.message)
+    emit('saved', res.rule)
+    emit('update:open', false)
+  } finally {
+    saving.value = false
+    pendingConflictResolution.value = null
   }
-  message.success(res.message)
-  emit('saved', res.rule)
-  emit('update:open', false)
 }
 
-function handleSave() {
-  const msgs = liveGuardMessages.value
-  if (!msgs.length) {
-    doSave()
-    return
-  }
-  Modal.confirm({
-    title: '配置存在风险，仍要保存？',
-    width: 560,
-    content: () =>
-      h(
-        'div',
-        msgs.map((m, i) =>
-          h('p', { key: i, style: 'margin: 0 0 8px; line-height: 1.5' }, `${i + 1}. ${m}`),
-        ),
-      ),
-    okText: '仍要保存',
-    cancelText: '返回修改',
-    onOk: () => doSave(),
-  })
+function onConflictConfirm(resolution) {
+  pendingConflictResolution.value = resolution
+  handleSave(resolution)
 }
 </script>
 
 <style scoped>
-.rule-guard-alert {
-  margin-bottom: 12px;
-  white-space: pre-line;
-}
 .rule-scope-tip {
   margin-bottom: 12px;
   padding: 4px 10px;
@@ -406,6 +372,32 @@ function handleSave() {
     font-weight: 400;
     line-height: 1.5;
     color: rgba(0, 0, 0, 0.65);
+  }
+}
+
+.rule-form {
+  :deep(.ant-form-item) {
+    margin-bottom: 12px;
+  }
+
+  /* 多选结算周期保持与普通选择框同高 */
+  .cycle-select {
+    width: 100%;
+
+    :deep(.ant-select-selector) {
+      min-height: 32px !important;
+      height: 32px !important;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    :deep(.ant-select-selection-overflow) {
+      flex-wrap: nowrap;
+    }
+  }
+
+  .remark-textarea {
+    min-height: 96px;
   }
 }
 </style>

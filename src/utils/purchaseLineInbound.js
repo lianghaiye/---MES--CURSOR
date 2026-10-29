@@ -240,29 +240,32 @@ export function calcPoHeaderInboundStatus(po) {
 }
 
 /**
- * 明细入账状态：已完全入库（含退货结清）→ 已入账；否则未入账。
- * （行上仅两种：已入账 / 未入账）
+ * 明细入账状态（对账口径，优先行上已存值）
+ * 未入账 | 入账待确认 | 已入账
+ * @deprecated 入库完成≠入账；请用对账单回写的 line.accountStatus
  */
 export function calcPoLineAccountStatus(po, line) {
-  return calcPoLineInboundStatus(po, line) === '已入库' ? '已入账' : '未入账'
+  if (line?.accountStatus) return line.accountStatus
+  return '未入账'
 }
 
 /**
- * 整单入账状态：全部已入账 / 全部未入账 / 部分入账
- * （任一行部分入库，或行间状态不一致 → 部分入账）
+ * 整单入账状态：由明细 accountStatus 汇总
  */
 export function calcPoHeaderAccountStatus(po) {
   const lines = (po?.lineItems || []).filter((l) => !l.cancelled)
-  if (!lines.length) return '已入账'
-  const inboundStatuses = lines.map((l) => calcPoLineInboundStatus(po, l))
-  if (inboundStatuses.every((s) => s === '已入库')) return '已入账'
-  if (inboundStatuses.every((s) => s === '待入库')) return '未入账'
+  if (!lines.length) return '未入账'
+  const statuses = lines.map((l) => l.accountStatus || '未入账')
+  if (statuses.every((s) => s === '已入账')) return '已入账'
+  if (statuses.every((s) => s === '未入账')) return '未入账'
+  if (statuses.every((s) => s === '入账待确认')) return '入账待确认'
   return '部分入账'
 }
 
 export function poLineAccountStatusColor(status) {
   const map = {
     未入账: 'default',
+    入账待确认: 'warning',
     已入账: 'success',
     部分入账: 'processing',
   }

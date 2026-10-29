@@ -328,14 +328,17 @@ import {
 } from '@/store/salesContractStore'
 import { salesOrderState, findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import {
+  CONTRACT_CASH_DIRECTION,
   CONTRACT_PAYMENT_STATUS,
   CONTRACT_STATUS,
+  CONTRACT_TYPE,
   PAYMENT_LINK_TYPE,
   contractPaymentStatusColor,
   contractPaymentStatusOptions,
   paymentLinkTypeOptions,
   paymentMethodOptions,
 } from '@/constants/salesContract'
+import { getPresetPaymentNodes } from '@/store/contractPaymentNodePresetStore'
 import PaymentStatsPanel from './components/PaymentStatsPanel.vue'
 import PaymentDetailDrawer from './components/PaymentDetailDrawer.vue'
 
@@ -515,19 +518,36 @@ const selectedLinkedOrderTotal = computed(() =>
   selectedLinkedOrders.value.reduce((s, r) => s + (Number(r.amount) || 0), 0),
 )
 
+function nodeSelectOptions(nodes = []) {
+  const seen = new Set()
+  return (nodes || [])
+    .map((n) => String(n?.name || '').trim())
+    .filter((name) => {
+      if (!name || seen.has(name)) return false
+      seen.add(name)
+      return true
+    })
+    .map((name) => ({ label: name, value: name }))
+}
+
+function presetIncomeNodeOptions(contractType) {
+  return nodeSelectOptions(
+    getPresetPaymentNodes(contractType || CONTRACT_TYPE.STANDARD, CONTRACT_CASH_DIRECTION.INCOME),
+  )
+}
+
 const nodeOpts = computed(() => {
-  let nodes = []
   if (form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo) {
-    nodes = getSalesContractByNo(form.contractNo)?.paymentNodes || []
-  } else if (form.salesOrderNo) {
-    const order = findSalesOrderByOrderNo(form.salesOrderNo)
-    const c = order?.contractNo ? getSalesContractByNo(order.contractNo) : null
-    nodes = c?.paymentNodes || []
+    const contract = getSalesContractByNo(form.contractNo)
+    const fromContract = nodeSelectOptions(contract?.paymentNodes)
+    if (fromContract.length) return fromContract
+    return presetIncomeNodeOptions(contract?.contractType)
   }
-  if (!nodes.length) {
-    return [{ label: '合同回款', value: '合同回款' }]
-  }
-  return nodes.map((n) => ({ label: n.name, value: n.name }))
+  const order = form.salesOrderNo ? findSalesOrderByOrderNo(form.salesOrderNo) : null
+  const contract = order?.contractNo ? getSalesContractByNo(order.contractNo) : null
+  const fromContract = nodeSelectOptions(contract?.paymentNodes)
+  if (fromContract.length) return fromContract
+  return presetIncomeNodeOptions(contract?.contractType || order?.contractType)
 })
 
 function formatMoney(val) {

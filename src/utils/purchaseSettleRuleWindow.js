@@ -84,10 +84,18 @@ export function resolveScanWindow(rule, now = dayjs()) {
 
 /**
  * 计算规则下次执行时刻（前端模拟用）
+ * 固定起止窗口：一次性任务——已执行过则不再自动排期；未执行则按频率算出首次触发时刻。
  * @returns {dayjs.Dayjs|null}
  */
 export function calcNextRunAt(rule, now = dayjs()) {
   if (!rule?.enabled) return null
+  // 固定窗口只自动跑一次：调度成功后写入 lastScheduleRunAt；手动试跑不占用
+  if (
+    (rule.scanWindowType || SCAN_WINDOW_TYPES.LAST_MONTH) === SCAN_WINDOW_TYPES.FIXED &&
+    rule.lastScheduleRunAt
+  ) {
+    return null
+  }
   const base = dayjs(now)
   const [hh, mm] = String(rule.executeTime || '02:00')
     .split(':')

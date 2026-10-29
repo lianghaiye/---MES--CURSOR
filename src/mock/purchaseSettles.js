@@ -3,12 +3,44 @@ import { roundNumber } from '@/utils/numberFormat'
 
 export const PURCHASE_SETTLE_STATUS = {
   DRAFT: '草稿',
+  RECONCILING: '对账中',
   CONFIRMED: '已确认',
 }
 
 export const PURCHASE_SETTLE_GENERATE_MODE = {
   PO: 'po',
   PERIOD: 'period',
+}
+
+/** 行争议状态：open 待处理；resolved 已闭环 */
+export const PURCHASE_SETTLE_LINE_DISPUTE_STATUS = {
+  NONE: '',
+  OPEN: 'open',
+  RESOLVED: 'resolved',
+}
+
+/**
+ * 处理结论（对方主张模型）：
+ * - ours / cancelled：按本行账面
+ * - theirs：按对方主张
+ * - split：按谈妥金额
+ */
+export const PURCHASE_SETTLE_LINE_DISPUTE_RESULT = {
+  OURS: 'ours',
+  THEIRS: 'theirs',
+  SPLIT: 'split',
+  CANCELLED: 'cancelled',
+}
+
+/** 挂起性质：差额只记主张差；整笔整行先不计入确认应付 */
+export const PURCHASE_SETTLE_LINE_DISPUTE_SCOPE = {
+  DIFF: 'diff',
+  FULL: 'full',
+}
+
+export const PURCHASE_SETTLE_LINE_DISPUTE_SCOPE_LABEL = {
+  diff: '差额',
+  full: '整笔',
 }
 
 export function createPurchaseSettleLine(partial = {}) {
@@ -18,15 +50,42 @@ export function createPurchaseSettleLine(partial = {}) {
     partial.amount != null ? Number(partial.amount) : roundNumber(settleQty * unitPrice, 4)
   return {
     id: partial.id || `ps-line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    /** inbound | purchase | return */
+    sourceType: '',
     inboundOrderId: '',
     inboundDocNo: '',
     inboundLineId: '',
     poLineId: '',
     purchaseOrderId: '',
     purchaseOrderNo: '',
+    returnOrderId: '',
+    returnOrderNo: '',
+    returnLineId: '',
+    outboundOrderId: '',
+    outboundDocNo: '',
     itemCode: '',
     itemName: '',
+    specModel: '',
+    material: '',
     settleUnit: '',
+    /** diff=差额 / full=整笔 */
+    disputeScope: '',
+    /** 对方主张金额（差额必填；整笔可选） */
+    disputeClaimAmount: null,
+    /** 差异类型：磅差/价差/量差… */
+    disputeDiffType: '',
+    /** 折中谈妥金额 */
+    disputeAgreedAmount: null,
+    /**
+     * 兼容旧字段：现表示「账面 − 行确认额」的净扣减（可被 sync 覆盖）
+     * 新逻辑请用 disputeClaimAmount / 工具函数
+     */
+    disputeAmount: 0,
+    disputeRemark: '',
+    disputeStatus: '',
+    disputeResult: '',
+    disputeResolutionRemark: '',
+    disputeResolvedAt: '',
     ...partial,
     settleQty,
     unitPrice,
@@ -46,11 +105,37 @@ export function createPurchaseSettle(partial = {}) {
           4,
         )
   const bookAmount = rest.bookAmount != null ? Number(rest.bookAmount) : totalAmount
-  const disputeAmount = rest.disputeAmount != null ? Number(rest.disputeAmount) : 0
+  // 挂起·差额仍按账面；挂起·整笔=0；核销后按结论
+  let inferredConfirm = bookAmount
+  if (rest.confirmedAmount == null) {
+    inferredConfirm = roundNumber(
+      lineItems.reduce((s, l) => {
+        const book = Number(l.amount) || 0
+        if (!l.disputeStatus) return s + book
+        if (l.disputeStatus === 'open') {
+          return s + (l.disputeScope === 'full' ? 0 : book)
+        }
+        if (l.disputeStatus === 'resolved') {
+          if (l.disputeResult === 'ours' || l.disputeResult === 'cancelled') return s + book
+          if (l.disputeResult === 'split' && l.disputeAgreedAmount != null) {
+            return s + (Number(l.disputeAgreedAmount) || 0)
+          }
+          if (l.disputeResult === 'theirs' && l.disputeClaimAmount != null) {
+            return s + (Number(l.disputeClaimAmount) || 0)
+          }
+          return s + book
+        }
+        return s + book
+      }, 0),
+      4,
+    )
+  }
   const confirmedAmount =
-    rest.confirmedAmount != null
-      ? Number(rest.confirmedAmount)
-      : roundNumber(Math.max(0, bookAmount - disputeAmount), 4)
+    rest.confirmedAmount != null ? Number(rest.confirmedAmount) : inferredConfirm
+  const disputeAmount =
+    rest.disputeAmount != null
+      ? Number(rest.disputeAmount)
+      : roundNumber(bookAmount - confirmedAmount, 4)
   return {
     id: '',
     settleNo: '',
@@ -70,6 +155,28 @@ export function createPurchaseSettle(partial = {}) {
     paymentTermStart: '',
     paymentTermDays: null,
     plannedPaymentDate: '',
+    /** 资金概览：期初应付余额（元）；空则详情按同供应商历史确认未付估算 */
+    openingBalance: null,
+    /** 已冲抵的期初金额（账龄付款可先冲期初） */
+    openingPaidAmount: 0,
+    /** 本单本期确认额已登记实付合计 */
+    paidAmount: 0,
+    paymentStatus: '', // '' | 部分付款 | 已付款
+    paymentRecords: [],
+    lastPaidAt: '',
+    lastPaidBy: '',
+    lastPaidRemark: '',
+    /** '' | 部分收票 | 已开票；多笔见 invoiceRecords */
+    invoiceStatus: '',
+    invoiceRecords: [],
+    invoiceNo: '',
+    invoiceDate: '',
+    invoiceAmount: null,
+    invoiceTaxAmount: null,
+    invoiceRemark: '',
+    invoicer: '',
+    invoicedAt: '',
+    disputeRemark: '',
     remark: '',
     creator: 'admin1',
     createdAt: now,
@@ -86,11 +193,9 @@ export function createPurchaseSettle(partial = {}) {
 
 /**
  * 演示结算单（对照结算规则讲解）：
- * 1) 月结·账期·草稿 — 多功能供应商01（上月入库汇总）
- * 2) 月结·账期·已确认 — 采购供应商A
- * 3) 周结·账期·草稿 — 标准件供应商（上周）
- * 4) 按采购单·草稿 — 多功能供应商02（整单完成后结算）
- * 5) 月结·账期·草稿 — 多功能供应商02（另一月结供应商，同月初对账）
+ * 1–5) 9 月账期等既有场景
+ * 6–8) 10 月账期（草稿 / 已确认部分付款 / 对账中）
+ * 9–11) 11 月账期（草稿 / 对账中 / 已确认已开票）
  */
 export function seedPurchaseSettles() {
   return [
@@ -111,15 +216,16 @@ export function seedPurchaseSettles() {
       paymentTermStart: '开票日',
       paymentTermDays: 30,
       plannedPaymentDate: '',
-      disputeAmount: 200,
+      openingBalance: 8600,
       purchaseOrderNos: ['CG20260804001', 'CG20260715001'],
       purchaseOrderNo: 'CG20260804001',
-      remark: '演示：月初规则扫上月入库·月结供应商·草稿待确认',
+      remark: '演示：月初规则扫上月入库·月结供应商·草稿待确认；叶轮行有待处理争议',
       creator: '规则自动',
       createdAt: '2026-10-01 02:00:12',
       lineItems: [
         createPurchaseSettleLine({
           id: 'ps-demo-1-l1',
+          sourceType: 'inbound',
           inboundOrderId: 'ib-demo-ps-1a',
           inboundDocNo: 'RK20260908001',
           inboundLineId: 'ibl-ps-1a',
@@ -133,6 +239,7 @@ export function seedPurchaseSettles() {
         }),
         createPurchaseSettleLine({
           id: 'ps-demo-1-l2',
+          sourceType: 'inbound',
           inboundOrderId: 'ib-demo-ps-1b',
           inboundDocNo: 'RK20260922001',
           inboundLineId: 'ibl-ps-1b',
@@ -143,6 +250,11 @@ export function seedPurchaseSettles() {
           settleUnit: '件',
           settleQty: 40,
           unitPrice: 320,
+          // 差额：账面 12800，主张 12600；挂起时确认额仍含 12800
+          disputeScope: 'diff',
+          disputeClaimAmount: 12600,
+          disputeRemark: '供应商主张单价按框架协议，本行应按 12600 结算',
+          disputeStatus: 'open',
         }),
       ],
     }),
@@ -164,6 +276,8 @@ export function seedPurchaseSettles() {
       paymentTermStart: '开票日',
       paymentTermDays: 60,
       plannedPaymentDate: '',
+      openingBalance: 12000,
+      paidAmount: 0,
       purchaseOrderNos: ['CG20260802001'],
       purchaseOrderNo: 'CG20260802001',
       remark: '演示：月结已确认（账期起算开票日+60天，付款在开票后）',
@@ -174,6 +288,7 @@ export function seedPurchaseSettles() {
       lineItems: [
         createPurchaseSettleLine({
           id: 'ps-demo-2-l1',
+          sourceType: 'inbound',
           inboundOrderId: 'ib-demo-ps-2a',
           inboundDocNo: 'RK20260915001',
           inboundLineId: 'ibl-ps-2a',
@@ -187,6 +302,7 @@ export function seedPurchaseSettles() {
         }),
         createPurchaseSettleLine({
           id: 'ps-demo-2-l2',
+          sourceType: 'inbound',
           inboundOrderId: 'ib-demo-ps-2b',
           inboundDocNo: 'RK20260928001',
           inboundLineId: 'ibl-ps-2b',
@@ -197,6 +313,23 @@ export function seedPurchaseSettles() {
           settleUnit: '件',
           settleQty: 800,
           unitPrice: 1.2,
+        }),
+        // 演示：已入库退货出库冲减对账（来源=退货，来源单号=退货单号）
+        createPurchaseSettleLine({
+          id: 'ps-demo-2-l3',
+          sourceType: 'return',
+          returnOrderId: 'prtn-settle-done',
+          returnOrderNo: 'CGTH-260918001',
+          returnLineId: 'prtn-settle-done-l1',
+          outboundOrderId: 'ob-prtn-settle-done',
+          outboundDocNo: 'CKTH-260918001',
+          purchaseOrderId: 'po-4',
+          purchaseOrderNo: 'CG20260802001',
+          itemCode: 'MAT-PLATE-10',
+          itemName: '钢板',
+          settleUnit: '张',
+          settleQty: -5,
+          unitPrice: 280,
         }),
       ],
     }),
@@ -273,6 +406,7 @@ export function seedPurchaseSettles() {
       lineItems: [
         createPurchaseSettleLine({
           id: 'ps-demo-4-l1',
+          sourceType: 'purchase',
           inboundOrderId: 'ib-demo-ps-4a',
           inboundDocNo: 'RK20260918001',
           inboundLineId: 'ibl-ps-4a',
@@ -322,14 +456,321 @@ export function seedPurchaseSettles() {
         }),
         createPurchaseSettleLine({
           id: 'ps-demo-5-l2',
+          inboundOrderId: 'ib-demo-ps-5a',
           inboundDocNo: 'RK20260912001',
           inboundLineId: 'ibl-ps-5b',
+          purchaseOrderId: 'po-demo-ps-6',
           purchaseOrderNo: 'CG20260803001',
           itemCode: 'MAT-CAST-01',
           itemName: '泵体铸件（按重结算）',
           settleUnit: 'kg',
           settleQty: 1260.5,
           unitPrice: 8.6,
+        }),
+      ],
+    }),
+
+    // 6. 10 月账期 · 草稿
+    createPurchaseSettle({
+      id: 'ps-demo-month-oct-draft',
+      settleNo: 'PS20261101001',
+      status: PURCHASE_SETTLE_STATUS.DRAFT,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-1',
+      supplier: '多功能供应商01',
+      settlementCycle: '月结',
+      periodKey: '2026-10',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      settleDate: '2026-11-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
+      plannedPaymentDate: '',
+      openingBalance: 19580,
+      purchaseOrderNos: ['CG20260910001'],
+      purchaseOrderNo: 'CG20260910001',
+      remark: '演示：10 月账期月初生成草稿',
+      creator: '规则自动',
+      createdAt: '2026-11-01 02:00:10',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-10-l1',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-10a',
+          inboundDocNo: 'RK20261008001',
+          inboundLineId: 'ibl-ps-10a',
+          purchaseOrderId: 'po-demo-ps-10',
+          purchaseOrderNo: 'CG20260910001',
+          itemCode: '010040045',
+          itemName: '泵轴套',
+          settleUnit: '件',
+          settleQty: 80,
+          unitPrice: 56.5,
+        }),
+      ],
+    }),
+
+    // 7. 10 月账期 · 已确认
+    createPurchaseSettle({
+      id: 'ps-demo-month-oct-confirmed',
+      settleNo: 'PS20261101002',
+      status: PURCHASE_SETTLE_STATUS.CONFIRMED,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-3',
+      supplier: '采购供应商A',
+      settlementCycle: '月结',
+      periodKey: '2026-10',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      settleDate: '2026-11-01',
+      paymentTermStart: '对账日',
+      paymentTermDays: 45,
+      plannedPaymentDate: '2026-12-16',
+      openingBalance: 2360,
+      paidAmount: 500,
+      paymentStatus: '部分付款',
+      lastPaidAt: '2026-11-05 11:20:00',
+      lastPaidBy: 'admin1',
+      lastPaidRemark: '首笔按票付款',
+      paymentRecords: [
+        {
+          id: 'pay-demo-oct-1',
+          batchId: 'pay-batch-demo-oct-1',
+          amount: 500,
+          targetType: 'period',
+          paidAt: '2026-11-05 11:20:00',
+          paidBy: 'admin1',
+          remark: '首笔按票付款',
+        },
+      ],
+      invoiceStatus: '部分收票',
+      invoiceNo: 'FP-202611-050',
+      invoiceDate: '2026-11-04',
+      invoiceAmount: 500,
+      invoicer: 'admin1',
+      invoicedAt: '2026-11-04 16:00:00',
+      invoiceRecords: [
+        {
+          id: 'inv-demo-oct-1',
+          invoiceNo: 'FP-202611-050',
+          invoiceDate: '2026-11-04',
+          invoiceAmount: 500,
+          invoiceTaxAmount: null,
+          invoiceRemark: '首张半额发票',
+          invoicer: 'admin1',
+          invoicedAt: '2026-11-04 16:00:00',
+        },
+      ],
+      purchaseOrderNos: ['CG20260915001'],
+      purchaseOrderNo: 'CG20260915001',
+      remark: '演示：账单确认后分次收票并按票付款（已收票500/已付500）',
+      creator: '规则自动',
+      createdAt: '2026-11-01 02:00:18',
+      confirmer: 'admin1',
+      confirmedAt: '2026-11-02 09:30:00',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-10-l2',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-10b',
+          inboundDocNo: 'RK20261018001',
+          inboundLineId: 'ibl-ps-10b',
+          purchaseOrderId: 'po-demo-ps-10b',
+          purchaseOrderNo: 'CG20260915001',
+          itemCode: '010040010',
+          itemName: '密封垫片',
+          settleUnit: '件',
+          settleQty: 300,
+          unitPrice: 2.8,
+        }),
+      ],
+    }),
+
+    // 8. 10 月账期 · 对账中
+    createPurchaseSettle({
+      id: 'ps-demo-month-oct-reconciling',
+      settleNo: 'PS20261101003',
+      status: PURCHASE_SETTLE_STATUS.RECONCILING,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-2',
+      supplier: '多功能供应商02',
+      settlementCycle: '月结',
+      periodKey: '2026-10',
+      periodStart: '2026-10-01',
+      periodEnd: '2026-10-31',
+      settleDate: '2026-11-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
+      openingBalance: 4200,
+      purchaseOrderNos: ['CG20260920001'],
+      purchaseOrderNo: 'CG20260920001',
+      remark: '演示：10 月账期对账中',
+      creator: '规则自动',
+      createdAt: '2026-11-01 02:00:25',
+      reconcilingAt: '2026-11-03 14:00:00',
+      reconciler: 'admin1',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-10-l3',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-10c',
+          inboundDocNo: 'RK20261025001',
+          inboundLineId: 'ibl-ps-10c',
+          purchaseOrderId: 'po-demo-ps-10c',
+          purchaseOrderNo: 'CG20260920001',
+          itemCode: '010050004',
+          itemName: '机械密封组件',
+          settleUnit: '套',
+          settleQty: 8,
+          unitPrice: 680,
+        }),
+      ],
+    }),
+
+    // 9. 11 月账期 · 草稿
+    createPurchaseSettle({
+      id: 'ps-demo-month-nov-draft',
+      settleNo: 'PS20261201001',
+      status: PURCHASE_SETTLE_STATUS.DRAFT,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-1',
+      supplier: '多功能供应商01',
+      settlementCycle: '月结',
+      periodKey: '2026-11',
+      periodStart: '2026-11-01',
+      periodEnd: '2026-11-30',
+      settleDate: '2026-12-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 30,
+      openingBalance: 24000,
+      purchaseOrderNos: ['CG20261008001'],
+      purchaseOrderNo: 'CG20261008001',
+      remark: '演示：11 月账期草稿',
+      creator: '规则自动',
+      createdAt: '2026-12-01 02:00:10',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-11-l1',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-11a',
+          inboundDocNo: 'RK20261105001',
+          inboundLineId: 'ibl-ps-11a',
+          purchaseOrderId: 'po-demo-ps-11',
+          purchaseOrderNo: 'CG20261008001',
+          itemCode: '010050003',
+          itemName: '叶轮',
+          settleUnit: '件',
+          settleQty: 25,
+          unitPrice: 320,
+        }),
+      ],
+    }),
+
+    // 10. 11 月账期 · 对账中
+    createPurchaseSettle({
+      id: 'ps-demo-month-nov-reconciling',
+      settleNo: 'PS20261201002',
+      status: PURCHASE_SETTLE_STATUS.RECONCILING,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-6',
+      supplier: '标准件供应商',
+      settlementCycle: '月结',
+      periodKey: '2026-11',
+      periodStart: '2026-11-01',
+      periodEnd: '2026-11-30',
+      settleDate: '2026-12-01',
+      paymentTermStart: '对账日',
+      paymentTermDays: 15,
+      plannedPaymentDate: '2026-12-16',
+      openingBalance: 860,
+      purchaseOrderNos: ['CG20261012001'],
+      purchaseOrderNo: 'CG20261012001',
+      remark: '演示：11 月账期对账中',
+      creator: '规则自动',
+      createdAt: '2026-12-01 02:00:18',
+      reconcilingAt: '2026-12-02 10:00:00',
+      reconciler: 'admin1',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-11-l2',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-11b',
+          inboundDocNo: 'RK20261112001',
+          inboundLineId: 'ibl-ps-11b',
+          purchaseOrderId: 'po-demo-ps-11b',
+          purchaseOrderNo: 'CG20261012001',
+          itemCode: 'STD-M8-20',
+          itemName: '六角螺栓 M8×20',
+          settleUnit: '件',
+          settleQty: 5000,
+          unitPrice: 0.35,
+        }),
+      ],
+    }),
+
+    // 11. 11 月账期 · 已确认已开票
+    createPurchaseSettle({
+      id: 'ps-demo-month-nov-confirmed',
+      settleNo: 'PS20261201003',
+      status: PURCHASE_SETTLE_STATUS.CONFIRMED,
+      generateMode: PURCHASE_SETTLE_GENERATE_MODE.PERIOD,
+      settleTarget: 'inbound',
+      supplierId: 'sup-3',
+      supplier: '采购供应商A',
+      settlementCycle: '月结',
+      periodKey: '2026-11',
+      periodStart: '2026-11-01',
+      periodEnd: '2026-11-30',
+      settleDate: '2026-12-01',
+      paymentTermStart: '开票日',
+      paymentTermDays: 60,
+      plannedPaymentDate: '2027-02-05',
+      openingBalance: 1440,
+      paidAmount: 0,
+      invoiceStatus: '已开票',
+      invoiceNo: 'FP-202612-088',
+      invoiceDate: '2026-12-06',
+      invoiceAmount: 1440,
+      invoicer: 'admin1',
+      invoicedAt: '2026-12-06 15:40:00',
+      invoiceRecords: [
+        {
+          id: 'inv-demo-nov-1',
+          invoiceNo: 'FP-202612-088',
+          invoiceDate: '2026-12-06',
+          invoiceAmount: 1440,
+          invoiceTaxAmount: null,
+          invoiceRemark: '',
+          invoicer: 'admin1',
+          invoicedAt: '2026-12-06 15:40:00',
+        },
+      ],
+      purchaseOrderNos: ['CG20261018001'],
+      purchaseOrderNo: 'CG20261018001',
+      remark: '演示：11 月账期已确认并收票',
+      creator: '规则自动',
+      createdAt: '2026-12-01 02:00:25',
+      confirmer: 'admin1',
+      confirmedAt: '2026-12-03 11:00:00',
+      lineItems: [
+        createPurchaseSettleLine({
+          id: 'ps-demo-11-l3',
+          sourceType: 'inbound',
+          inboundOrderId: 'ib-demo-ps-11c',
+          inboundDocNo: 'RK20261120001',
+          inboundLineId: 'ibl-ps-11c',
+          purchaseOrderId: 'po-demo-ps-11c',
+          purchaseOrderNo: 'CG20261018001',
+          itemCode: '010040012',
+          itemName: 'O型圈',
+          settleUnit: '件',
+          settleQty: 1200,
+          unitPrice: 1.2,
         }),
       ],
     }),

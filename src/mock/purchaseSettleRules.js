@@ -39,12 +39,41 @@ export const SETTLE_RULE_SCOPE_LABEL = {
   [SETTLE_RULE_SCOPE.SUPPLIER]: '供应商规则',
 }
 
+/** 系统内置工厂默认规则 id（不可删除） */
+export const BUILTIN_SETTLE_RULE_IDS = [
+  'psr-builtin-month-inbound',
+  'psr-builtin-month-po',
+  'psr-builtin-week-inbound',
+  'psr-builtin-week-po',
+]
+
+export function isBuiltinSettleRule(ruleOrId) {
+  const id = typeof ruleOrId === 'string' ? ruleOrId : ruleOrId?.id
+  return BUILTIN_SETTLE_RULE_IDS.includes(id) || Boolean(ruleOrId?.builtin)
+}
+
+/** 生成规则编码，如 SR20261029001 */
+export function generateSettleRuleCode(existing = []) {
+  const prefix = `SR${dayjs().format('YYYYMMDD')}`
+  let maxSeq = 0
+  ;(existing || []).forEach((r) => {
+    const code = String(r?.code || '')
+    if (!code.startsWith(prefix)) return
+    const n = Number(code.slice(prefix.length))
+    if (Number.isFinite(n)) maxSeq = Math.max(maxSeq, n)
+  })
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`
+}
+
 export function createPurchaseSettleRule(partial = {}) {
   const now = dayjs().format('YYYY-MM-DD HH:mm:ss')
   return {
     id: '',
+    code: '',
     name: '',
     enabled: true,
+    /** 系统内置：不可删除，可禁用；锁定场景/层级/生成维度/结算周期 */
+    builtin: false,
     /** purchase | outsourcing */
     bizScene: SETTLE_RULE_SCENE.PURCHASE,
     /** factory | supplier */
@@ -74,8 +103,11 @@ export function createPurchaseSettleRule(partial = {}) {
     settlementCycles: [],
     remark: '',
     lastRunAt: '',
+    /** 固定窗口：调度成功后写入，用于「自动只跑一次」 */
+    lastScheduleRunAt: '',
     nextRunAt: '',
     creator: 'admin1',
+    updater: 'admin1',
     createdAt: now,
     updatedAt: now,
     ...partial,
@@ -100,11 +132,22 @@ export function createSettleRuleLog(partial = {}) {
   }
 }
 
-export function seedPurchaseSettleRules() {
+/**
+ * 工厂内置默认规则（4 条）：
+ * 月结按入库 / 月结按采购 / 周结按入库 / 周结按采购
+ * 执行时跳过已有供应商自定义规则覆盖的供应商
+ */
+export function getBuiltinSettleRuleDefs() {
   return [
     createPurchaseSettleRule({
-      id: 'psr-demo-inbound',
-      name: '采购·工厂默认·上月入库（月结）',
+      id: 'psr-builtin-month-inbound',
+      code: 'SR-BUILTIN-MI',
+      name: '月结·按入库（工厂默认）',
+      builtin: true,
+      creator: '',
+      updater: '',
+      createdAt: '',
+      updatedAt: '',
       enabled: true,
       bizScene: SETTLE_RULE_SCENE.PURCHASE,
       ruleScope: SETTLE_RULE_SCOPE.FACTORY,
@@ -115,14 +158,42 @@ export function seedPurchaseSettleRules() {
       executeMonthDay: 1,
       scanWindowType: SCAN_WINDOW_TYPES.LAST_MONTH,
       settlementCycles: ['月结'],
-      remark: '工厂兜底：每月 1 日扫上月入库；已被供应商规则覆盖的供应商不会进本规则',
+      remark: '内置：每月 1 日扫上月入库；与「按采购单」互斥；已配置供应商规则的供应商自动跳过',
     }),
     createPurchaseSettleRule({
-      id: 'psr-demo-weekly-supplier',
-      name: '采购·供应商覆盖·周结（演示）',
+      id: 'psr-builtin-month-po',
+      code: 'SR-BUILTIN-MP',
+      name: '月结·按采购单（工厂默认）',
+      builtin: true,
+      creator: '',
+      updater: '',
+      createdAt: '',
+      updatedAt: '',
+      // 与「月结·按入库」互斥：默认停用，按需启用（启用时自动停入库）
       enabled: false,
       bizScene: SETTLE_RULE_SCENE.PURCHASE,
-      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+      ruleScope: SETTLE_RULE_SCOPE.FACTORY,
+      settleTarget: SETTLE_RULE_TARGET.PURCHASE_ORDER,
+      resultMode: SETTLE_RULE_RESULT.DRAFT,
+      executeFreq: SETTLE_RULE_FREQ.MONTHLY,
+      executeTime: '02:30',
+      executeMonthDay: 1,
+      scanWindowType: SCAN_WINDOW_TYPES.LAST_MONTH,
+      settlementCycles: ['月结'],
+      remark: '内置：每月 1 日扫上月完成的采购单；与「按入库」互斥，不可同时启用',
+    }),
+    createPurchaseSettleRule({
+      id: 'psr-builtin-week-inbound',
+      code: 'SR-BUILTIN-WI',
+      name: '周结·按入库（工厂默认）',
+      builtin: true,
+      creator: '',
+      updater: '',
+      createdAt: '',
+      updatedAt: '',
+      enabled: true,
+      bizScene: SETTLE_RULE_SCENE.PURCHASE,
+      ruleScope: SETTLE_RULE_SCOPE.FACTORY,
       settleTarget: SETTLE_RULE_TARGET.INBOUND,
       resultMode: SETTLE_RULE_RESULT.DRAFT,
       executeFreq: SETTLE_RULE_FREQ.WEEKLY,
@@ -130,38 +201,140 @@ export function seedPurchaseSettleRules() {
       executeWeekday: 1,
       scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
       settlementCycles: ['周结'],
-      supplierIds: [],
-      remark: '供应商覆盖示例：启用前请勾选具体周结供应商；覆盖后工厂月结规则不再扫这些供应商',
+      remark: '内置：每周一扫上周入库；与「按采购单」互斥；已配置供应商规则的供应商自动跳过',
     }),
     createPurchaseSettleRule({
-      id: 'psr-demo-outsourcing-factory',
-      name: '外协·工厂默认·上月回货入库（月结）',
-      enabled: false,
-      bizScene: SETTLE_RULE_SCENE.OUTSOURCING,
-      ruleScope: SETTLE_RULE_SCOPE.FACTORY,
-      settleTarget: SETTLE_RULE_TARGET.INBOUND,
-      resultMode: SETTLE_RULE_RESULT.DRAFT,
-      executeFreq: SETTLE_RULE_FREQ.MONTHLY,
-      executeTime: '02:30',
-      executeMonthDay: 1,
-      scanWindowType: SCAN_WINDOW_TYPES.LAST_MONTH,
-      settlementCycles: ['月结'],
-      remark: '外协场景工厂兜底（演示默认停用）',
-    }),
-    createPurchaseSettleRule({
-      id: 'psr-demo-po',
-      name: '采购·工厂默认·已完成采购单（演示）',
+      id: 'psr-builtin-week-po',
+      code: 'SR-BUILTIN-WP',
+      name: '周结·按采购单（工厂默认）',
+      builtin: true,
+      creator: '',
+      updater: '',
+      createdAt: '',
+      updatedAt: '',
+      // 与「周结·按入库」互斥：默认停用
       enabled: false,
       bizScene: SETTLE_RULE_SCENE.PURCHASE,
       ruleScope: SETTLE_RULE_SCOPE.FACTORY,
       settleTarget: SETTLE_RULE_TARGET.PURCHASE_ORDER,
       resultMode: SETTLE_RULE_RESULT.DRAFT,
-      executeFreq: SETTLE_RULE_FREQ.DAILY,
-      executeTime: '03:00',
-      scanWindowType: SCAN_WINDOW_TYPES.FIXED,
-      scanStart: '2026-08-01',
-      scanEnd: '2026-08-31',
-      remark: '演示：按采购单完成日落在 2026-08 的单据结算（默认停用，可手动试跑）',
+      executeFreq: SETTLE_RULE_FREQ.WEEKLY,
+      executeTime: '02:30',
+      executeWeekday: 1,
+      scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
+      settlementCycles: ['周结'],
+      remark: '内置：每周一扫上周完成的采购单；与「按入库」互斥，不可同时启用',
     }),
   ]
+}
+
+/** 演示用供应商自定义规则（含重叠供应商，便于验证冲突弹窗） */
+export function getDemoSupplierSettleRules() {
+  return [
+    createPurchaseSettleRule({
+      id: 'psr-demo-supplier-a',
+      code: 'SR-DEMO-A',
+      name: '演示·供应商覆盖A（多功能02+采购B）',
+      enabled: true,
+      builtin: false,
+      bizScene: SETTLE_RULE_SCENE.PURCHASE,
+      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+      settleTarget: SETTLE_RULE_TARGET.INBOUND,
+      resultMode: SETTLE_RULE_RESULT.DRAFT,
+      executeFreq: SETTLE_RULE_FREQ.WEEKLY,
+      executeTime: '03:00',
+      executeWeekday: 1,
+      scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
+      supplierIds: ['sup-2', 'sup-4'],
+      settlementCycles: [],
+      remark: '演示冲突：与规则B共用「多功能供应商02」；保存/启用时会提示',
+      creator: '张三',
+      updater: '张三',
+      createdAt: '2026-10-20 10:00:00',
+      updatedAt: '2026-10-28 15:20:00',
+    }),
+    createPurchaseSettleRule({
+      id: 'psr-demo-supplier-b',
+      code: 'SR-DEMO-B',
+      name: '演示·供应商覆盖B（多功能02+SKF）',
+      enabled: true,
+      builtin: false,
+      bizScene: SETTLE_RULE_SCENE.PURCHASE,
+      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+      settleTarget: SETTLE_RULE_TARGET.INBOUND,
+      resultMode: SETTLE_RULE_RESULT.DRAFT,
+      executeFreq: SETTLE_RULE_FREQ.WEEKLY,
+      executeTime: '03:30',
+      executeWeekday: 1,
+      scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
+      supplierIds: ['sup-2', 'sup-5'],
+      settlementCycles: [],
+      remark: '演示冲突：与规则A共用「多功能供应商02」',
+      creator: '李四',
+      updater: '李四',
+      createdAt: '2026-10-21 11:00:00',
+      updatedAt: '2026-10-28 16:10:00',
+    }),
+    createPurchaseSettleRule({
+      id: 'psr-demo-supplier-c',
+      code: 'SR-DEMO-C',
+      name: '演示·供应商覆盖C（采购B，停用）',
+      enabled: false,
+      builtin: false,
+      bizScene: SETTLE_RULE_SCENE.PURCHASE,
+      ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
+      settleTarget: SETTLE_RULE_TARGET.INBOUND,
+      resultMode: SETTLE_RULE_RESULT.DRAFT,
+      executeFreq: SETTLE_RULE_FREQ.WEEKLY,
+      executeTime: '04:00',
+      executeWeekday: 2,
+      scanWindowType: SCAN_WINDOW_TYPES.LAST_WEEK,
+      supplierIds: ['sup-4'],
+      settlementCycles: [],
+      remark: '停用态；启用时会与规则A在「采购供应商B」上冲突，可验证冲突弹窗',
+      creator: '王五',
+      updater: '王五',
+      createdAt: '2026-10-22 09:30:00',
+      updatedAt: '2026-10-27 09:30:00',
+    }),
+  ]
+}
+
+export function seedPurchaseSettleRules() {
+  return [...getBuiltinSettleRuleDefs(), ...getDemoSupplierSettleRules()]
+}
+
+/**
+ * 合并/补齐内置规则：保留用户对调度、结果、备注的修改；锁定身份字段
+ */
+export function mergeBuiltinSettleRules(existing = []) {
+  const list = Array.isArray(existing) ? [...existing] : []
+  const byId = new Map(list.map((r) => [r.id, r]))
+  getBuiltinSettleRuleDefs().forEach((def) => {
+    const cur = byId.get(def.id)
+    if (!cur) {
+      list.unshift(def)
+      byId.set(def.id, def)
+      return
+    }
+    Object.assign(cur, {
+      builtin: true,
+      code: def.code || cur.code,
+      name: def.name,
+      bizScene: def.bizScene,
+      ruleScope: SETTLE_RULE_SCOPE.FACTORY,
+      settleTarget: def.settleTarget,
+      settlementCycles: [...(def.settlementCycles || [])],
+      supplierIds: [],
+      creator: '',
+      createdAt: '',
+    })
+  })
+  // 补齐演示供应商规则（仅当本地还没有时插入，不覆盖用户已改内容）
+  getDemoSupplierSettleRules().forEach((def) => {
+    if (byId.has(def.id)) return
+    list.push(def)
+    byId.set(def.id, def)
+  })
+  return list
 }

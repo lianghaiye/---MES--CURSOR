@@ -1,81 +1,105 @@
 <template>
   <div class="settle-rule-page">
     <div class="filter-card">
-      <a-form layout="inline" class="filter-form">
-        <a-form-item label="规则名称">
-          <a-input v-model:value="filters.name" allow-clear size="small" placeholder="请输入" />
-        </a-form-item>
-        <a-form-item label="业务场景">
-          <a-select
-            v-model:value="filters.bizScene"
-            allow-clear
-            size="small"
-            placeholder="全部"
-            style="width: 110px"
-            :options="sceneOpts"
-          />
-        </a-form-item>
-        <a-form-item label="规则层级">
-          <a-select
-            v-model:value="filters.ruleScope"
-            allow-clear
-            size="small"
-            placeholder="全部"
-            style="width: 130px"
-            :options="scopeOpts"
-          />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select
-            v-model:value="filters.enabled"
-            allow-clear
-            size="small"
-            placeholder="全部"
-            style="width: 120px"
-            :options="enabledOpts"
-          />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" size="small" @click="handleSearch">搜索</a-button>
-            <a-button size="small" @click="handleReset">清空</a-button>
-          </a-space>
-        </a-form-item>
+      <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+        <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="规则名称">
+              <a-input v-model:value="filters.name" allow-clear placeholder="请输入" size="small" />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="业务场景">
+              <a-select
+                v-model:value="filters.bizScene"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="sceneOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="规则层级">
+              <a-select
+                v-model:value="filters.ruleScope"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="scopeOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="状态">
+              <a-select
+                v-model:value="filters.enabled"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="enabledOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="8">
+            <a-form-item class="filter-actions-item">
+              <a-space>
+                <a-button type="primary" size="small" @click="handleSearch">
+                  <SearchOutlined />
+                  搜索
+                </a-button>
+                <a-button size="small" @click="handleReset">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </div>
 
+    <div class="toolbar-row">
+      <a-space wrap :size="8">
+        <a-button type="primary" size="small" @click="openCreate">
+          <PlusOutlined />
+          新建规则
+        </a-button>
+        <a-button size="small" @click="logOpen = true">执行日志</a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <a-tooltip title="刷新">
+          <a-button type="text" size="small" @click="handleSearch">
+            <ReloadOutlined />
+          </a-button>
+        </a-tooltip>
+      </a-space>
+    </div>
+
+    <a-alert type="info" show-icon class="summary-bar" :banner="false">
+      <template #message>
+        <span>
+          共计 {{ filteredList.length }} 条规则。内置四条工厂默认（月结/周结 ×
+          入库/采购单）；同场景下「按入库」与「按采购单」互斥，启用一侧会自动停用另一侧。供应商有自定义规则时，工厂默认跳过该供应商。内置可改调度与结果、可停用，不可删除。
+        </span>
+      </template>
+    </a-alert>
+
     <div class="table-card">
-      <div class="table-toolbar">
-        <a-space>
-          <a-dropdown>
-            <a-button type="primary" size="small"> 新建规则 </a-button>
-            <template #overlay>
-              <a-menu @click="onCreateMenu">
-                <a-menu-item key="blank">空白规则</a-menu-item>
-                <a-menu-divider />
-                <a-menu-item v-for="t in templateMenuItems" :key="t.key">{{ t.label }}</a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-          <a-button size="small" @click="logOpen = true">执行日志</a-button>
-        </a-space>
-      </div>
-      <a-alert
-        type="info"
-        show-icon
-        class="page-tip"
-        message="工厂默认作兜底，供应商规则覆盖同场景同生成维度下的指定供应商。启用后按时刻调度；草稿占量防重复出单。外协与采购规则相互独立。"
-      />
       <a-table
         :columns="columns"
         :data-source="pagedList"
         row-key="id"
         size="small"
+        bordered
         :pagination="false"
-        :scroll="{ x: 1480 }"
+        :scroll="{ x: 2200 }"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'enabled'">
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ rowIndex(index) }}
+          </template>
+          <template v-else-if="column.key === 'code'">
+            <a class="link-code" @click.prevent="openDetail(record)">{{ record.code || '—' }}</a>
+          </template>
+          <template v-else-if="column.key === 'enabled'">
             <a-switch
               :checked="record.enabled"
               checked-children="启"
@@ -91,6 +115,18 @@
               {{ scopeLabel(record.ruleScope) }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ isBuiltinRule(record) ? '—' : record.creator || '—' }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ isBuiltinRule(record) ? '—' : record.createdAt || '—' }}
+          </template>
+          <template v-else-if="column.key === 'updater'">
+            {{ record.updater || '—' }}
+          </template>
+          <template v-else-if="column.key === 'updatedAt'">
+            {{ record.updatedAt || '—' }}
+          </template>
           <template v-else-if="column.key === 'settleTarget'">
             {{ formatSettleTarget(record) }}
           </template>
@@ -105,10 +141,10 @@
           </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
-              <a @click="openEdit(record)">编辑</a>
-              <a @click="onRun(record)">立即试跑</a>
-              <a @click="openLogs(record)">日志</a>
-              <a class="danger" @click="onDelete(record)">删除</a>
+              <a class="link-code" @click="openEdit(record)">编辑</a>
+              <a class="link-code" @click="onRun(record)">立即试跑</a>
+              <a class="link-code" @click="openLogs(record)">日志</a>
+              <a v-if="!isBuiltinRule(record)" class="danger" @click="onDelete(record)"> 删除 </a>
             </a-space>
           </template>
           <template v-else>
@@ -116,7 +152,7 @@
           </template>
         </template>
       </a-table>
-      <div class="pagination-wrap">
+      <div class="table-pagination">
         <a-pagination
           v-model:current="pagination.current"
           v-model:page-size="pagination.pageSize"
@@ -127,13 +163,25 @@
       </div>
     </div>
 
-    <SettleRuleFormModal
-      v-model:open="formOpen"
-      :rule="editing"
-      :template-key="createTemplateKey"
-      @saved="onSaved"
-    />
+    <SettleRuleFormModal v-model:open="formOpen" :rule="editing" @saved="onSaved" />
     <SettleRuleLogDrawer v-model:open="logOpen" :rule-id="logRuleId" />
+    <SettleRuleDetailDrawer v-model:open="detailOpen" :rule-id="detailRuleId" />
+
+    <QcTemplateConflictModal
+      v-model:open="conflictOpen"
+      kind="supplier"
+      title="结算规则冲突"
+      entity-label="规则"
+      object-noun-override="供应商"
+      object-column-title="供应商"
+      list-hint-text="启用本规则时，以下供应商已绑定其他已启用的供应商结算规则。"
+      replace-hint="将该供应商从原规则解绑，改由当前规则覆盖；原规则若无剩余供应商则自动停用。"
+      skip-hint="当前规则不绑定该供应商，维持原有生效规则不变。"
+      :conflicts="conflictRows"
+      :current-template-name="conflictRuleName"
+      @confirm="onEnableConflictConfirm"
+      @cancel="onEnableConflictCancel"
+    />
   </div>
 </template>
 
@@ -142,29 +190,27 @@ export default { name: 'PurchaseSettleRuleView' }
 </script>
 
 <script setup>
-import { computed, h, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
   purchaseSettleRuleState,
-  listPurchaseSettleRules,
   setPurchaseSettleRuleEnabled,
   deletePurchaseSettleRule,
   executePurchaseSettleRule,
 } from '@/store/purchaseSettleRuleStore'
 import { SCAN_WINDOW_TYPES } from '@/utils/purchaseSettleRuleWindow'
 import {
-  SETTLE_RULE_TEMPLATES,
-  findConflictingSettleRules,
-  formatSettleRuleGuardMessages,
-} from '@/utils/purchaseSettleRuleGuard'
-import {
   SETTLE_RULE_SCENE,
   SETTLE_RULE_SCOPE,
   SETTLE_RULE_SCENE_LABEL,
   SETTLE_RULE_SCOPE_LABEL,
+  isBuiltinSettleRule,
 } from '@/mock/purchaseSettleRules'
 import SettleRuleFormModal from './components/SettleRuleFormModal.vue'
 import SettleRuleLogDrawer from './components/SettleRuleLogDrawer.vue'
+import SettleRuleDetailDrawer from './components/SettleRuleDetailDrawer.vue'
+import QcTemplateConflictModal from '@/views/quality/components/QcTemplateConflictModal.vue'
 
 const filters = reactive({
   name: '',
@@ -176,10 +222,15 @@ const applied = reactive({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const formOpen = ref(false)
 const editing = ref(null)
-const createTemplateKey = ref('')
 const logOpen = ref(false)
 const logRuleId = ref('')
-const templateMenuItems = SETTLE_RULE_TEMPLATES
+const detailOpen = ref(false)
+const detailRuleId = ref('')
+
+const conflictOpen = ref(false)
+const conflictRows = ref([])
+const pendingEnableId = ref('')
+const conflictRuleName = ref('')
 
 const enabledOpts = [
   { label: '启用', value: true },
@@ -195,7 +246,9 @@ const scopeOpts = [
 ]
 
 const columns = [
-  { title: '规则名称', dataIndex: 'name', key: 'name', width: 220, ellipsis: true },
+  { title: '序号', key: 'index', width: 60, align: 'center', fixed: 'left' },
+  { title: '规则编码', key: 'code', width: 140, fixed: 'left' },
+  { title: '规则名称', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
   { title: '启用', key: 'enabled', width: 80 },
   { title: '业务场景', key: 'bizScene', width: 90 },
   { title: '规则层级', key: 'ruleScope', width: 110 },
@@ -205,7 +258,11 @@ const columns = [
   { title: '扫描窗口', key: 'scan', width: 160, ellipsis: true },
   { title: '上次执行', dataIndex: 'lastRunAt', key: 'lastRunAt', width: 160 },
   { title: '下次执行', dataIndex: 'nextRunAt', key: 'nextRunAt', width: 160 },
-  { title: '操作', key: 'actions', width: 220 },
+  { title: '创建人', key: 'creator', width: 90 },
+  { title: '创建时间', key: 'createdAt', width: 160 },
+  { title: '更新人', key: 'updater', width: 90 },
+  { title: '更新时间', key: 'updatedAt', width: 160 },
+  { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
 
 const filteredList = computed(() => {
@@ -250,6 +307,9 @@ function formatSettleTarget(row) {
 
 function formatSchedule(row) {
   const time = row.executeTime || '—'
+  if (row.scanWindowType === SCAN_WINDOW_TYPES.FIXED) {
+    return `一次性 ${time}`
+  }
   if (row.executeFreq === 'weekly') {
     const map = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六', 7: '日' }
     return `每周${map[row.executeWeekday] || row.executeWeekday} ${time}`
@@ -262,7 +322,7 @@ function formatScan(row) {
   if (row.scanWindowType === SCAN_WINDOW_TYPES.LAST_WEEK) return '上周'
   if (row.scanWindowType === SCAN_WINDOW_TYPES.LAST_N_DAYS) return `近 ${row.scanLastNDays || 7} 天`
   if (row.scanWindowType === SCAN_WINDOW_TYPES.FIXED) {
-    return `${row.scanStart || '?'} ~ ${row.scanEnd || '?'}`
+    return `固定 ${row.scanStart || '?'} ~ ${row.scanEnd || '?'}`
   }
   return '上月'
 }
@@ -280,21 +340,27 @@ function handleReset() {
   handleSearch()
 }
 
-function openCreate(templateKey = '') {
-  editing.value = null
-  createTemplateKey.value = templateKey || ''
-  formOpen.value = true
+function isBuiltinRule(record) {
+  return isBuiltinSettleRule(record)
 }
 
-function onCreateMenu({ key }) {
-  if (key === 'blank') openCreate('')
-  else openCreate(key)
+function rowIndex(index) {
+  return (pagination.current - 1) * pagination.pageSize + index + 1
+}
+
+function openCreate() {
+  editing.value = null
+  formOpen.value = true
 }
 
 function openEdit(record) {
   editing.value = { ...record }
-  createTemplateKey.value = ''
   formOpen.value = true
+}
+
+function openDetail(record) {
+  detailRuleId.value = record?.id || ''
+  detailOpen.value = true
 }
 
 function onSaved() {
@@ -306,8 +372,17 @@ function openLogs(record) {
   logOpen.value = true
 }
 
-function applyToggle(record, checked) {
-  const res = setPurchaseSettleRuleEnabled(record.id, checked)
+function applyToggle(record, checked, conflictResolution) {
+  const res = setPurchaseSettleRuleEnabled(record.id, checked, {
+    conflictResolution,
+  })
+  if (res.needConflict) {
+    pendingEnableId.value = record.id
+    conflictRuleName.value = record.name || ''
+    conflictRows.value = res.conflict.conflicts || []
+    conflictOpen.value = true
+    return
+  }
   if (!res.ok) message.warning(res.message)
   else message.success(res.message)
 }
@@ -317,34 +392,29 @@ function onToggle(record, checked) {
     applyToggle(record, false)
     return
   }
-  const probe = { ...record, enabled: true }
-  const conflicts = findConflictingSettleRules(probe, listPurchaseSettleRules())
-  const msgs = formatSettleRuleGuardMessages([], conflicts)
-  if (!msgs.length) {
-    applyToggle(record, true)
-    return
-  }
-  Modal.confirm({
-    title: `启用「${record.name}」存在冲突风险`,
-    width: 560,
-    content: () =>
-      h(
-        'div',
-        msgs.map((m, i) =>
-          h('p', { key: i, style: 'margin: 0 0 8px; line-height: 1.5' }, `${i + 1}. ${m}`),
-        ),
-      ),
-    okText: '仍要启用',
-    cancelText: '取消',
-    onOk: () => applyToggle(record, true),
-  })
+  applyToggle(record, true)
+}
+
+function onEnableConflictConfirm(resolution) {
+  const id = pendingEnableId.value
+  pendingEnableId.value = ''
+  if (!id) return
+  const record = purchaseSettleRuleState.rules.find((r) => r.id === id)
+  if (!record) return
+  applyToggle(record, true, resolution)
+}
+
+function onEnableConflictCancel() {
+  pendingEnableId.value = ''
 }
 
 function onRun(record) {
   Modal.confirm({
     title: `立即试跑「${record.name}」？`,
     content:
-      '将按规则当前配置的扫描窗口生成结算单（不改变下次计划时间的业务含义，但仍会刷新 nextRunAt）。',
+      record.scanWindowType === SCAN_WINDOW_TYPES.FIXED
+        ? '将按固定起止窗口生成结算单。固定窗口自动调度只跑一次；手动试跑可重复，不占用自动排期名额。'
+        : '将按规则当前配置的扫描窗口生成结算单，并刷新下次计划时间。',
     okText: '试跑',
     onOk() {
       const res = executePurchaseSettleRule(record.id, { trigger: 'manual' })
@@ -358,6 +428,10 @@ function onRun(record) {
 }
 
 function onDelete(record) {
+  if (isBuiltinRule(record)) {
+    message.warning('内置规则不可删除，可停用')
+    return
+  }
   Modal.confirm({
     title: `删除规则「${record.name}」？`,
     okText: '删除',
@@ -373,26 +447,99 @@ function onDelete(record) {
 
 <style lang="less" scoped>
 .settle-rule-page {
-  padding: 0;
+  margin: -12px;
+  padding: 12px;
+  background: var(--page-bg, #f0f2f5);
+  min-height: calc(100vh - 112px);
 }
+
 .filter-card,
 .table-card {
   background: #fff;
-  border-radius: 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.filter-card {
+  padding: 10px 12px 6px;
+  margin-bottom: 8px;
+}
+
+.horizontal-form {
+  width: 100%;
+
+  :deep(.ant-form-item) {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  :deep(.ant-form-item-row) {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  :deep(.ant-form-item-label > label) {
+    height: 24px;
+    line-height: 24px;
+    font-size: 13px;
+  }
+
+  .filter-actions-item {
+    :deep(.ant-form-item-label) {
+      display: none;
+    }
+  }
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.summary-bar {
+  margin-bottom: 8px;
+  padding: 6px 12px;
+
+  :deep(.ant-alert-message) {
+    font-size: 13px;
+  }
+}
+
+.table-card {
   padding: 8px 12px 12px;
-  margin-bottom: 8px;
+
+  :deep(.ant-table-thead > tr > th) {
+    background: #fafafa;
+    font-weight: 500;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  :deep(.ant-table-tbody > tr > td) {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
 }
-.table-toolbar {
-  margin-bottom: 8px;
+
+.link-code {
+  color: #1677ff;
+  cursor: pointer;
+
+  &:hover {
+    color: #4096ff;
+  }
 }
-.page-tip {
-  margin-bottom: 12px;
-}
-.pagination-wrap {
-  margin-top: 12px;
+
+.table-pagination {
   display: flex;
   justify-content: flex-end;
+  margin-top: 12px;
 }
+
 .danger {
   color: #ff4d4f;
 }

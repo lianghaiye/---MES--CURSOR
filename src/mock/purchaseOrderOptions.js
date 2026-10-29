@@ -12,11 +12,11 @@ export const poSourceOptions = ['新增', '采购申请', '外购销售']
 
 export const inboundStatusOptions = ['待入库', '部分入库', '已入库']
 
-/** 采购订单整单入账状态 */
-export const accountStatusOptions = ['未入账', '部分入账', '已入账']
+/** 采购订单整单入账状态（对账口径） */
+export const accountStatusOptions = ['未入账', '入账待确认', '部分入账', '已入账']
 
-/** 采购订单明细入账状态 */
-export const lineAccountStatusOptions = ['未入账', '已入账']
+/** 采购订单明细入账状态（对账口径） */
+export const lineAccountStatusOptions = ['未入账', '入账待确认', '已入账']
 
 export const overdueStatusOptions = ['未逾期', '已逾期']
 

@@ -155,6 +155,16 @@
         <a-space>
           <a-button type="primary" size="small" @click="openPeriodCreate">按账期生成</a-button>
           <a-button size="small" @click="openCreate">从采购单生成对账</a-button>
+          <a-dropdown>
+            <a-button size="small"> 批量打印 </a-button>
+            <template #overlay>
+              <a-menu @click="onPrintMenuClick">
+                <a-menu-item key="打印对账单">打印采购对账单</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-button size="small" @click="onBatchUnconfirm">反确认</a-button>
+          <a-button size="small" @click="exportModalOpen = true">导出</a-button>
         </a-space>
       </div>
       <a-table
@@ -163,22 +173,54 @@
         row-key="id"
         size="small"
         :pagination="false"
-        :scroll="{ x: 1680 }"
+        :scroll="{ x: 3320 }"
+        :row-selection="{ selectedRowKeys, onChange: onSelectChange }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">
             {{ (pagination.current - 1) * pagination.pageSize + index + 1 }}
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === '已确认' ? 'green' : 'default'">{{
-              record.status
-            }}</a-tag>
+            <a-tag
+              :color="
+                record.status === '已确认'
+                  ? 'green'
+                  : record.status === '对账中'
+                    ? 'processing'
+                    : 'default'
+              "
+            >
+              {{ record.status }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'paymentStatus'">
+            <a-tag
+              :color="
+                record.paymentStatus === '已付款'
+                  ? 'green'
+                  : record.paymentStatus === '部分付款'
+                    ? 'orange'
+                    : 'default'
+              "
+            >
+              {{ record.paymentStatus || '未付款' }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'invoiceStatus'">
+            <a-tag
+              :color="
+                record.invoiceStatus === '已开票'
+                  ? 'blue'
+                  : record.invoiceStatus === '部分收票'
+                    ? 'processing'
+                    : 'default'
+              "
+            >
+              {{ record.invoiceStatus || '未收票' }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'settleNo'">
             <a @click="openDetail(record)">{{ record.settleNo }}</a>
-          </template>
-          <template v-else-if="column.key === 'purchaseOrderNo'">
-            {{ displayPoNos(record) }}
           </template>
           <template v-else-if="column.key === 'periodWindow'">
             {{ displayPeriodWindow(record) }}
@@ -186,11 +228,29 @@
           <template v-else-if="column.key === 'bookAmount'">
             {{ formatMoney(resolveBookAmount(record)) }}
           </template>
+          <template v-else-if="column.key === 'openingBalance'">
+            {{ formatMoney(resolveSettleFundOverview(record).openingBalance) }}
+          </template>
+          <template v-else-if="column.key === 'feeAdjustAmount'">
+            {{ formatMoney(calcSettleFeeAdjustAmount(record)) }}
+          </template>
           <template v-else-if="column.key === 'disputeAmount'">
             {{ formatMoney(Number(record.disputeAmount) || 0) }}
           </template>
           <template v-else-if="column.key === 'confirmedAmount'">
             {{ formatMoney(resolveConfirmedAmount(record)) }}
+          </template>
+          <template v-else-if="column.key === 'invoiceAmount'">
+            {{ formatMoney(resolveInvoiceAmount(record)) }}
+          </template>
+          <template v-else-if="column.key === 'periodPaid'">
+            {{ formatMoney(Number(record.paidAmount) || 0) }}
+          </template>
+          <template v-else-if="column.key === 'settleTarget'">
+            {{ displaySettleTarget(record) }}
+          </template>
+          <template v-else-if="column.key === 'generateMode'">
+            {{ record.generateMode === 'period' ? '按账期' : '从采购单' }}
           </template>
           <template v-else-if="column.key === 'paymentTermStart'">
             {{ record.paymentTermStart || '—' }}
@@ -202,11 +262,20 @@
             {{ record.plannedPaymentDate || '—' }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space>
-              <a @click="openDetail(record)">详情</a>
-              <a v-if="record.status === '草稿'" @click="onConfirm(record)">确认</a>
-              <a v-if="record.status === '草稿'" class="danger" @click="onDelete(record)">删除</a>
+            <a-space v-if="isPreConfirmSettle(record)">
+              <a @click="onConfirm(record)">确认</a>
+              <a v-if="record.status === '草稿'" @click="onMarkReconciling(record)"> 标记对账中 </a>
+              <a class="danger" @click="onDelete(record)">删除</a>
             </a-space>
+            <a-space v-else-if="showConfirmedListActions(record)">
+              <a v-if="canListInvoice(record)" @click="openDetailAction(record, 'invoice')">
+                收票登记
+              </a>
+              <a v-if="canListPayment(record)" @click="openDetailAction(record, 'payment')">
+                付款登记
+              </a>
+            </a-space>
+            <span v-else class="actions-empty">—</span>
           </template>
           <template v-else>
             {{ record[column.dataIndex] || '—' }}
@@ -226,6 +295,15 @@
 
     <GeneratePurchaseSettleModal v-model:open="createOpen" @confirmed="onCreated" />
     <GeneratePeriodSettleModal v-model:open="periodOpen" @confirmed="onCreated" />
+    <PurchaseSettlePrintModal v-model:open="printModalOpen" :settles="printSettles" />
+    <ExportExcelModal
+      v-model:open="exportModalOpen"
+      v-model:settings="exportFieldSettings"
+      :default-settings="defaultExportFieldSettings"
+      :filtered-count="filteredList.length"
+      :selected-count="selectedRowKeys.length"
+      @export="doExport"
+    />
   </div>
 </template>
 
@@ -242,10 +320,19 @@ import { useTabs } from '@/composables/useTabs'
 import {
   purchaseSettleState,
   confirmPurchaseSettle,
+  unconfirmPurchaseSettle,
   deletePurchaseSettle,
+  markPurchaseSettleReconciling,
+  resolveSettleFundOverview,
+  calcSettleFeeAdjustAmount,
+  settleInvoicedTotal,
 } from '@/store/purchaseSettleStore'
 import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
 import GeneratePeriodSettleModal from './components/GeneratePeriodSettleModal.vue'
+import PurchaseSettlePrintModal from './components/PurchaseSettlePrintModal.vue'
+import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import { useListExport } from '@/composables/useListExport'
+import { purchaseSettleExportFields } from '@/utils/exportFields/purchaseSettleExport'
 import { formatNumber } from '@/utils/numberFormat'
 const router = useRouter()
 const { openTab } = useTabs()
@@ -326,8 +413,56 @@ const periodOpen = ref(false)
 
 const statusOpts = [
   { label: '草稿', value: '草稿' },
+  { label: '对账中', value: '对账中' },
   { label: '已确认', value: '已确认' },
 ]
+
+const selectedRowKeys = ref([])
+const printModalOpen = ref(false)
+const printSettles = ref([])
+
+const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
+  useListExport({
+    storageKey: 'purchase-settle-list',
+    fieldDefinitions: purchaseSettleExportFields,
+    getFilteredRows: () => filteredList.value,
+    getSelectedRows: () =>
+      purchaseSettleState.settles.filter((s) => selectedRowKeys.value.includes(s.id)),
+    fileNamePrefix: '采购对账单',
+    sheetName: '采购对账',
+  })
+
+function onSelectChange(keys) {
+  selectedRowKeys.value = keys
+}
+
+function onPrintMenuClick({ key }) {
+  if (key === '打印对账单') openBatchPrint()
+}
+
+function openBatchPrint() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要打印的对账单')
+    return
+  }
+  printSettles.value = purchaseSettleState.settles.filter((s) =>
+    selectedRowKeys.value.includes(s.id),
+  )
+  if (!printSettles.value.length) {
+    message.warning('未找到可打印的对账单')
+    return
+  }
+  printModalOpen.value = true
+}
+
+function onMarkReconciling(record) {
+  const res = markPurchaseSettleReconciling(record.id)
+  if (!res.ok) {
+    message.warning(res.message)
+    return
+  }
+  message.success(res.message)
+}
 
 const generateModeOpts = [
   { label: '账期', value: 'period' },
@@ -349,19 +484,30 @@ const monthOpts = computed(() =>
 const columns = [
   { title: '序号', key: 'index', width: 60, fixed: 'left' },
   { title: '状态', key: 'status', width: 90, fixed: 'left' },
+  { title: '付款状态', key: 'paymentStatus', width: 100, fixed: 'left' },
+  { title: '收票状态', key: 'invoiceStatus', width: 90, fixed: 'left' },
+  { title: '对账单号', key: 'settleNo', width: 150, fixed: 'left' },
   { title: '供应商', dataIndex: 'supplier', key: 'supplier', width: 140, ellipsis: true },
-  { title: '对账单号', key: 'settleNo', width: 150 },
-  { title: '采购单号', key: 'purchaseOrderNo', width: 160, ellipsis: true },
-  { title: '账期', dataIndex: 'periodKey', key: 'periodKey', width: 110 },
+  { title: '账期', dataIndex: 'periodKey', key: 'periodKey', width: 100 },
   { title: '结算期间', key: 'periodWindow', width: 190 },
   { title: '账面金额', key: 'bookAmount', width: 110, align: 'right' },
+  { title: '期初余额', key: 'openingBalance', width: 110, align: 'right' },
+  { title: '追加/补差金额', key: 'feeAdjustAmount', width: 120, align: 'right' },
   { title: '争议金额', key: 'disputeAmount', width: 100, align: 'right' },
   { title: '确认金额', key: 'confirmedAmount', width: 110, align: 'right' },
+  { title: '收票金额', key: 'invoiceAmount', width: 110, align: 'right' },
+  { title: '本期已付', key: 'periodPaid', width: 110, align: 'right' },
+  { title: '生成维度', key: 'settleTarget', width: 120 },
+  { title: '生成方式', key: 'generateMode', width: 90 },
   { title: '结算周期', dataIndex: 'settlementCycle', key: 'settlementCycle', width: 90 },
   { title: '账期起算', key: 'paymentTermStart', width: 90 },
   { title: '账期天数', key: 'paymentTermDays', width: 90, align: 'right' },
-  { title: '计划付款日期', key: 'plannedPaymentDate', width: 120 },
-  { title: '操作', key: 'actions', width: 140, fixed: 'right' },
+  { title: '计划付款日', key: 'plannedPaymentDate', width: 120 },
+  { title: '创建人', dataIndex: 'creator', key: 'creator', width: 90 },
+  { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 160 },
+  { title: '确认人', dataIndex: 'confirmer', key: 'confirmer', width: 90 },
+  { title: '确认时间', dataIndex: 'confirmedAt', key: 'confirmedAt', width: 160 },
+  { title: '操作', key: 'actions', width: 260, fixed: 'right' },
 ]
 
 const rangeMonthSet = computed(
@@ -464,11 +610,6 @@ function syncFocusPeriod() {
   pagination.current = 1
 }
 
-function displayPoNos(record) {
-  if (record.purchaseOrderNos?.length) return record.purchaseOrderNos.join('、')
-  return record.purchaseOrderNo || '—'
-}
-
 function displayPeriodWindow(record) {
   if (record.periodStart && record.periodEnd) {
     return `${record.periodStart} ~ ${record.periodEnd}`
@@ -488,10 +629,20 @@ function resolveConfirmedAmount(record) {
   return Math.max(0, resolveBookAmount(record) - (Number(record.disputeAmount) || 0))
 }
 
+function resolveInvoiceAmount(record) {
+  return settleInvoicedTotal(record)
+}
+
 function displayPaymentTermDays(record) {
   const days = Number(record.paymentTermDays)
   if (Number.isFinite(days) && days > 0) return `${days}天`
   return '—'
+}
+
+function displaySettleTarget(record) {
+  if (record.settleTarget === 'purchase_order') return '按采购单（已完成）'
+  if (record.settleTarget === 'inbound') return '按入库'
+  return record.generateMode === 'po' ? '按采购单（已完成）' : '按入库'
 }
 
 function formatMoney(v) {
@@ -526,17 +677,101 @@ function onCreated() {
   pagination.current = 1
 }
 
-function openDetail(record) {
+function openDetail(record, query = {}) {
   if (!record?.id) return
   const path = `/settlement/purchase-settles/${record.id}`
   openTab(path, `采购对账 ${record.settleNo || ''}`)
-  router.push({ name: 'settlement-purchase-settles-detail', params: { id: record.id } })
+  router.push({
+    name: 'settlement-purchase-settles-detail',
+    params: { id: record.id },
+    query,
+  })
+}
+
+function openDetailAction(record, action) {
+  openDetail(record, { action })
+}
+
+/** 待确认：草稿 / 对账中 */
+function isPreConfirmSettle(record) {
+  return record?.status === '草稿' || record?.status === '对账中'
+}
+
+/** 已确认且票、款均已完成 → 操作列为空 */
+function isConfirmedFullyDone(record) {
+  return (
+    record?.status === '已确认' &&
+    record?.invoiceStatus === '已开票' &&
+    record?.paymentStatus === '已付款'
+  )
+}
+
+function canListInvoice(record) {
+  return record?.status === '已确认' && record?.invoiceStatus !== '已开票'
+}
+
+function canListPayment(record) {
+  return record?.status === '已确认' && record?.paymentStatus !== '已付款'
+}
+
+function showConfirmedListActions(record) {
+  if (record?.status !== '已确认') return false
+  if (isConfirmedFullyDone(record)) return false
+  return canListInvoice(record) || canListPayment(record)
+}
+
+/** 未收票且未付款的已确认单可反确认 */
+function canUnconfirmSettle(record) {
+  if (!record || record.status !== '已确认') return false
+  if (record.invoiceStatus === '已开票' || record.invoiceStatus === '部分收票') return false
+  if ((record.invoiceRecords || []).length > 0) return false
+  if (record.paymentStatus === '已付款') return false
+  if ((Number(record.paidAmount) || 0) > 0) return false
+  return true
+}
+
+function onBatchUnconfirm() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要对账单')
+    return
+  }
+  const targets = purchaseSettleState.settles.filter(
+    (s) => selectedRowKeys.value.includes(s.id) && canUnconfirmSettle(s),
+  )
+  if (!targets.length) {
+    message.warning('勾选中没有可反确认的单据（需已确认且未收票、未付款）')
+    return
+  }
+  Modal.confirm({
+    title: `反确认 ${targets.length} 张对账单？`,
+    content: '将退回草稿并释放入库/退货占量；仅未开票且未付款的已确认单可操作。',
+    okText: '反确认',
+    onOk() {
+      let okCount = 0
+      const fails = []
+      const doneIds = []
+      targets.forEach((row) => {
+        const res = unconfirmPurchaseSettle(row.id)
+        if (res.ok) {
+          okCount += 1
+          doneIds.push(row.id)
+        } else {
+          fails.push(`${row.settleNo}：${res.message}`)
+        }
+      })
+      if (doneIds.length) {
+        selectedRowKeys.value = selectedRowKeys.value.filter((id) => !doneIds.includes(id))
+      }
+      if (okCount) message.success(`已反确认 ${okCount} 张`)
+      if (fails.length) message.warning(fails.slice(0, 3).join('；'))
+    },
+  })
 }
 
 function onConfirm(record) {
   Modal.confirm({
     title: `确认对账单 ${record.settleNo}？`,
-    content: '确认后将占用入库行的结算数量，不可撤销。',
+    content: '确认后将占用入库行的结算数量；未开票未付款时可反确认。',
     okText: '确认',
     onOk() {
       const res = confirmPurchaseSettle(record.id)
@@ -866,6 +1101,10 @@ resetToCurrentPeriod()
   display: flex;
   justify-content: flex-end;
 }
+.actions-empty {
+  color: #bfbfbf;
+}
+
 .danger {
   color: #ff4d4f;
 }
