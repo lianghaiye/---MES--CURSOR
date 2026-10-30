@@ -17,6 +17,9 @@
         <a-descriptions-item label="执行结果">
           {{ rule.resultMode === 'auto_confirm' ? '自动确认' : '生成草稿' }}
         </a-descriptions-item>
+        <a-descriptions-item label="追加未结算量">
+          {{ rule.allowAppend ? '是（已有同账期单仍可追加）' : '否（已有同账期单则跳过）' }}
+        </a-descriptions-item>
         <a-descriptions-item label="适用结算周期">{{ cycleText }}</a-descriptions-item>
         <a-descriptions-item label="执行计划" :span="2">{{ scheduleText }}</a-descriptions-item>
         <a-descriptions-item label="扫描窗口" :span="2">{{ scanText }}</a-descriptions-item>

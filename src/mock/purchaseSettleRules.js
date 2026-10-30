@@ -101,6 +101,12 @@ export function createPurchaseSettleRule(partial = {}) {
     supplierIds: [],
     /** 空=不限；如 ['月结'] */
     settlementCycles: [],
+    /**
+     * 同供应商+同账期已有对账单时：
+     * - true：仍扫剩余可结量并新开一张（追加）
+     * - false：跳过（默认，兼容历史规则）
+     */
+    allowAppend: false,
     remark: '',
     lastRunAt: '',
     /** 固定窗口：调度成功后写入，用于「自动只跑一次」 */

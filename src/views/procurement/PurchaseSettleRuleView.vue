@@ -133,6 +133,9 @@
           <template v-else-if="column.key === 'resultMode'">
             {{ record.resultMode === 'auto_confirm' ? '自动确认' : '生成草稿' }}
           </template>
+          <template v-else-if="column.key === 'allowAppend'">
+            {{ record.allowAppend ? '是' : '否' }}
+          </template>
           <template v-else-if="column.key === 'schedule'">
             {{ formatSchedule(record) }}
           </template>
@@ -254,6 +257,7 @@ const columns = [
   { title: '规则层级', key: 'ruleScope', width: 110 },
   { title: '生成维度', key: 'settleTarget', width: 120 },
   { title: '执行结果', key: 'resultMode', width: 100 },
+  { title: '追加未结算', key: 'allowAppend', width: 100 },
   { title: '执行计划', key: 'schedule', width: 160 },
   { title: '扫描窗口', key: 'scan', width: 160, ellipsis: true },
   { title: '上次执行', dataIndex: 'lastRunAt', key: 'lastRunAt', width: 160 },

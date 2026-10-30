@@ -199,6 +199,7 @@ export function listSupplierIdsCoveredByOverrides(bizScene, settleTarget, exclud
 const BUILTIN_EDITABLE_KEYS = [
   'enabled',
   'resultMode',
+  'allowAppend',
   'executeFreq',
   'executeTime',
   'executeWeekday',
@@ -468,6 +469,7 @@ function runInboundRule(rule, windowInfo) {
   if (!isFactoryScope(rule) && !supplierIds?.length) {
     return { ok: false, message: '供应商规则未指定供应商', settles: [], skipped: [] }
   }
+  const allowAppend = !!rule.allowAppend
   const preview = previewSettlesByFixedWindow({
     periodStart: windowInfo.periodStart,
     periodEnd: windowInfo.periodEnd,
@@ -475,7 +477,7 @@ function runInboundRule(rule, windowInfo) {
     periodLabel: windowInfo.label,
     supplierIds,
     settlementCycles: rule.settlementCycles?.length ? rule.settlementCycles : undefined,
-    allowAppend: false,
+    allowAppend,
   })
   if (!preview.ok) {
     return { ok: false, message: preview.message, settles: [], skipped: [] }
@@ -490,11 +492,15 @@ function runInboundRule(rule, windowInfo) {
       ...skippedCovered,
       ...scopedGroups
         .filter((g) => g.exists || !g.lineCount)
-        .map((g) =>
-          g.exists
-            ? `${g.supplier} 已有结算「${g.existingSettleNo}」`
-            : `${g.supplier} 无可结算明细`,
-        ),
+        .map((g) => {
+          if (g.exists && g.lineCount) {
+            return `${g.supplier} 已有结算「${g.existingSettleNo}」（未开启追加）`
+          }
+          if (g.exists) {
+            return `${g.supplier} 已有结算「${g.existingSettleNo}」且无可追加明细`
+          }
+          return `${g.supplier} 无可结算明细`
+        }),
     ]
     return {
       ok: true,
@@ -507,7 +513,7 @@ function runInboundRule(rule, windowInfo) {
   const createdRes = createSettlesFromPeriod(selectable, {
     settleDate: dayjs().format('YYYY-MM-DD'),
     remark: `规则「${rule.name}」自动生成 ${windowInfo.label}`,
-    allowAppend: false,
+    allowAppend,
   })
   if (!createdRes.ok && !createdRes.settles?.length) {
     return {
@@ -574,16 +580,19 @@ function runPurchaseOrderRule(rule, windowInfo) {
     return { ok: true, message: '扫描窗口内无已完成且可结算的采购单', settles: [], skipped: [] }
   }
 
+  const allowAppend = !!rule.allowAppend
   for (const po of candidates) {
     const periodKey = `${rule.id}:${windowInfo.periodKey}:po:${po.id}`
     const existsByKey = findSettleByPeriodKey(periodKey)
-    if (existsByKey) {
+    const lines = listSettleableInboundLines(po.id)
+    if (existsByKey && !allowAppend) {
       skipped.push(`${po.orderNo} 本窗已结算过`)
       continue
     }
-    const lines = listSettleableInboundLines(po.id)
     if (!lines.length) {
-      skipped.push(`${po.orderNo} 无可结算入库`)
+      skipped.push(
+        existsByKey ? `${po.orderNo} 已有结算且无可追加入库` : `${po.orderNo} 无可结算入库`,
+      )
       continue
     }
     const res = createSettleFromPurchaseOrder(po.id, {

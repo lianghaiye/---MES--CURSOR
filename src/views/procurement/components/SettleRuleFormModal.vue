@@ -5,7 +5,7 @@
       type="info"
       show-icon
       class="rule-scope-tip"
-      message="内置工厂默认规则：可改执行结果、执行频率/时刻、扫描窗口与备注；可停用。场景、生成维度、结算周期不可改，且不可删除。"
+      message="内置工厂默认规则：可改执行结果、追加未结算量、执行频率/时刻、扫描窗口与备注；可停用。场景、生成维度、结算周期不可改，且不可删除。"
     />
     <a-alert
       v-else
@@ -55,13 +55,23 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="执行频率" required>
-            <a-select v-model:value="form.executeFreq" :options="freqOpts" />
+          <a-form-item label="追加未结算量">
+            <a-checkbox
+              v-model:checked="form.allowAppend"
+              title="勾选后：同供应商同账期已有对账单时，仍扫描剩余可结量并新开一张"
+            >
+              已有同账期单仍可追加
+            </a-checkbox>
           </a-form-item>
         </a-col>
       </a-row>
 
       <a-row :gutter="12">
+        <a-col :span="8">
+          <a-form-item label="执行频率" required>
+            <a-select v-model:value="form.executeFreq" :options="freqOpts" />
+          </a-form-item>
+        </a-col>
         <a-col :span="8">
           <a-form-item label="执行时刻" required>
             <a-time-picker
@@ -289,9 +299,13 @@ watch(
     Object.assign(form, emptyForm(), props.rule || {})
     if (!form.executeTime) form.executeTime = '02:00'
     if (!form.bizScene) form.bizScene = SETTLE_RULE_SCENE.PURCHASE
+    if (props.rule?.id && props.rule.allowAppend == null) {
+      form.allowAppend = false
+    }
     if (!props.rule?.id) {
       form.ruleScope = SETTLE_RULE_SCOPE.SUPPLIER
       form.builtin = false
+      form.allowAppend = true
     }
     pendingConflictResolution.value = null
     conflictRows.value = []
@@ -308,6 +322,8 @@ function emptyForm() {
     ruleScope: SETTLE_RULE_SCOPE.SUPPLIER,
     settleTarget: SETTLE_RULE_TARGET.INBOUND,
     resultMode: SETTLE_RULE_RESULT.DRAFT,
+    /** 新建默认勾选，与手工按账期生成一致；历史规则无字段仍按 false */
+    allowAppend: true,
     executeFreq: SETTLE_RULE_FREQ.WEEKLY,
     executeTime: '02:00',
     executeWeekday: 1,
