@@ -96,6 +96,8 @@
                 </template>
               </a-tab-pane>
               <a-tab-pane key="price-change" :tab="`订单变更 (${priceChangeCount})`" />
+              <a-tab-pane key="payment" :tab="`回款信息 (${paymentPlanCount})`" />
+              <a-tab-pane key="invoice" :tab="`开票信息 (${invoiceLedgerCount})`" />
               <a-tab-pane key="industrial-label" :tab="`工业标识 (${industrialLabelSnCount})`" />
               <a-tab-pane key="approval" tab="审批信息" />
             </a-tabs>
@@ -919,6 +921,169 @@
             </DetailSectionCard>
           </template>
 
+          <template v-else-if="activeTab === 'payment'">
+            <a-alert
+              v-if="linkedContractNo"
+              type="info"
+              show-icon
+              class="payment-order-alert"
+              :message="`本订单已关联合同 ${linkedContractNo}，回款计划在合同侧维护；下方展示挂到本订单的回款流水。`"
+            />
+            <a-alert
+              v-else-if="!canMaintainOrderPayment"
+              type="info"
+              show-icon
+              class="payment-order-alert"
+              message="订单审核通过后，未挂合同台账时会按预设回款节点生成订单回款计划。"
+            />
+            <DetailSectionCard v-if="!linkedContractNo" title="回款节点">
+              <template v-if="canMaintainStandalonePayment" #extra>
+                <a-space :size="8">
+                  <a-button size="small" @click="orderPlanEditOpen = true">编辑回款计划</a-button>
+                  <a-button type="primary" size="small" @click="openOrderPaymentRegister()">
+                    登记回款
+                  </a-button>
+                </a-space>
+              </template>
+              <a-table
+                :columns="orderPaymentPlanColumns"
+                :data-source="orderPaymentPlan"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1100 }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'startDate'">
+                    <span :class="{ 'muted-empty': !row.startDate }">
+                      {{ row.startDate || '待补写' }}
+                    </span>
+                  </template>
+                  <template v-else-if="column.key === 'planAmount'">
+                    ¥ {{ formatMoney(row.planAmount) }}
+                  </template>
+                  <template v-else-if="column.key === 'paid'">
+                    {{ Number(row.paid) > 0 ? `¥ ${formatMoney(row.paid)}` : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'unpaid'">
+                    {{ Number(row.unpaid) > 0 ? `¥ ${formatMoney(row.unpaid)}` : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'paymentMethod'">
+                    {{ row.paymentMethod || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'overdue'">
+                    <a-tag v-if="row.overdue" color="error">逾期</a-tag>
+                    <span v-else>—</span>
+                  </template>
+                  <template v-else-if="column.key === 'actions'">
+                    <a-space v-if="canMaintainStandalonePayment" :size="8">
+                      <a @click="openOrderMaintainNode(row, 'startDate')">维护起算日</a>
+                      <a @click="openOrderMaintainNode(row, 'register')">登记回款</a>
+                    </a-space>
+                    <span v-else class="muted">—</span>
+                  </template>
+                </template>
+                <template #emptyText>
+                  <a-empty :image="false" description="暂无回款节点" />
+                </template>
+              </a-table>
+            </DetailSectionCard>
+
+            <DetailSectionCard title="回款流水">
+              <template v-if="canMaintainStandalonePayment" #extra>
+                <a-button size="small" @click="openOrderPaymentRegister()">登记回款</a-button>
+              </template>
+              <a-table
+                :columns="orderPaymentLedgerColumns"
+                :data-source="orderPaymentLedger"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 900 }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'amount'">
+                    ¥ {{ formatMoney(row.amount) }}
+                  </template>
+                  <template v-else-if="column.key === 'nodeName'">
+                    {{ row.nodeName || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'paymentMethod'">
+                    {{ row.paymentMethod || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'receivedAt'">
+                    {{ row.receivedAt || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'remark'">
+                    {{ row.remark || '—' }}
+                  </template>
+                </template>
+                <template #emptyText>
+                  <a-empty :image="false" description="暂无回款流水" />
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
+          <template v-else-if="activeTab === 'invoice'">
+            <a-alert
+              v-if="linkedContractNo"
+              type="info"
+              show-icon
+              class="payment-order-alert"
+              :message="`本订单已关联合同 ${linkedContractNo}，开票也可在合同回款中登记；下方展示挂到本订单的开票流水。`"
+            />
+            <DetailSectionCard title="开票流水">
+              <template v-if="canMaintainStandalonePayment" #extra>
+                <a-button type="primary" size="small" @click="openOrderInvoiceRegister()">
+                  登记开票
+                </a-button>
+              </template>
+              <a-table
+                :columns="orderInvoiceLedgerColumns"
+                :data-source="orderInvoiceLedger"
+                row-key="id"
+                size="small"
+                bordered
+                :pagination="false"
+                :scroll="{ x: 1000 }"
+              >
+                <template #bodyCell="{ column, record: row }">
+                  <template v-if="column.key === 'amount'">
+                    ¥ {{ formatMoney(row.amount) }}
+                  </template>
+                  <template v-else-if="column.key === 'nodeName'">
+                    {{ row.nodeName || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'taxRate'">
+                    {{ row.taxRate != null && row.taxRate !== '' ? `${row.taxRate}%` : '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'taxAmount'">
+                    {{
+                      row.taxAmount != null && row.taxAmount !== ''
+                        ? `¥ ${formatMoney(row.taxAmount)}`
+                        : '—'
+                    }}
+                  </template>
+                  <template v-else-if="column.key === 'invoiceNo'">
+                    {{ row.invoiceNo || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'invoiceDate'">
+                    {{ row.invoiceDate || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'remark'">
+                    {{ row.remark || '—' }}
+                  </template>
+                </template>
+                <template #emptyText>
+                  <a-empty :image="false" description="暂无开票流水" />
+                </template>
+              </a-table>
+            </DetailSectionCard>
+          </template>
+
           <template v-else-if="activeTab === 'approval'">
             <SalesApprovalInfoPanel :order="order" :change-groups="priceChangeApprovalGroups" />
           </template>
@@ -940,6 +1105,26 @@
       @done="onPriceChangeDone"
     />
     <SalesOrderPrintModal v-model:open="printModalOpen" :sales-order="order" />
+    <PaymentNodeMaintainModal
+      v-model:open="orderPaymentMaintainOpen"
+      :summary="orderPaymentSummary"
+      :node="orderPaymentMaintainNode"
+      :mode="orderPaymentMaintainMode"
+      @saved="onOrderPaymentMaintained"
+    />
+    <PaymentInvoiceRegisterModal
+      v-model:open="orderInvoiceOpen"
+      :summary="orderPaymentSummary"
+      :node="orderInvoiceNode"
+      prefer-order-tab
+      @saved="onOrderPaymentMaintained"
+    />
+    <SalesOrderPaymentPlanEditModal
+      v-model:open="orderPlanEditOpen"
+      :order="order"
+      :plan-rows="orderPaymentPlan"
+      @saved="onOrderPaymentMaintained"
+    />
     <a-modal
       v-model:open="supplementLabelOpen"
       title="工业标识补申请"
@@ -1079,9 +1264,20 @@ import {
 } from '@/store/salesOrderStore'
 import {
   canGenerateContractFromSalesOrder,
+  getSalesContractByNo,
   listContractsBySourceSalesOrder,
 } from '@/store/salesContractStore'
-import { CONTRACT_TYPE } from '@/constants/salesContract'
+import { CONTRACT_TYPE, PAYMENT_LINK_TYPE } from '@/constants/salesContract'
+import {
+  buildSalesOrderPaymentPlan,
+  buildSalesOrderPaymentSummary,
+  listInvoicesForSummary,
+  listPaymentsForSummary,
+  salesPaymentState,
+} from '@/store/salesPaymentStore'
+import PaymentNodeMaintainModal from './components/PaymentNodeMaintainModal.vue'
+import PaymentInvoiceRegisterModal from './components/PaymentInvoiceRegisterModal.vue'
+import SalesOrderPaymentPlanEditModal from './components/SalesOrderPaymentPlanEditModal.vue'
 import { findCreatePageByListPath } from '@/config/createPages'
 import {
   functionParamState,
@@ -1094,7 +1290,13 @@ import {
   SALES_ORDER_REVOKE_BLOCKED_MESSAGE,
   hasSalesOrderRevokeBlockers,
 } from '@/utils/salesOrderRevokeApproval'
-import { salesOrderStatusColor, salesDeliveryStatusColor } from '@/utils/salesOrderStatus'
+import {
+  salesOrderStatusColor,
+  salesDeliveryStatusColor,
+  isSalesOrderApproved,
+  normalizeSalesOrderProgressStatus,
+  SALES_ORDER_STATUS,
+} from '@/utils/salesOrderStatus'
 import { buildPriceChangeApprovalGroups } from '@/utils/salesPriceChange'
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
@@ -1206,6 +1408,141 @@ const priceChangeCount = computed(() => priceChangeRecords.value.length)
 const priceChangeApprovalGroups = computed(() =>
   buildPriceChangeApprovalGroups(priceChangeRecords.value),
 )
+
+const paymentTick = ref(0)
+const orderPaymentMaintainOpen = ref(false)
+const orderPaymentMaintainNode = ref(null)
+const orderPaymentMaintainMode = ref('register')
+const orderInvoiceOpen = ref(false)
+const orderInvoiceNode = ref(null)
+const orderPlanEditOpen = ref(false)
+
+const linkedContractNo = computed(() => {
+  const no = String(order.value?.contractNo || '').trim()
+  if (!no) return ''
+  return getSalesContractByNo(no) ? no : ''
+})
+
+const canMaintainOrderPayment = computed(() => {
+  if (!order.value) return false
+  if (!isSalesOrderApproved(order.value)) return false
+  const st = normalizeSalesOrderProgressStatus(order.value.progressStatus)
+  return st !== SALES_ORDER_STATUS.VOIDED
+})
+
+/** 仅未挂合同台账的订单才在本单生成节点并登记 */
+const canMaintainStandalonePayment = computed(
+  () => canMaintainOrderPayment.value && !linkedContractNo.value,
+)
+
+const orderPaymentSummary = computed(() => {
+  void salesPaymentState.payments
+  void salesPaymentState.plans
+  void salesPaymentState.invoices
+  void paymentTick.value
+  if (!order.value) return null
+  if (linkedContractNo.value) {
+    return {
+      id: `so-pay-linked-${order.value.id || order.value.orderNo}`,
+      linkType: PAYMENT_LINK_TYPE.SALES_ORDER,
+      contractNo: '',
+      salesOrderNo: order.value.orderNo,
+      displayNo: order.value.orderNo,
+      customerName: order.value.customerName || '',
+      planRows: [],
+    }
+  }
+  return buildSalesOrderPaymentSummary(order.value)
+})
+
+const orderPaymentPlan = computed(() => {
+  void salesPaymentState.payments
+  void salesPaymentState.plans
+  void paymentTick.value
+  if (!order.value || linkedContractNo.value) return []
+  return buildSalesOrderPaymentPlan(order.value)
+})
+
+const paymentPlanCount = computed(() => orderPaymentPlan.value.length)
+
+const orderPaymentLedger = computed(() => {
+  void salesPaymentState.payments
+  void paymentTick.value
+  return listPaymentsForSummary(orderPaymentSummary.value)
+})
+
+const orderInvoiceLedger = computed(() => {
+  void salesPaymentState.invoices
+  void paymentTick.value
+  return listInvoicesForSummary(orderPaymentSummary.value)
+})
+
+const invoiceLedgerCount = computed(() => orderInvoiceLedger.value.length)
+
+const orderPaymentPlanColumns = [
+  { title: '节点', dataIndex: 'name', width: 90 },
+  { title: '计划金额', key: 'planAmount', width: 110, align: 'right' },
+  { title: '起算类型', dataIndex: 'termStartType', width: 90 },
+  { title: '起算日', key: 'startDate', width: 100 },
+  { title: '到期日', dataIndex: 'dueDate', width: 100 },
+  { title: '已回', key: 'paid', width: 100, align: 'right' },
+  { title: '未回', key: 'unpaid', width: 100, align: 'right' },
+  { title: '回款方式', key: 'paymentMethod', width: 90 },
+  { title: '逾期', key: 'overdue', width: 70 },
+  { title: '操作', key: 'actions', width: 180, fixed: 'right' },
+]
+
+const orderPaymentLedgerColumns = [
+  { title: '回款单号', dataIndex: 'paymentNo', width: 150 },
+  { title: '回款节点', key: 'nodeName', width: 100 },
+  { title: '回款金额', key: 'amount', width: 120, align: 'right' },
+  { title: '回款方式', key: 'paymentMethod', width: 100 },
+  { title: '到账日期', key: 'receivedAt', width: 110 },
+  { title: '备注', key: 'remark', ellipsis: true },
+]
+
+const orderInvoiceLedgerColumns = [
+  { title: '开票单号', dataIndex: 'invoiceRecordNo', width: 150 },
+  { title: '开票节点', key: 'nodeName', width: 100 },
+  { title: '开票金额', key: 'amount', width: 120, align: 'right' },
+  { title: '税率', key: 'taxRate', width: 80, align: 'right' },
+  { title: '税额', key: 'taxAmount', width: 100, align: 'right' },
+  { title: '发票号码', key: 'invoiceNo', width: 140 },
+  { title: '开票日期', key: 'invoiceDate', width: 110 },
+  { title: '备注', key: 'remark', ellipsis: true },
+]
+
+function openOrderMaintainNode(row, mode = 'register') {
+  orderPaymentMaintainNode.value = row
+  orderPaymentMaintainMode.value = mode
+  orderPaymentMaintainOpen.value = true
+}
+
+function openOrderPaymentRegister() {
+  const unpaid = orderPaymentPlan.value.find((n) => (Number(n.unpaid) || 0) > 0)
+  const node = unpaid || orderPaymentPlan.value[0]
+  if (!node) {
+    message.warning('暂无回款节点，请先确认订单已审核且未挂合同')
+    return
+  }
+  openOrderMaintainNode(node, 'register')
+}
+
+function openOrderInvoiceRegister(row) {
+  orderInvoiceNode.value =
+    row ||
+    orderPaymentPlan.value.find((n) => {
+      const remain = Math.max(0, (Number(n.planAmount) || 0) - (Number(n.invoiceAmount) || 0))
+      return remain > 0
+    }) ||
+    orderPaymentPlan.value[0] ||
+    null
+  orderInvoiceOpen.value = true
+}
+
+function onOrderPaymentMaintained() {
+  paymentTick.value += 1
+}
 
 const showLiveStockRemind = computed(() => shouldShowLiveStockRemind(order.value))
 
@@ -2585,5 +2922,17 @@ function openBomDetail(bomId, bomName) {
 
 :deep(.line-cancelled) {
   color: rgba(0, 0, 0, 0.45);
+}
+
+.payment-order-alert {
+  margin-bottom: 12px;
+}
+
+.muted-empty {
+  color: #fa8c16;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.25);
 }
 </style>

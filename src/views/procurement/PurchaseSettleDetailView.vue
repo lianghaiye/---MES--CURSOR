@@ -319,14 +319,13 @@
 
         <template v-else-if="activeTab === 'invoice'">
           <DetailSectionCard title="发票信息">
-            <div class="info-grid">
-              <div v-for="field in invoiceFields" :key="field.key" class="info-item">
-                <span class="field-label">{{ field.label }}</span>
-                <span class="field-value" :title="field.value">{{ field.value }}</span>
+            <div class="settle-basic-section">
+              <div class="info-grid">
+                <div v-for="field in invoiceFields" :key="field.key" class="info-item">
+                  <span class="field-label">{{ field.label }}</span>
+                  <span class="field-value" :title="field.value">{{ field.value }}</span>
+                </div>
               </div>
-            </div>
-            <div v-if="isConfirmed && canRegisterInvoice" class="tab-action-row">
-              <a-button type="primary" size="small" @click="openInvoiceModal">收票登记</a-button>
             </div>
             <div class="entry-title" style="margin-top: 16px">收票登记记录</div>
             <a-table
@@ -341,6 +340,9 @@
               <template #bodyCell="{ column, record: row }">
                 <template v-if="column.key === 'invoiceAmount'">
                   ¥ {{ formatMoney(row.invoiceAmount) }}
+                </template>
+                <template v-else-if="column.key === 'taxRate'">
+                  {{ row.taxRate != null && row.taxRate !== '' ? `${Number(row.taxRate)}` : '—' }}
                 </template>
                 <template v-else-if="column.key === 'invoiceTaxAmount'">
                   {{
@@ -357,33 +359,98 @@
 
         <template v-else-if="activeTab === 'payment'">
           <DetailSectionCard title="付款信息">
-            <div class="info-grid">
-              <div v-for="field in paymentFields" :key="field.key" class="info-item">
-                <span class="field-label">{{ field.label }}</span>
-                <span class="field-value" :title="field.value">{{ field.value }}</span>
+            <div class="settle-basic-section">
+              <div class="info-grid">
+                <div v-for="field in paymentFields" :key="field.key" class="info-item">
+                  <span class="field-label">{{ field.label }}</span>
+                  <span class="field-value" :title="field.value">{{ field.value }}</span>
+                </div>
               </div>
             </div>
-            <div v-if="isConfirmed && record.paymentStatus !== '已付款'" class="tab-action-row">
-              <a-button size="small" @click="openPaymentModal">登记付款</a-button>
-            </div>
             <div class="entry-title" style="margin-top: 16px">付款登记记录</div>
+            <div class="entry-sub-tip">
+              按每次登记汇总；若冲抵往期/他单，展开可看同批次全部分配关联。
+            </div>
             <a-table
-              :columns="paymentRecordColumns"
-              :data-source="paymentRecords"
+              :columns="paymentBatchColumns"
+              :data-source="paymentBatches"
               row-key="id"
               size="small"
               bordered
               :pagination="false"
               :locale="{ emptyText: '暂无付款登记' }"
+              :expanded-row-keys="paymentExpandedKeys"
+              @expand="onPaymentBatchExpand"
             >
               <template #bodyCell="{ column, record: row }">
-                <template v-if="column.key === 'amount'">
-                  ¥ {{ formatMoney(row.amount) }}
+                <template v-if="column.key === 'totalAmount'">
+                  ¥ {{ formatMoney(row.totalAmount) }}
                 </template>
-                <template v-else-if="column.key === 'targetType'">
-                  {{ row.targetType === 'opening' ? '期初余额' : '本期确认' }}
+                <template v-else-if="column.key === 'currentAmount'">
+                  ¥ {{ formatMoney(row.currentAmount) }}
+                </template>
+                <template v-else-if="column.key === 'relatedAmount'">
+                  <span :class="{ 'is-linkish': row.relatedAmount > 0 }">
+                    ¥ {{ formatMoney(row.relatedAmount) }}
+                  </span>
+                </template>
+                <template v-else-if="column.key === 'role'">
+                  <a-tag :color="row.isEntry ? 'blue' : 'default'">
+                    {{ row.isEntry ? '本单登记' : '他单冲入' }}
+                  </a-tag>
                 </template>
                 <template v-else>{{ row[column.dataIndex] || '—' }}</template>
+              </template>
+              <template #expandedRowRender="{ record: batch }">
+                <div class="payment-batch-detail">
+                  <div class="payment-batch-detail__title">
+                    本批次分配明细
+                    <span
+                      v-if="batch.entrySettleNo && !batch.isEntry"
+                      class="payment-batch-detail__meta"
+                    >
+                      （由 {{ batch.entrySettleNo }} 登记）
+                    </span>
+                  </div>
+                  <a-table
+                    :columns="paymentAllocColumns"
+                    :data-source="batch.allocations"
+                    row-key="id"
+                    size="small"
+                    bordered
+                    :pagination="false"
+                  >
+                    <template #bodyCell="{ column, record: alloc }">
+                      <template v-if="column.key === 'settleNo'">
+                        <a
+                          v-if="alloc.settleId && !alloc.isCurrent"
+                          @click="goSettleDetail(alloc.settleId, alloc.settleNo)"
+                        >
+                          {{ alloc.settleNo || '—' }}
+                        </a>
+                        <span v-else>
+                          {{ alloc.settleNo || '—' }}
+                          <a-tag v-if="alloc.isCurrent" color="processing" class="inline-tag">
+                            本单
+                          </a-tag>
+                        </span>
+                      </template>
+                      <template v-else-if="column.key === 'targetType'">
+                        {{
+                          alloc.targetType === 'opening'
+                            ? '期初余额'
+                            : alloc.isCurrent
+                              ? '本期确认'
+                              : '历史账单'
+                        }}
+                      </template>
+                      <template v-else-if="column.key === 'amount'">
+                        ¥ {{ formatMoney(alloc.amount) }}
+                      </template>
+                      <template v-else>{{ alloc[column.dataIndex] || '—' }}</template>
+                    </template>
+                  </a-table>
+                </div>
               </template>
             </a-table>
           </DetailSectionCard>
@@ -606,55 +673,7 @@
         </a-form>
       </a-modal>
 
-      <a-modal
-        v-model:open="invoiceModalOpen"
-        title="收票登记"
-        ok-text="保存"
-        destroy-on-close
-        @ok="submitInvoice"
-      >
-        <a-form layout="vertical">
-          <a-form-item label="发票号码" required>
-            <a-input v-model:value="invoiceForm.invoiceNo" allow-clear placeholder="供应商发票号" />
-          </a-form-item>
-          <a-form-item label="开票日期" required>
-            <a-date-picker
-              v-model:value="invoiceForm.invoiceDate"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-              placeholder="选择开票日"
-            />
-          </a-form-item>
-          <a-form-item label="票面金额（含税）" required>
-            <a-input-number
-              v-model:value="invoiceForm.invoiceAmount"
-              :min="0.01"
-              :max="invoiceRemainToReceive || undefined"
-              :precision="2"
-              style="width: 100%"
-              placeholder="本次票面"
-            />
-          </a-form-item>
-          <div class="modal-hint" style="margin-top: -8px; margin-bottom: 12px">
-            确认金额 ¥ {{ formatMoney(confirmedAmount) }}，已收票 ¥
-            {{ formatMoney(invoicedTotal) }}，本次最多 ¥
-            {{ formatMoney(invoiceRemainToReceive) }}。可分次收票；付款按账单未付额，不按票面卡死。
-          </div>
-          <a-form-item label="税额">
-            <a-input-number
-              v-model:value="invoiceForm.invoiceTaxAmount"
-              :min="0"
-              :precision="2"
-              style="width: 100%"
-              placeholder="选填"
-            />
-          </a-form-item>
-          <a-form-item label="备注">
-            <a-textarea v-model:value="invoiceForm.invoiceRemark" :rows="2" allow-clear />
-          </a-form-item>
-          <div class="modal-hint">账期起算为「开票日」时，保存后将按开票日重算计划付款日。</div>
-        </a-form>
-      </a-modal>
+      <PurchaseSettleInvoicePaymentModals ref="invoicePaymentModalsRef" />
 
       <a-modal
         v-model:open="openingModalOpen"
@@ -678,92 +697,6 @@
           <a-button type="link" size="small" style="padding-left: 0" @click="clearOpeningBalance">
             清空并恢复系统自动汇总
           </a-button>
-        </a-form>
-      </a-modal>
-
-      <a-modal
-        v-model:open="paymentModalOpen"
-        title="登记付款"
-        ok-text="保存"
-        width="640px"
-        destroy-on-close
-        @ok="submitPayment"
-      >
-        <a-form layout="vertical">
-          <a-form-item label="冲抵方式" required>
-            <a-radio-group v-model:value="paymentForm.allocateMode">
-              <a-radio value="aging">先旧后新（先冲期初，再按账龄）</a-radio>
-              <a-radio value="currentFirst">先付清本单（期初+本期），再冲历史</a-radio>
-              <a-radio value="current">只付本单本期</a-radio>
-            </a-radio-group>
-          </a-form-item>
-          <a-form-item label="本次付款金额" required>
-            <a-input-number
-              v-model:value="paymentForm.payAmount"
-              :min="0.01"
-              :max="agingPaymentPreview.totalUnpaid || undefined"
-              :precision="2"
-              style="width: 100%"
-              placeholder="实付金额"
-            />
-          </a-form-item>
-          <a-form-item label="备注">
-            <a-textarea v-model:value="paymentForm.remark" :rows="2" allow-clear />
-          </a-form-item>
-          <div class="modal-hint">
-            <template v-if="paymentForm.allocateMode === 'aging'">
-              先冲本单期初，再按账龄冲各单本期。可冲抵合计 ¥
-              {{ formatMoney(agingPaymentPreview.totalUnpaid) }}。
-            </template>
-            <template v-else-if="paymentForm.allocateMode === 'currentFirst'">
-              先付清本单期初与本期，剩余再按账龄冲其他历史账单。可冲抵合计 ¥
-              {{ formatMoney(agingPaymentPreview.totalUnpaid) }}。
-            </template>
-            <template v-else>
-              仅冲本单本期确认未付。可冲抵 ¥
-              {{ formatMoney(agingPaymentPreview.totalUnpaid) }}。
-            </template>
-          </div>
-          <div v-if="agingPaymentPreview.allocations?.length" class="aging-preview">
-            <div class="aging-preview__title">
-              分配预览（金额不足时后续行本次分配为 0，仍保留展示）
-            </div>
-            <a-table
-              :columns="agingPreviewColumns"
-              :data-source="agingPaymentPreview.allocations"
-              :row-key="(row) => `${row.settleId}-${row.type}`"
-              size="small"
-              bordered
-              :pagination="false"
-              :row-class-name="(row) => (row.applyAmount > 0 ? '' : 'aging-row-skip')"
-            >
-              <template #bodyCell="{ column, record: row }">
-                <template v-if="column.key === 'targetLabel'">
-                  <a-tag :color="row.type === 'opening' ? 'orange' : 'blue'">{{
-                    row.targetLabel
-                  }}</a-tag>
-                </template>
-                <template v-else-if="column.key === 'remainBefore'">
-                  ¥ {{ formatMoney(row.remainBefore) }}
-                </template>
-                <template v-else-if="column.key === 'applyAmount'">
-                  <span :class="{ 'is-muted': !(row.applyAmount > 0) }">
-                    ¥ {{ formatMoney(row.applyAmount) }}
-                  </span>
-                </template>
-                <template v-else-if="column.key === 'remainAfter'">
-                  ¥ {{ formatMoney(row.remainAfter) }}
-                </template>
-                <template v-else>{{ row[column.dataIndex] || '—' }}</template>
-              </template>
-            </a-table>
-          </div>
-          <div
-            v-else-if="paymentForm.payAmount && agingPaymentPreview.message"
-            class="modal-hint is-warn"
-          >
-            {{ agingPaymentPreview.message }}
-          </div>
         </a-form>
       </a-modal>
     </template>
@@ -790,12 +723,10 @@ import {
   resolveSettleFundOverview,
   registerPurchaseSettleLineDispute,
   resolvePurchaseSettleLineDispute,
-  registerPurchaseSettleInvoice,
-  registerPurchaseSettlePayment,
-  previewAgingPaymentAllocation,
   settleInvoicedTotal,
   settleInvoiceRemainToReceive,
   ensureSettleInvoiceRecords,
+  listSettlePaymentBatches,
   updatePurchaseSettleOpeningBalance,
   addPurchaseSettleFeeLine,
   removePurchaseSettleFeeLine,
@@ -809,6 +740,7 @@ import { purchaseSettleLineExportFields } from '@/utils/exportFields/purchaseSet
 import { useListExport } from '@/composables/useListExport'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import PurchaseSettlePrintModal from '@/views/procurement/components/PurchaseSettlePrintModal.vue'
+import PurchaseSettleInvoicePaymentModals from '@/views/procurement/components/PurchaseSettleInvoicePaymentModals.vue'
 import { buildPurchaseSettleOperationLogs } from '@/utils/purchaseSettleOperationLog'
 import { DISPUTE_DIFF_TYPE_OPTIONS } from '@/store/purchaseDisputeAccrualStore'
 import { inboundOrderState } from '@/store/inboundOrderStore'
@@ -1001,24 +933,10 @@ const registerDisputeOpen = ref(false)
 const resolveDisputeOpen = ref(false)
 const readonlyDisputeOpen = ref(false)
 const disputeTargetLine = ref(null)
-const invoiceModalOpen = ref(false)
-const paymentModalOpen = ref(false)
+const invoicePaymentModalsRef = ref(null)
 const openingModalOpen = ref(false)
 const openingForm = reactive({ openingBalance: null })
 const feeModalOpen = ref(false)
-const paymentForm = reactive({
-  payAmount: null,
-  remark: '',
-  allocateMode: 'aging',
-})
-const agingPreviewColumns = [
-  { title: '对账单号', dataIndex: 'settleNo', width: 130 },
-  { title: '冲抵对象', key: 'targetLabel', width: 100 },
-  { title: '账期', dataIndex: 'periodKey', width: 90 },
-  { title: '冲前未付', key: 'remainBefore', width: 100, align: 'right' },
-  { title: '本次分配', key: 'applyAmount', width: 100, align: 'right' },
-  { title: '冲后未付', key: 'remainAfter', width: 100, align: 'right' },
-]
 const feeForm = reactive({
   feeType: '运费',
   itemName: '',
@@ -1052,32 +970,10 @@ const registerHangPreview = computed(() => {
   if (registerDisputeForm.scope === 'full') return true
   return registerDiffPreview.value != null
 })
-const invoiceForm = reactive({
-  invoiceNo: '',
-  invoiceDate: '',
-  invoiceAmount: null,
-  invoiceTaxAmount: null,
-  invoiceRemark: '',
-})
 
 const openingBalanceManual = computed(() => {
   const row = record.value
   return row != null && row.openingBalance != null && row.openingBalance !== ''
-})
-
-const agingPaymentPreview = computed(() => {
-  void purchaseSettleState.settles
-  const row = record.value
-  if (!row) return { ok: false, totalUnpaid: 0, allocations: [], message: '' }
-  const mode =
-    paymentForm.allocateMode === 'current' || paymentForm.allocateMode === 'currentFirst'
-      ? paymentForm.allocateMode
-      : 'aging'
-  return previewAgingPaymentAllocation({
-    entrySettleId: row.id,
-    payAmount: Number(paymentForm.payAmount) > 0 ? paymentForm.payAmount : 0,
-    mode,
-  })
 })
 
 function disputeResultLabel(result) {
@@ -1167,27 +1063,11 @@ function showDisputeReadonly(row) {
 }
 
 function openInvoiceModal() {
-  const row = record.value
-  if (!row) return
-  const remain = settleInvoiceRemainToReceive(row)
-  invoiceForm.invoiceNo = ''
-  invoiceForm.invoiceDate = dayjs().format('YYYY-MM-DD')
-  invoiceForm.invoiceAmount = remain > 0 ? remain : null
-  invoiceForm.invoiceTaxAmount = null
-  invoiceForm.invoiceRemark = ''
-  invoiceModalOpen.value = true
+  invoicePaymentModalsRef.value?.openInvoice(record.value)
 }
 
-function submitInvoice() {
-  const row = record.value
-  if (!row) return
-  const res = registerPurchaseSettleInvoice(row.id, { ...invoiceForm })
-  if (!res.ok) {
-    message.warning(res.message)
-    return Promise.reject()
-  }
-  message.success(res.message)
-  invoiceModalOpen.value = false
+function openPaymentModal() {
+  invoicePaymentModalsRef.value?.openPayment(record.value)
 }
 
 function openOpeningModal() {
@@ -1225,20 +1105,6 @@ function clearOpeningBalance() {
   openingModalOpen.value = false
 }
 
-function openPaymentModal() {
-  const row = record.value
-  if (!row) return
-  paymentForm.allocateMode = 'aging'
-  paymentForm.remark = ''
-  const preview = previewAgingPaymentAllocation({
-    entrySettleId: row.id,
-    payAmount: 0,
-    mode: 'aging',
-  })
-  paymentForm.payAmount = preview.totalUnpaid > 0 ? preview.totalUnpaid : null
-  paymentModalOpen.value = true
-}
-
 /** 列表「收票登记 / 付款登记」跳转带 ?action= */
 watch(
   () => [record.value?.id, route.query.action],
@@ -1259,22 +1125,6 @@ watch(
   },
   { flush: 'post' },
 )
-
-function submitPayment() {
-  const row = record.value
-  if (!row) return
-  const res = registerPurchaseSettlePayment(row.id, {
-    payAmount: paymentForm.payAmount,
-    remark: paymentForm.remark,
-    allocateMode: paymentForm.allocateMode || 'aging',
-  })
-  if (!res.ok) {
-    message.warning(res.message)
-    return Promise.reject()
-  }
-  message.success(res.message)
-  paymentModalOpen.value = false
-}
 
 const paymentTermDaysText = computed(() => {
   const days = Number(record.value?.paymentTermDays)
@@ -1370,7 +1220,6 @@ const invoiceFields = computed(() => {
       label: '收票笔数',
       value: String(invoiceRecords.value.length),
     },
-    { key: 'invoiceNo', label: '发票号码', value: display(row.invoiceNo) },
     { key: 'invoiceDate', label: '最近开票日', value: display(row.invoiceDate) },
     {
       key: 'invoiceTaxAmount',
@@ -1387,6 +1236,7 @@ const invoiceRecordColumns = [
   { title: '发票号码', dataIndex: 'invoiceNo', key: 'invoiceNo', width: 140 },
   { title: '开票日期', dataIndex: 'invoiceDate', key: 'invoiceDate', width: 120 },
   { title: '票面金额', key: 'invoiceAmount', width: 120, align: 'right' },
+  { title: '税率(%)', key: 'taxRate', width: 90, align: 'right' },
   { title: '税额', key: 'invoiceTaxAmount', width: 100, align: 'right' },
   { title: '登记人', dataIndex: 'invoicer', key: 'invoicer', width: 100 },
   { title: '登记时间', dataIndex: 'invoicedAt', key: 'invoicedAt', width: 170 },
@@ -1413,20 +1263,51 @@ const paymentFields = computed(() => {
     { key: 'plannedPaymentDate', label: '计划付款日', value: display(row.plannedPaymentDate) },
     { key: 'paymentTermStart', label: '账期起算', value: display(row.paymentTermStart) },
     { key: 'paymentTermDays', label: '账期天数', value: paymentTermDaysText.value },
-    { key: 'lastPaidBy', label: '登记人', value: display(row.lastPaidBy) },
-    { key: 'lastPaidAt', label: '登记时间', value: display(row.lastPaidAt) },
     { key: 'lastPaidRemark', label: '付款备注', value: display(row.lastPaidRemark) },
   ]
 })
 
-const paymentRecords = computed(() => record.value?.paymentRecords || [])
-const paymentRecordColumns = [
+const paymentBatches = computed(() => {
+  void purchaseSettleState.settles
+  if (!record.value?.id) return []
+  return listSettlePaymentBatches(record.value.id)
+})
+
+const paymentExpandedKeys = ref([])
+
+const paymentBatchColumns = [
   { title: '登记时间', dataIndex: 'paidAt', width: 170 },
-  { title: '登记人', dataIndex: 'paidBy', width: 100 },
-  { title: '冲抵对象', key: 'targetType', width: 100 },
-  { title: '金额', key: 'amount', width: 110, align: 'right' },
+  { title: '登记人', dataIndex: 'paidBy', width: 90 },
+  { title: '来源', key: 'role', width: 100 },
+  { title: '本次付款合计', key: 'totalAmount', width: 120, align: 'right' },
+  { title: '冲本单', key: 'currentAmount', width: 110, align: 'right' },
+  { title: '冲关联单', key: 'relatedAmount', width: 110, align: 'right' },
   { title: '备注', dataIndex: 'remark', ellipsis: true },
 ]
+
+const paymentAllocColumns = [
+  { title: '对账单号', key: 'settleNo', width: 160 },
+  { title: '冲抵对象', key: 'targetType', width: 110 },
+  { title: '金额', key: 'amount', width: 110, align: 'right' },
+]
+
+function onPaymentBatchExpand(expanded, row) {
+  const key = row.id
+  if (expanded) {
+    if (!paymentExpandedKeys.value.includes(key)) {
+      paymentExpandedKeys.value = [...paymentExpandedKeys.value, key]
+    }
+  } else {
+    paymentExpandedKeys.value = paymentExpandedKeys.value.filter((k) => k !== key)
+  }
+}
+
+function goSettleDetail(id, settleNo) {
+  if (!id) return
+  const path = `/settlement/purchase-settles/${id}`
+  openTab(path, `采购对账 ${settleNo || ''}`)
+  router.push({ name: 'settlement-purchase-settles-detail', params: { id } })
+}
 
 function resolveSourceLine(row) {
   const inbound = inboundOrderState.orders.find((o) => o.id === row.inboundOrderId)
@@ -2064,6 +1945,38 @@ function onDelete() {
   margin-bottom: 8px;
   font-size: 14px;
   font-weight: 600;
+}
+
+.entry-sub-tip {
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.5;
+}
+
+.payment-batch-detail {
+  padding: 4px 8px 8px;
+  background: #fafafa;
+}
+
+.payment-batch-detail__title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.payment-batch-detail__meta {
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.inline-tag {
+  margin-left: 6px;
+}
+
+.is-linkish {
+  color: #1677ff;
 }
 
 .payment-tip {

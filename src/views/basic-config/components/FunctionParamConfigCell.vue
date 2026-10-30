@@ -134,6 +134,20 @@
       @change="onEnableSalesOrderDiscountChange"
     />
 
+    <a-radio-group
+      v-else-if="record.key === 'paymentLinkMode'"
+      :value="paymentLinkMode"
+      @change="(e) => onPaymentLinkModeChange(e.target.value)"
+    >
+      <a-radio
+        v-for="option in PAYMENT_LINK_MODE_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.label }}
+      </a-radio>
+    </a-radio-group>
+
     <a-switch
       v-else-if="record.key === 'transferRequireInboundConfirm'"
       :checked="transferRequireInboundConfirm"
@@ -209,6 +223,7 @@ export default { name: 'FunctionParamConfigCell' }
 import { computed } from 'vue'
 import { message } from 'ant-design-vue'
 import {
+  PAYMENT_LINK_MODE_OPTIONS,
   SALARY_PUSH_OPTIONS,
   AUTO_GENERATE_DOC_OPTIONS,
   AUTO_APPROVE_OPTIONS,
@@ -240,6 +255,8 @@ import {
   setEnableBomLevelMts,
   isSalesOrderDiscountEnabled,
   setEnableSalesOrderDiscount,
+  getPaymentLinkMode,
+  setPaymentLinkMode,
   isTransferRequireInboundConfirm,
   setTransferRequireInboundConfirm,
   isStocktakeAutoPostOnApprove,
@@ -262,6 +279,7 @@ const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
 const enableSalesOrderDiscount = computed(() => isSalesOrderDiscountEnabled())
+const paymentLinkMode = computed(() => getPaymentLinkMode())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
 const stocktakeAutoPostOnApprove = computed(() => isStocktakeAutoPostOnApprove())
 
@@ -341,6 +359,9 @@ function onEnableSalesOrderDiscountChange(checked) {
     setEnableSalesOrderDiscount(checked),
     checked ? '已开启销售订单价格折扣' : '已关闭销售订单价格折扣',
   )
+}
+function onPaymentLinkModeChange(mode) {
+  toastSave(setPaymentLinkMode(mode))
 }
 function onTransferRequireInboundConfirmChange(checked) {
   toastSave(

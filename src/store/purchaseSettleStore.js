@@ -1538,6 +1538,7 @@ export function registerPurchaseSettleInvoice(settleId, payload = {}) {
   if (amount > remain + 1e-9) {
     return { ok: false, message: `本次票面不能超过未收票余额（¥ ${remain}）` }
   }
+  const taxRate = payload.taxRate != null && payload.taxRate !== '' ? Number(payload.taxRate) : null
   const tax =
     payload.invoiceTaxAmount != null && payload.invoiceTaxAmount !== ''
       ? round2(Number(payload.invoiceTaxAmount) || 0)
@@ -1548,6 +1549,7 @@ export function registerPurchaseSettleInvoice(settleId, payload = {}) {
     invoiceNo,
     invoiceDate,
     invoiceAmount: amount,
+    taxRate: Number.isFinite(taxRate) ? taxRate : null,
     invoiceTaxAmount: tax,
     invoiceRemark: String(payload.invoiceRemark || '').trim(),
     invoicer: 'admin1',
@@ -1756,13 +1758,20 @@ export function previewAgingPaymentAllocation({
   }
 }
 
-function pushPaymentRecord(settle, { amount, paidAt, paidBy, remark, batchId, targetType }) {
+function pushPaymentRecord(
+  settle,
+  { amount, paidAt, paidBy, remark, batchId, targetType, entrySettleId, entrySettleNo },
+) {
   if (!Array.isArray(settle.paymentRecords)) settle.paymentRecords = []
   settle.paymentRecords.unshift({
     id: `pay-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     batchId: batchId || '',
     amount,
     targetType: targetType || 'period',
+    targetSettleId: settle.id,
+    targetSettleNo: settle.settleNo || '',
+    entrySettleId: entrySettleId || settle.id,
+    entrySettleNo: entrySettleNo || settle.settleNo || '',
     paidAt,
     paidBy,
     remark,
@@ -1814,7 +1823,14 @@ export function registerPurchaseSettlePayment(settleId, payload = {}) {
   })
   if (!preview.ok) return { ok: false, message: preview.message, totalUnpaid: preview.totalUnpaid }
 
-  const meta = { paidAt, paidBy, remark, batchId }
+  const meta = {
+    paidAt,
+    paidBy,
+    remark,
+    batchId,
+    entrySettleId: settle.id,
+    entrySettleNo: settle.settleNo || '',
+  }
   preview.allocations.forEach((row) => {
     if (!(row.applyAmount > 0)) return
     const target = getPurchaseSettleById(row.settleId)
@@ -1860,6 +1876,118 @@ export function updatePurchaseSettleOpeningBalance(settleId, openingBalance) {
 }
 
 export { settleUnpaidRemain, settleOpeningRemain, settlePeriodRemain, sameSettleSupplier }
+
+/**
+ * 某对账单相关的付款批次（含同批次冲往期/他单的分配明细）
+ * - 本单作为登记入口，或本单被冲抵，都会出现
+ * - 按批次汇总：本次实付合计 + 各对账单分配行
+ */
+export function listSettlePaymentBatches(settleId) {
+  const settle = getPurchaseSettleById(settleId)
+  if (!settle) return []
+
+  const localRecords = Array.isArray(settle.paymentRecords) ? settle.paymentRecords : []
+  const batchIds = new Set()
+  const orphanKeys = []
+
+  localRecords.forEach((r) => {
+    if (r.batchId) batchIds.add(r.batchId)
+    else orphanKeys.push(r.id)
+  })
+
+  // 本单作为登记入口、但本单金额为 0 的极端情况：仍按 entrySettleId 捞批次
+  purchaseSettleState.settles.forEach((s) => {
+    ;(s.paymentRecords || []).forEach((r) => {
+      if (r.entrySettleId === settleId && r.batchId) batchIds.add(r.batchId)
+    })
+  })
+
+  const batches = []
+
+  batchIds.forEach((batchId) => {
+    const allocations = []
+    purchaseSettleState.settles.forEach((s) => {
+      ;(s.paymentRecords || []).forEach((r) => {
+        if (r.batchId !== batchId) return
+        allocations.push({
+          id: r.id,
+          settleId: s.id,
+          settleNo: r.targetSettleNo || s.settleNo || '',
+          targetType: r.targetType || 'period',
+          amount: Number(r.amount) || 0,
+          isCurrent: s.id === settleId,
+          paidAt: r.paidAt,
+          paidBy: r.paidBy,
+          remark: r.remark || '',
+          entrySettleId: r.entrySettleId || '',
+          entrySettleNo: r.entrySettleNo || '',
+        })
+      })
+    })
+    if (!allocations.length) return
+    allocations.sort((a, b) => {
+      if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1
+      if (a.targetType !== b.targetType) return a.targetType === 'opening' ? -1 : 1
+      return String(a.settleNo).localeCompare(String(b.settleNo))
+    })
+    const head = allocations[0]
+    const entrySettleId = head.entrySettleId || settleId
+    batches.push({
+      id: batchId,
+      batchId,
+      paidAt: head.paidAt || '',
+      paidBy: head.paidBy || '',
+      remark: head.remark || '',
+      totalAmount: round2(allocations.reduce((s, a) => s + (Number(a.amount) || 0), 0)),
+      currentAmount: round2(
+        allocations.filter((a) => a.isCurrent).reduce((s, a) => s + (Number(a.amount) || 0), 0),
+      ),
+      relatedAmount: round2(
+        allocations.filter((a) => !a.isCurrent).reduce((s, a) => s + (Number(a.amount) || 0), 0),
+      ),
+      entrySettleId,
+      entrySettleNo: head.entrySettleNo || '',
+      isEntry: entrySettleId === settleId,
+      allocations,
+    })
+  })
+
+  // 无 batchId 的历史单行
+  orphanKeys.forEach((rid) => {
+    const r = localRecords.find((x) => x.id === rid)
+    if (!r) return
+    batches.push({
+      id: rid,
+      batchId: '',
+      paidAt: r.paidAt || '',
+      paidBy: r.paidBy || '',
+      remark: r.remark || '',
+      totalAmount: Number(r.amount) || 0,
+      currentAmount: Number(r.amount) || 0,
+      relatedAmount: 0,
+      entrySettleId: settleId,
+      entrySettleNo: settle.settleNo || '',
+      isEntry: true,
+      allocations: [
+        {
+          id: r.id,
+          settleId,
+          settleNo: settle.settleNo || '',
+          targetType: r.targetType || 'period',
+          amount: Number(r.amount) || 0,
+          isCurrent: true,
+          paidAt: r.paidAt,
+          paidBy: r.paidBy,
+          remark: r.remark || '',
+          entrySettleId: settleId,
+          entrySettleNo: settle.settleNo || '',
+        },
+      ],
+    })
+  })
+
+  return batches.sort((a, b) => String(b.paidAt || '').localeCompare(String(a.paidAt || '')))
+}
 
 /** 对账单费用/补差行金额合计（计入账面的追加额度） */
 export function calcSettleFeeAdjustAmount(settle) {

@@ -27,7 +27,7 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="5">
-            <a-form-item label="合同编号">
+            <a-form-item :label="docNoFilterLabel">
               <a-input
                 v-model:value="filters.contractNo"
                 allow-clear
@@ -36,7 +36,7 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :xs="24" :sm="12" :md="5">
+          <a-col v-if="listTab !== 'order'" :xs="24" :sm="12" :md="5">
             <a-form-item label="合同名称">
               <a-input
                 v-model:value="filters.contractName"
@@ -67,30 +67,49 @@
           <PlusOutlined />
           登记回款
         </a-button>
+        <a-button size="small" @click="openInvoiceCreate">登记开票</a-button>
+        <a-button size="small" @click="orderPresetOpen = true">预设订单回款节点</a-button>
         <a-button size="small" @click="handleSearch">
           <ReloadOutlined />
           刷新
         </a-button>
+      </a-space>
+      <a-space :size="4" class="toolbar-icons">
+        <TableColumnSettingButton @click="columnDrawerOpen = true" />
       </a-space>
     </div>
 
     <a-alert type="info" show-icon class="summary-bar" :banner="false">
       <template #message>
         <span>
-          共计 <strong>{{ filteredList.length }}</strong> 份合同回款计划（由合同回款节点自动生成）。
+          共计
+          <strong>{{ filteredList.length }}</strong>
+          份回款计划（合同按合同节点；未挂合同的销售订单按预设节点）。
         </span>
       </template>
     </a-alert>
 
+    <a-tabs
+      v-if="showListTabs"
+      v-model:activeKey="listTab"
+      size="small"
+      class="list-status-tabs"
+      @change="onListTabChange"
+    >
+      <a-tab-pane key="all" tab="全部" />
+      <a-tab-pane key="contract" tab="合同回款" />
+      <a-tab-pane key="order" tab="订单回款" />
+    </a-tabs>
+
     <div class="table-card">
       <a-table
-        :columns="columns"
+        :columns="displayColumns"
         :data-source="pagedList"
         row-key="id"
         size="small"
         bordered
         :pagination="false"
-        :scroll="{ x: 1500 }"
+        :scroll="{ x: tableScrollX }"
       >
         <template #bodyCell="{ column, record, index }">
           <template v-if="column.key === 'index'">
@@ -107,8 +126,15 @@
             </a-tooltip>
             <a-tag v-else color="default">未逾期</a-tag>
           </template>
+          <template v-else-if="column.key === 'linkType'">
+            <a-tag :color="record.linkType === PAYMENT_LINK_TYPE.SALES_ORDER ? 'blue' : 'default'">
+              {{ record.linkType === PAYMENT_LINK_TYPE.SALES_ORDER ? '订单回款' : '合同回款' }}
+            </a-tag>
+          </template>
           <template v-else-if="column.key === 'contractNo'">
-            <a class="link-code" @click="goContract(record)">{{ record.contractNo }}</a>
+            <a class="link-code" @click="goContract(record)">{{
+              record.displayNo || record.contractNo || record.salesOrderNo
+            }}</a>
           </template>
           <template v-else-if="column.key === 'customerName'">
             {{ record.customerName || '—' }}
@@ -128,6 +154,9 @@
           <template v-else-if="column.key === 'unpaidTotal'">
             {{ formatMoney(record.unpaidTotal) }}
           </template>
+          <template v-else-if="column.key === 'invoiceTotal'">
+            {{ formatMoney(record.invoiceTotal) }}
+          </template>
           <template v-else-if="column.key === 'paymentTermStart'">
             {{ record.paymentTermStart || '—' }}
           </template>
@@ -139,11 +168,21 @@
             }}
           </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space v-if="record.paymentStatus !== CONTRACT_PAYMENT_STATUS.CLEARED" :size="8">
-              <a @click="openMaintainStart(record)">维护起算日</a>
-              <a @click="openCreateForContract(record)">登记回款</a>
+            <a-space :size="8">
+              <a
+                v-if="record.paymentStatus !== CONTRACT_PAYMENT_STATUS.CLEARED"
+                @click="openMaintainStart(record)"
+              >
+                维护起算日
+              </a>
+              <a
+                v-if="record.paymentStatus !== CONTRACT_PAYMENT_STATUS.CLEARED"
+                @click="openCreateForContract(record)"
+              >
+                登记回款
+              </a>
+              <a @click="openInvoiceForRecord(record)">登记开票</a>
             </a-space>
-            <span v-else class="muted-action">—</span>
           </template>
         </template>
       </a-table>
@@ -160,6 +199,27 @@
     </div>
 
     <PaymentDetailDrawer v-model:open="detailOpen" :record="detailRecord" @saved="tick += 1" />
+
+    <PaymentInvoiceRegisterModal
+      v-model:open="invoiceModalOpen"
+      :summary="invoiceSummary"
+      :prefer-order-tab="preferOrderLink"
+      @saved="tick += 1"
+    />
+
+    <PaymentNodeMaintainModal
+      v-model:open="startDateOpen"
+      :summary="startDateSummary"
+      mode="startDate"
+      @saved="tick += 1"
+    />
+    <SalesOrderPaymentNodePresetModal v-model:open="orderPresetOpen" />
+
+    <TableColumnSettingDrawer
+      v-model:open="columnDrawerOpen"
+      v-model:settings="columnSettings"
+      :default-settings="defaultColumnSettings"
+    />
 
     <a-modal
       v-model:open="modalOpen"
@@ -204,12 +264,16 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="回款节点">
+            <a-form-item label="回款节点" :required="form.linkType === PAYMENT_LINK_TYPE.CONTRACT">
               <a-select
                 v-model:value="form.nodeName"
                 allow-clear
                 :options="nodeOpts"
-                placeholder="请选择节点"
+                :placeholder="
+                  form.linkType === PAYMENT_LINK_TYPE.SALES_ORDER
+                    ? '选填，可不指定节点'
+                    : '请选择节点'
+                "
                 style="width: 100%"
               />
             </a-form-item>
@@ -283,23 +347,7 @@
         </a-row>
 
         <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="开票金额（可选）">
-              <a-input-number
-                v-model:value="form.invoiceAmount"
-                :min="0"
-                :precision="2"
-                style="width: 100%"
-                placeholder="同步到该节点开票金额"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="发票号码（可选）">
-              <a-input v-model:value="form.invoiceNo" allow-clear placeholder="请输入发票号码" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
+          <a-col :span="24">
             <a-form-item label="备注">
               <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
             </a-form-item>
@@ -339,8 +387,22 @@ import {
   paymentMethodOptions,
 } from '@/constants/salesContract'
 import { getPresetPaymentNodes } from '@/store/contractPaymentNodePresetStore'
+import { getOrderPresetPaymentNodes } from '@/store/salesOrderPaymentNodePresetStore'
 import PaymentStatsPanel from './components/PaymentStatsPanel.vue'
 import PaymentDetailDrawer from './components/PaymentDetailDrawer.vue'
+import PaymentInvoiceRegisterModal from './components/PaymentInvoiceRegisterModal.vue'
+import PaymentNodeMaintainModal from './components/PaymentNodeMaintainModal.vue'
+import SalesOrderPaymentNodePresetModal from './components/SalesOrderPaymentNodePresetModal.vue'
+import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
+import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
+import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
+import {
+  PAYMENT_LINK_MODES,
+  functionParamState,
+  getPaymentLinkMode,
+  isPaymentLinkBoth,
+  isPaymentLinkOrderMode,
+} from '@/store/functionParamStore'
 
 defineOptions({ name: 'SalesPaymentView' })
 
@@ -357,6 +419,29 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const pagination = reactive({ current: 1, pageSize: 10 })
 const tick = ref(0)
+const listTab = ref('all')
+
+const paymentLinkMode = computed(() => {
+  void functionParamState.params.paymentLinkMode
+  return getPaymentLinkMode()
+})
+const showListTabs = computed(() => isPaymentLinkBoth())
+const preferOrderLink = computed(() => isPaymentLinkOrderMode() || listTab.value === 'order')
+
+function syncListTabToMode() {
+  const mode = getPaymentLinkMode()
+  if (mode === PAYMENT_LINK_MODES.ORDER) listTab.value = 'order'
+  else if (mode === PAYMENT_LINK_MODES.CONTRACT) listTab.value = 'all'
+}
+
+watch(
+  paymentLinkMode,
+  () => {
+    syncListTabToMode()
+    pagination.current = 1
+  },
+  { immediate: true },
+)
 
 function applyFiltersFromRouteQuery() {
   const due = String(route.query.due || '').trim()
@@ -373,6 +458,11 @@ watch(
 const modalOpen = ref(false)
 const detailOpen = ref(false)
 const detailRecord = ref(null)
+const invoiceModalOpen = ref(false)
+const invoiceSummary = ref(null)
+const startDateOpen = ref(false)
+const startDateSummary = ref(null)
+const orderPresetOpen = ref(false)
 
 const form = reactive({
   linkType: PAYMENT_LINK_TYPE.CONTRACT,
@@ -382,8 +472,6 @@ const form = reactive({
   nodeName: undefined,
   amount: null,
   paymentMethod: undefined,
-  invoiceAmount: null,
-  invoiceNo: '',
   receivedAt: dayjs(),
   remark: '',
 })
@@ -394,25 +482,98 @@ const selectedOrderColumns = [
   { title: '金额（含税）', key: 'amount', width: 120, align: 'right' },
 ]
 
-const columns = [
+const statusColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
   { title: '回款状态', key: 'paymentStatus', width: 100, fixed: 'left' },
-  { title: '逾期状态', key: 'overdueStatus', width: 100 },
-  { title: '合同编号', key: 'contractNo', width: 150, fixed: 'left' },
-  { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
-  { title: '合同名称', key: 'contractName', width: 160, ellipsis: true },
+  { title: '逾期状态', key: 'overdueStatus', width: 100, fixed: 'left' },
+]
+const moneyColumns = [
   { title: '节点进度', key: 'nodeProgress', width: 100 },
   { title: '计划总额', key: 'planTotal', width: 120, align: 'right' },
   { title: '已收金额', key: 'paidTotal', width: 120, align: 'right' },
   { title: '待收金额', key: 'unpaidTotal', width: 120, align: 'right' },
+  { title: '已开票', key: 'invoiceTotal', width: 120, align: 'right' },
+]
+const actionColumn = { title: '操作', key: 'actions', width: 220, fixed: 'right' }
+
+const allBaseColumns = [
+  ...statusColumns,
+  { title: '挂接方式', key: 'linkType', width: 110 },
+  { title: '单据号', key: 'contractNo', width: 180, fixed: 'left' },
+  { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
+  { title: '合同名称', key: 'contractName', width: 160, ellipsis: true },
+  ...moneyColumns,
   { title: '账期起算', key: 'paymentTermStart', width: 100 },
   { title: '账期天数', key: 'paymentTermDays', width: 90 },
-  { title: '操作', key: 'actions', width: 160, fixed: 'right' },
+  actionColumn,
 ]
+
+const contractBaseColumns = [
+  ...statusColumns,
+  { title: '合同编号', key: 'contractNo', width: 180, fixed: 'left' },
+  { title: '合同名称', key: 'contractName', width: 180, ellipsis: true },
+  { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
+  ...moneyColumns,
+  { title: '账期起算', key: 'paymentTermStart', width: 110 },
+  { title: '账期天数', key: 'paymentTermDays', width: 90 },
+  actionColumn,
+]
+
+const orderBaseColumns = [
+  ...statusColumns,
+  { title: '销售订单号', key: 'contractNo', width: 180, fixed: 'left' },
+  { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
+  ...moneyColumns,
+  { title: '账期起算', key: 'paymentTermStart', width: 110 },
+  { title: '账期天数', key: 'paymentTermDays', width: 90 },
+  actionColumn,
+]
+
+const allTable = useTableColumnSettings('sales-payment-all-v2', allBaseColumns, {
+  minScrollX: 1400,
+  defaultHiddenKeys: ['contractName', 'paymentTermStart', 'paymentTermDays'],
+})
+const contractTable = useTableColumnSettings('sales-payment-contract-v2', contractBaseColumns, {
+  minScrollX: 1600,
+})
+const orderTable = useTableColumnSettings('sales-payment-order-v2', orderBaseColumns, {
+  minScrollX: 1400,
+})
+
+const activeColumnTable = computed(() => {
+  if (listTab.value === 'contract') return contractTable
+  if (listTab.value === 'order') return orderTable
+  return allTable
+})
+
+const columnSettings = computed({
+  get: () => activeColumnTable.value.columnSettings.value,
+  set: (value) => {
+    activeColumnTable.value.columnSettings.value = value
+  },
+})
+const columnDrawerOpen = computed({
+  get: () => activeColumnTable.value.columnDrawerOpen.value,
+  set: (value) => {
+    activeColumnTable.value.columnDrawerOpen.value = value
+  },
+})
+const displayColumns = computed(() => activeColumnTable.value.displayColumns.value)
+const tableScrollX = computed(() => activeColumnTable.value.tableScrollX.value)
+const defaultColumnSettings = computed(() => activeColumnTable.value.defaultColumnSettings)
+
+const docNoFilterLabel = computed(() => {
+  if (listTab.value === 'contract') return '合同编号'
+  if (listTab.value === 'order') return '销售订单号'
+  return '合同/订单号'
+})
 
 const allSummaries = computed(() => {
   void salesPaymentState.payments
+  void salesPaymentState.plans
+  void salesPaymentState.invoices
   void salesContractState.contracts
+  void salesOrderState.orders
   void tick.value
   return listContractPaymentSummaries()
 })
@@ -429,6 +590,8 @@ const filteredList = computed(() => {
     .trim()
     .toLowerCase()
   return allSummaries.value.filter((row) => {
+    if (listTab.value === 'contract' && row.linkType !== PAYMENT_LINK_TYPE.CONTRACT) return false
+    if (listTab.value === 'order' && row.linkType !== PAYMENT_LINK_TYPE.SALES_ORDER) return false
     if (f.paymentStatus && row.paymentStatus !== f.paymentStatus) return false
     if (
       customer &&
@@ -440,6 +603,9 @@ const filteredList = computed(() => {
     if (
       contractNo &&
       !String(row.contractNo || '')
+        .toLowerCase()
+        .includes(contractNo) &&
+      !String(row.salesOrderNo || row.displayNo || '')
         .toLowerCase()
         .includes(contractNo)
     )
@@ -545,9 +711,12 @@ const nodeOpts = computed(() => {
   }
   const order = form.salesOrderNo ? findSalesOrderByOrderNo(form.salesOrderNo) : null
   const contract = order?.contractNo ? getSalesContractByNo(order.contractNo) : null
-  const fromContract = nodeSelectOptions(contract?.paymentNodes)
-  if (fromContract.length) return fromContract
-  return presetIncomeNodeOptions(contract?.contractType || order?.contractType)
+  if (contract) {
+    const fromContract = nodeSelectOptions(contract?.paymentNodes)
+    if (fromContract.length) return fromContract
+    return presetIncomeNodeOptions(contract?.contractType)
+  }
+  return nodeSelectOptions(getOrderPresetPaymentNodes())
 })
 
 function formatMoney(val) {
@@ -556,6 +725,10 @@ function formatMoney(val) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+function onListTabChange() {
+  pagination.current = 1
 }
 
 function handleSearch() {
@@ -574,34 +747,48 @@ function handleReset() {
 }
 
 function goContract(record) {
-  if (!record?.contractNo) return
+  if (!record?.contractNo && !record?.salesOrderNo) return
   detailRecord.value = record
   detailOpen.value = true
 }
 
-/** 列表侧维护起算日：打开合同回款明细，按节点操作 */
 function openMaintainStart(record) {
-  goContract(record)
+  startDateSummary.value = record
+  startDateOpen.value = true
 }
 
 function openCreate() {
-  form.linkType = PAYMENT_LINK_TYPE.CONTRACT
+  form.linkType = preferOrderLink.value ? PAYMENT_LINK_TYPE.SALES_ORDER : PAYMENT_LINK_TYPE.CONTRACT
   form.contractNo = undefined
   form.salesOrderNo = undefined
   form.salesOrderNos = []
   form.nodeName = undefined
   form.amount = null
   form.paymentMethod = undefined
-  form.invoiceAmount = null
-  form.invoiceNo = ''
   form.receivedAt = dayjs()
   form.remark = ''
   modalOpen.value = true
 }
 
+function openInvoiceCreate() {
+  invoiceSummary.value = null
+  invoiceModalOpen.value = true
+}
+
+function openInvoiceForRecord(record) {
+  invoiceSummary.value = record
+  invoiceModalOpen.value = true
+}
+
 function openCreateForContract(record, node) {
   openCreate()
-  form.contractNo = record.contractNo
+  if (record.linkType === PAYMENT_LINK_TYPE.SALES_ORDER) {
+    form.linkType = PAYMENT_LINK_TYPE.SALES_ORDER
+    form.salesOrderNo = record.salesOrderNo
+    form.contractNo = undefined
+  } else {
+    form.contractNo = record.contractNo
+  }
   if (node?.name) {
     form.nodeName = node.name
     if ((Number(node.unpaid) || 0) > 0) form.amount = node.unpaid
@@ -630,11 +817,14 @@ function onContractChange() {
 function onOrderChange() {
   form.nodeName = undefined
   form.amount = null
-  const order = findSalesOrderByOrderNo(form.salesOrderNo)
-  if (order?.contractNo) form.contractNo = order.contractNo
+  form.contractNo = undefined
 }
 
 function handleSave() {
+  if (form.linkType === PAYMENT_LINK_TYPE.CONTRACT && !form.nodeName) {
+    message.warning('请选择回款节点')
+    return Promise.reject()
+  }
   const salesOrderNos =
     form.linkType === PAYMENT_LINK_TYPE.CONTRACT
       ? form.salesOrderNos || []
@@ -643,14 +833,12 @@ function handleSave() {
         : []
   const res = addSalesPayment({
     linkType: form.linkType,
-    contractNo: form.contractNo,
+    contractNo: form.linkType === PAYMENT_LINK_TYPE.CONTRACT ? form.contractNo : '',
     salesOrderNos,
     salesOrderNo: salesOrderNos[0] || '',
     nodeName: form.nodeName || '',
     amount: form.amount,
     paymentMethod: form.paymentMethod || '',
-    invoiceAmount: form.invoiceAmount,
-    invoiceNo: form.invoiceNo || '',
     receivedAt: form.receivedAt ? form.receivedAt.format('YYYY-MM-DD') : '',
     remark: form.remark,
   })
@@ -718,6 +906,28 @@ function handleSave() {
     margin-bottom: 8px;
   }
 
+  .list-status-tabs {
+    margin-bottom: 0;
+    background: #fff;
+    border: 1px solid var(--divider, #e5e6eb);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 0 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+    :deep(.ant-tabs-nav) {
+      margin: 0;
+    }
+
+    :deep(.ant-tabs-nav::before) {
+      border-bottom-color: #f0f0f0;
+    }
+  }
+
+  .list-status-tabs + .table-card {
+    border-radius: 0 0 6px 6px;
+  }
+
   .table-card {
     background: #fff;
     border-radius: 4px;
@@ -733,6 +943,10 @@ function handleSave() {
   .link-code {
     color: #1677ff;
     cursor: pointer;
+  }
+
+  .link-type-tag {
+    margin-left: 6px;
   }
 
   .field-tip {

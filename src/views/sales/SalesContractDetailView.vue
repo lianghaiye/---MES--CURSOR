@@ -419,9 +419,10 @@
                     <span v-else>—</span>
                   </template>
                   <template v-else-if="column.key === 'actions'">
-                    <a-space v-if="canMaintainPayment && (Number(row.unpaid) || 0) > 0" :size="8">
+                    <a-space v-if="canMaintainPayment" :size="8">
                       <a @click="openMaintainNode(row, 'startDate')">维护起算日</a>
                       <a @click="openMaintainNode(row, 'register')">登记{{ paymentNoun }}</a>
+                      <a @click="openInvoiceNode(row)">登记开票</a>
                     </a-space>
                     <span v-else class="muted">—</span>
                   </template>
@@ -438,6 +439,12 @@
               :node="maintainNode"
               :mode="maintainMode"
               :cash-direction="record.cashDirection"
+              @saved="onPaymentMaintained"
+            />
+            <PaymentInvoiceRegisterModal
+              v-model:open="invoiceOpen"
+              :summary="paymentSummary"
+              :node="invoiceNode"
               @saved="onPaymentMaintained"
             />
           </template>
@@ -557,6 +564,7 @@ import {
   salesPaymentState,
 } from '@/store/salesPaymentStore'
 import PaymentNodeMaintainModal from './components/PaymentNodeMaintainModal.vue'
+import PaymentInvoiceRegisterModal from './components/PaymentInvoiceRegisterModal.vue'
 import {
   canCreateContractChange,
   diffContractSnapshots,
@@ -594,6 +602,8 @@ const tick = ref(0)
 const maintainOpen = ref(false)
 const maintainNode = ref(null)
 const maintainMode = ref('startDate')
+const invoiceOpen = ref(false)
+const invoiceNode = ref(null)
 
 const record = computed(() => {
   void tick.value
@@ -711,7 +721,7 @@ const planColumns = [
   { title: '收付款方式', key: 'paymentMethod', width: 90 },
   { title: '发票号码', key: 'invoiceNo', width: 120, ellipsis: true },
   { title: '逾期', key: 'overdue', width: 70 },
-  { title: '操作', key: 'actions', width: 160, fixed: 'right' },
+  { title: '操作', key: 'actions', width: 220, fixed: 'right' },
 ]
 
 const salesLinkedOrderColumns = [
@@ -840,6 +850,11 @@ function openMaintainNode(row, mode = 'startDate') {
   maintainNode.value = row
   maintainMode.value = mode
   maintainOpen.value = true
+}
+
+function openInvoiceNode(row) {
+  invoiceNode.value = row
+  invoiceOpen.value = true
 }
 
 function onPaymentMaintained() {

@@ -195,7 +195,7 @@ export function createPurchaseSettle(partial = {}) {
  * 演示结算单（对照结算规则讲解）：
  * 1–5) 9 月账期等既有场景
  * 6–8) 10 月账期（草稿 / 已确认部分付款 / 对账中）
- * 9–11) 11 月账期（草稿 / 对账中 / 已确认已开票）
+ * 9–11) 11 月账期（草稿 / 对账中 / 已确认；#11 含冲抵往期#7 的付款批次）
  */
 export function seedPurchaseSettles() {
   return [
@@ -529,17 +529,35 @@ export function seedPurchaseSettles() {
       paymentTermDays: 45,
       plannedPaymentDate: '2026-12-16',
       openingBalance: 2360,
-      paidAmount: 500,
-      paymentStatus: '部分付款',
-      lastPaidAt: '2026-11-05 11:20:00',
+      // 确认额 840：首笔自付 500 + 11 月单登记付款冲入 340 → 已付清
+      paidAmount: 840,
+      paymentStatus: '已付款',
+      lastPaidAt: '2026-12-08 10:30:00',
       lastPaidBy: 'admin1',
-      lastPaidRemark: '首笔按票付款',
+      lastPaidRemark: '由 11 月对账单登记付款冲入尾款',
       paymentRecords: [
+        {
+          id: 'pay-demo-cross-oct',
+          batchId: 'pay-batch-demo-cross-aging',
+          amount: 340,
+          targetType: 'period',
+          targetSettleId: 'ps-demo-month-oct-confirmed',
+          targetSettleNo: 'PS20261101002',
+          entrySettleId: 'ps-demo-month-nov-confirmed',
+          entrySettleNo: 'PS20261201003',
+          paidAt: '2026-12-08 10:30:00',
+          paidBy: 'admin1',
+          remark: '11 月账期登记付款 1000，按先旧后新冲本单尾款',
+        },
         {
           id: 'pay-demo-oct-1',
           batchId: 'pay-batch-demo-oct-1',
           amount: 500,
           targetType: 'period',
+          targetSettleId: 'ps-demo-month-oct-confirmed',
+          targetSettleNo: 'PS20261101002',
+          entrySettleId: 'ps-demo-month-oct-confirmed',
+          entrySettleNo: 'PS20261101002',
           paidAt: '2026-11-05 11:20:00',
           paidBy: 'admin1',
           remark: '首笔按票付款',
@@ -565,7 +583,7 @@ export function seedPurchaseSettles() {
       ],
       purchaseOrderNos: ['CG20260915001'],
       purchaseOrderNo: 'CG20260915001',
-      remark: '演示：账单确认后分次收票并按票付款（已收票500/已付500）',
+      remark: '演示：本单确认额 840；曾自付 500，尾款 340 由 11 月单登记付款冲入',
       creator: '规则自动',
       createdAt: '2026-11-01 02:00:18',
       confirmer: 'admin1',
@@ -713,7 +731,7 @@ export function seedPurchaseSettles() {
       ],
     }),
 
-    // 11. 11 月账期 · 已确认已开票
+    // 11. 11 月账期 · 已确认已开票；登记付款 1000 冲往期 10 月单尾款 340 + 本单 660
     createPurchaseSettle({
       id: 'ps-demo-month-nov-confirmed',
       settleNo: 'PS20261201003',
@@ -730,8 +748,27 @@ export function seedPurchaseSettles() {
       paymentTermStart: '开票日',
       paymentTermDays: 60,
       plannedPaymentDate: '2027-02-05',
-      openingBalance: 1440,
-      paidAmount: 0,
+      openingBalance: 0,
+      paidAmount: 660,
+      paymentStatus: '部分付款',
+      lastPaidAt: '2026-12-08 10:30:00',
+      lastPaidBy: 'admin1',
+      lastPaidRemark: '先旧后新：冲 10 月尾款 340 + 本单 660',
+      paymentRecords: [
+        {
+          id: 'pay-demo-cross-nov',
+          batchId: 'pay-batch-demo-cross-aging',
+          amount: 660,
+          targetType: 'period',
+          targetSettleId: 'ps-demo-month-nov-confirmed',
+          targetSettleNo: 'PS20261201003',
+          entrySettleId: 'ps-demo-month-nov-confirmed',
+          entrySettleNo: 'PS20261201003',
+          paidAt: '2026-12-08 10:30:00',
+          paidBy: 'admin1',
+          remark: '先旧后新：冲 10 月尾款 340 + 本单 660',
+        },
+      ],
       invoiceStatus: '已开票',
       invoiceNo: 'FP-202612-088',
       invoiceDate: '2026-12-06',
@@ -744,7 +781,8 @@ export function seedPurchaseSettles() {
           invoiceNo: 'FP-202612-088',
           invoiceDate: '2026-12-06',
           invoiceAmount: 1440,
-          invoiceTaxAmount: null,
+          taxRate: 13,
+          invoiceTaxAmount: 165.84,
           invoiceRemark: '',
           invoicer: 'admin1',
           invoicedAt: '2026-12-06 15:40:00',
@@ -752,7 +790,8 @@ export function seedPurchaseSettles() {
       ],
       purchaseOrderNos: ['CG20261018001'],
       purchaseOrderNo: 'CG20261018001',
-      remark: '演示：11 月账期已确认并收票',
+      remark:
+        '演示：在本单登记付款 ¥1000（先旧后新）→ 冲往期 PS20261101002 尾款 ¥340 + 本单 ¥660；付款信息可展开看关联',
       creator: '规则自动',
       createdAt: '2026-12-01 02:00:25',
       confirmer: 'admin1',

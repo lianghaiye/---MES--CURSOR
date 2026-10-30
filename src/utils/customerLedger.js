@@ -1,5 +1,5 @@
 /**
- * 客户往来台账：销售订单（应收增加）+ 回款流水（实收）+ 回款计划开票
+ * 客户往来台账：销售订单（应收增加）+ 回款流水（实收）+ 开票流水
  *
  * 列表口径（与供应商往来对称）：
  * - 期初应收 / 本期增加 / 本期实收 / 期末应收
@@ -148,6 +148,7 @@ export function listCustomerLedgerSummaries(params = {}) {
 
   ensureAllPaymentPlans()
   void salesPaymentState.plans
+  void salesPaymentState.invoices
   salesPaymentState.plans.forEach((plan) => {
     const customerName =
       String(plan.customerName || '').trim() ||
@@ -158,13 +159,21 @@ export function listCustomerLedgerSummaries(params = {}) {
     const planAmt = Number(plan.planAmount) || 0
     row.invoicedTotal = round2(row.invoicedTotal + inv)
     row.openInvoiceDebt = round2(row.openInvoiceDebt + Math.max(0, planAmt - inv))
-    if (!(inv > 0)) return
-    const invAt = String(plan.updatedAt || plan.createdAt || '').slice(0, 10)
+  })
+  ;(salesPaymentState.invoices || []).forEach((invRow) => {
+    const customerName =
+      String(invRow.customerName || '').trim() ||
+      String(getSalesContractByNo(invRow.contractNo)?.customerName || '').trim()
+    const row = ensure(customerName)
+    if (!row) return
+    const amt = Number(invRow.amount) || 0
+    if (!(amt > 0)) return
+    const invAt = String(invRow.invoiceDate || invRow.createdAt || '').slice(0, 10)
     if (inRange(invAt, periodStart, periodEnd)) {
-      row.periodInvoiced = round2(row.periodInvoiced + inv)
+      row.periodInvoiced = round2(row.periodInvoiced + amt)
     }
     if (inRange(invAt, yearStart, yearEnd)) {
-      row.yearInvoiced = round2(row.yearInvoiced + inv)
+      row.yearInvoiced = round2(row.yearInvoiced + amt)
     }
   })
 
@@ -222,25 +231,25 @@ export function listCustomerLedgerEntries(customerName, params = {}) {
   })
 
   ensureAllPaymentPlans()
-  salesPaymentState.plans.forEach((plan) => {
+  ;(salesPaymentState.invoices || []).forEach((invRow) => {
     const customerName =
-      String(plan.customerName || '').trim() ||
-      String(getSalesContractByNo(plan.contractNo)?.customerName || '').trim()
+      String(invRow.customerName || '').trim() ||
+      String(getSalesContractByNo(invRow.contractNo)?.customerName || '').trim()
     if (customerName !== name) return
-    const inv = Number(plan.invoiceAmount) || 0
-    if (!(inv > 0)) return
-    const at = String(plan.updatedAt || plan.createdAt || '').slice(0, 10)
+    const amt = Number(invRow.amount) || 0
+    if (!(amt > 0) && !String(invRow.invoiceNo || '').trim()) return
+    const at = String(invRow.invoiceDate || invRow.createdAt || '').slice(0, 10)
     if (!inRange(at, rangeStart, rangeEnd)) return
     entries.push({
-      id: `inv-${plan.id}`,
+      id: `inv-${invRow.id}`,
       bizDate: at,
       type: '开票',
-      docNo: plan.contractNo || plan.invoiceNo || '',
-      contractNo: plan.contractNo || '',
+      docNo: invRow.invoiceRecordNo || invRow.invoiceNo || invRow.contractNo || '',
+      contractNo: invRow.contractNo || '',
       debit: 0,
       credit: 0,
-      amount: inv,
-      remark: [plan.name, plan.invoiceNo ? `发票 ${plan.invoiceNo}` : '']
+      amount: amt,
+      remark: [invRow.nodeName, invRow.invoiceNo ? `发票 ${invRow.invoiceNo}` : '', invRow.remark]
         .filter(Boolean)
         .join(' · '),
     })

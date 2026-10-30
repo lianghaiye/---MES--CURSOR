@@ -10,7 +10,10 @@
   >
     <template #title>
       <div v-if="summary" class="header-main">
-        <span class="contract-no">{{ summary.contractNo }}</span>
+        <span class="contract-no">{{
+          summary.displayNo || summary.contractNo || summary.salesOrderNo
+        }}</span>
+        <a-tag v-if="summary.linkType === '销售订单'">订单</a-tag>
         <a-tag :color="contractPaymentStatusColor(summary.paymentStatus)">
           {{ summary.paymentStatus }}
         </a-tag>
@@ -29,7 +32,7 @@
 
       <div class="progress-block">
         <div class="progress-head">
-          <span>合同回款进度</span>
+          <span>{{ summary.linkType === '销售订单' ? '订单回款进度' : '合同回款进度' }}</span>
           <span class="progress-pct">{{ summary.collectionRate }}%</span>
         </div>
         <a-progress
@@ -89,13 +92,96 @@
           <template v-else-if="column.key === 'invoiceNo'">
             {{ record.invoiceNo || '—' }}
           </template>
+          <template v-else-if="column.key === 'invoiceDate'">
+            {{ record.invoiceDate || '—' }}
+          </template>
           <template v-else-if="column.key === 'actions'">
-            <a-space v-if="(Number(record.unpaid) || 0) > 0" :size="8">
+            <a-space :size="8">
               <a @click="openMaintain(record, 'startDate')">维护起算日</a>
               <a @click="openMaintain(record, 'register')">登记回款</a>
+              <a @click="openInvoice(record)">登记开票</a>
             </a-space>
-            <span v-else class="muted-action">—</span>
           </template>
+        </template>
+      </a-table>
+
+      <div class="section-title ledger-title">
+        <span class="bar" />
+        <span>回款流水</span>
+        <a-badge :count="paymentLedger.length" :number-style="badgeStyle" />
+        <span class="section-tip">每次登记回款的明细</span>
+      </div>
+      <a-table
+        :columns="ledgerColumns"
+        :data-source="paymentLedger"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        bordered
+        :scroll="{ x: 900 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'amount'"> ¥ {{ formatMoney(record.amount) }} </template>
+          <template v-else-if="column.key === 'receivedAt'">
+            {{ record.receivedAt || '—' }}
+          </template>
+          <template v-else-if="column.key === 'nodeName'">
+            {{ record.nodeName || '—' }}
+          </template>
+          <template v-else-if="column.key === 'paymentMethod'">
+            {{ record.paymentMethod || '—' }}
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            {{ record.remark || '—' }}
+          </template>
+        </template>
+        <template #emptyText>
+          <a-empty :image="false" description="暂无回款流水" />
+        </template>
+      </a-table>
+
+      <div class="section-title ledger-title">
+        <span class="bar" />
+        <span>开票流水</span>
+        <a-badge :count="invoiceLedger.length" :number-style="badgeStyle" />
+        <span class="section-tip">每次登记开票的明细</span>
+      </div>
+      <a-table
+        :columns="invoiceColumns"
+        :data-source="invoiceLedger"
+        :pagination="false"
+        row-key="id"
+        size="small"
+        bordered
+        :scroll="{ x: 1100 }"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'amount'"> ¥ {{ formatMoney(record.amount) }} </template>
+          <template v-else-if="column.key === 'nodeName'">
+            {{ record.nodeName || '—' }}
+          </template>
+          <template v-else-if="column.dataIndex === 'taxRate'">
+            {{ record.taxRate != null && record.taxRate !== '' ? `${record.taxRate}%` : '—' }}
+          </template>
+          <template v-else-if="column.dataIndex === 'taxAmount'">
+            {{
+              record.taxAmount != null && record.taxAmount !== ''
+                ? `¥ ${formatMoney(record.taxAmount)}`
+                : '—'
+            }}
+          </template>
+          <template v-else-if="column.key === 'invoiceNo'">
+            {{ record.invoiceNo || '—' }}
+          </template>
+          <template v-else-if="column.key === 'invoiceDate'">
+            {{ record.invoiceDate || '—' }}
+          </template>
+          <template v-else-if="column.key === 'remark'">
+            {{ record.remark || '—' }}
+          </template>
+        </template>
+        <template #emptyText>
+          <a-empty :image="false" description="暂无开票流水" />
         </template>
       </a-table>
     </template>
@@ -108,6 +194,12 @@
       :mode="maintainMode"
       @saved="onMaintained"
     />
+    <PaymentInvoiceRegisterModal
+      v-model:open="invoiceOpen"
+      :summary="summary"
+      :node="invoiceNode"
+      @saved="onMaintained"
+    />
   </a-drawer>
 </template>
 
@@ -115,10 +207,22 @@
 import { computed, ref } from 'vue'
 import { useDrawerWidth } from '@/composables/useDrawerWidth'
 import { DRAWER_MASK_STYLE } from '@/utils/drawerWidth'
-import { CONTRACT_PAYMENT_STATUS, contractPaymentStatusColor } from '@/constants/salesContract'
-import { buildContractPaymentSummary, salesPaymentState } from '@/store/salesPaymentStore'
+import {
+  CONTRACT_PAYMENT_STATUS,
+  PAYMENT_LINK_TYPE,
+  contractPaymentStatusColor,
+} from '@/constants/salesContract'
+import {
+  buildContractPaymentSummary,
+  buildSalesOrderPaymentSummary,
+  listInvoicesForSummary,
+  listPaymentsForSummary,
+  salesPaymentState,
+} from '@/store/salesPaymentStore'
 import { getSalesContractByNo, salesContractState } from '@/store/salesContractStore'
+import { findSalesOrderByOrderNo, salesOrderState } from '@/store/salesOrderStore'
 import PaymentNodeMaintainModal from './PaymentNodeMaintainModal.vue'
+import PaymentInvoiceRegisterModal from './PaymentInvoiceRegisterModal.vue'
 
 defineOptions({ name: 'PaymentDetailDrawer' })
 
@@ -142,14 +246,24 @@ const badgeStyle = {
 const maintainOpen = ref(false)
 const maintainNode = ref(null)
 const maintainMode = ref('startDate')
+const invoiceOpen = ref(false)
+const invoiceNode = ref(null)
 const tick = ref(0)
 
 const summary = computed(() => {
   void salesPaymentState.payments
   void salesPaymentState.plans
+  void salesPaymentState.invoices
   void salesContractState.contracts
+  void salesOrderState.orders
   void tick.value
-  const no = props.record?.contractNo
+  const rec = props.record
+  if (!rec) return null
+  if (rec.linkType === PAYMENT_LINK_TYPE.SALES_ORDER || rec.salesOrderNo) {
+    const order = findSalesOrderByOrderNo(rec.salesOrderNo)
+    if (order) return buildSalesOrderPaymentSummary(order)
+  }
+  const no = rec.contractNo
   if (!no) return null
   const c = getSalesContractByNo(no)
   return c ? buildContractPaymentSummary(c) : null
@@ -161,8 +275,8 @@ const miniCards = computed(() => {
   return [
     { key: 'plan', label: '计划总额', value: formatCompactMoney(s.planTotal) },
     { key: 'paid', label: '已收金额', value: formatCompactMoney(s.paidTotal) },
+    { key: 'invoice', label: '已开票', value: formatCompactMoney(s.invoiceTotal) },
     { key: 'unpaid', label: '待收金额', value: formatCompactMoney(s.unpaidTotal) },
-    { key: 'rate', label: '回款进度', value: `${Number(s.collectionRate || 0)}%` },
   ]
 })
 
@@ -185,8 +299,41 @@ const columns = [
   { title: '实际回款', key: 'paid', width: 110, align: 'right' },
   { title: '回款方式', key: 'paymentMethod', width: 90 },
   { title: '发票号码', key: 'invoiceNo', width: 120, ellipsis: true },
-  { title: '操作', key: 'actions', width: 160, fixed: 'right' },
+  { title: '开票日期', key: 'invoiceDate', width: 110 },
+  { title: '操作', key: 'actions', width: 240, fixed: 'right' },
 ]
+
+const ledgerColumns = [
+  { title: '回款单号', dataIndex: 'paymentNo', width: 150 },
+  { title: '回款节点', key: 'nodeName', width: 100 },
+  { title: '回款金额', key: 'amount', width: 120, align: 'right' },
+  { title: '回款方式', key: 'paymentMethod', width: 100 },
+  { title: '到账日期', key: 'receivedAt', width: 110 },
+  { title: '备注', key: 'remark', ellipsis: true },
+]
+
+const invoiceColumns = [
+  { title: '开票单号', dataIndex: 'invoiceRecordNo', width: 150 },
+  { title: '开票节点', key: 'nodeName', width: 100 },
+  { title: '开票金额', key: 'amount', width: 120, align: 'right' },
+  { title: '税率', dataIndex: 'taxRate', width: 80, align: 'right' },
+  { title: '税额', dataIndex: 'taxAmount', width: 100, align: 'right' },
+  { title: '发票号码', key: 'invoiceNo', width: 140 },
+  { title: '开票日期', key: 'invoiceDate', width: 110 },
+  { title: '备注', key: 'remark', ellipsis: true },
+]
+
+const paymentLedger = computed(() => {
+  void salesPaymentState.payments
+  void tick.value
+  return listPaymentsForSummary(summary.value)
+})
+
+const invoiceLedger = computed(() => {
+  void salesPaymentState.invoices
+  void tick.value
+  return listInvoicesForSummary(summary.value)
+})
 
 function formatMoney(val) {
   const n = Number(val)
@@ -218,6 +365,11 @@ function openMaintain(node, mode = 'startDate') {
   maintainNode.value = node
   maintainMode.value = mode
   maintainOpen.value = true
+}
+
+function openInvoice(node) {
+  invoiceNode.value = node
+  invoiceOpen.value = true
 }
 
 function onMaintained() {
@@ -316,7 +468,7 @@ function onMaintained() {
   color: #fa8c16;
 }
 
-.muted-action {
-  color: rgba(0, 0, 0, 0.25);
+.ledger-title {
+  margin-top: 24px;
 }
 </style>

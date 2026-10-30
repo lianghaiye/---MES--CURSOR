@@ -72,12 +72,34 @@
           </div>
         </div>
         <div class="period-payable">
-          <div class="period-payable__label">
-            {{ viewMode === 'current' ? '本期应付总额' : '范围内应付总额' }}
+          <div class="period-payable__item">
+            <div class="period-payable__label">
+              {{ viewMode === 'current' ? '本期期初总额' : '范围内期初总额' }}
+            </div>
+            <div class="period-payable__value">
+              <span class="period-payable__currency">¥</span>
+              <span class="period-payable__num">{{ formatMoney(periodOpeningTotal) }}</span>
+            </div>
           </div>
-          <div class="period-payable__value">
-            <span class="period-payable__currency">¥</span>
-            <span class="period-payable__num">{{ formatMoney(periodPayableTotal) }}</span>
+          <div class="period-payable__divider" aria-hidden="true" />
+          <div class="period-payable__item">
+            <div class="period-payable__label">
+              {{ viewMode === 'current' ? '本期应付总额' : '范围内应付总额' }}
+            </div>
+            <div class="period-payable__value period-payable__value--accent">
+              <span class="period-payable__currency">¥</span>
+              <span class="period-payable__num">{{ formatMoney(periodPayableTotal) }}</span>
+            </div>
+          </div>
+          <div class="period-payable__divider" aria-hidden="true" />
+          <div class="period-payable__item">
+            <div class="period-payable__label">
+              {{ viewMode === 'current' ? '本期已付总额' : '范围内已付总额' }}
+            </div>
+            <div class="period-payable__value">
+              <span class="period-payable__currency">¥</span>
+              <span class="period-payable__num">{{ formatMoney(periodPaidTotal) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -268,12 +290,8 @@
               <a class="danger" @click="onDelete(record)">删除</a>
             </a-space>
             <a-space v-else-if="showConfirmedListActions(record)">
-              <a v-if="canListInvoice(record)" @click="openDetailAction(record, 'invoice')">
-                收票登记
-              </a>
-              <a v-if="canListPayment(record)" @click="openDetailAction(record, 'payment')">
-                付款登记
-              </a>
+              <a v-if="canListInvoice(record)" @click="openListInvoice(record)">收票登记</a>
+              <a v-if="canListPayment(record)" @click="openListPayment(record)">付款登记</a>
             </a-space>
             <span v-else class="actions-empty">—</span>
           </template>
@@ -296,6 +314,7 @@
     <GeneratePurchaseSettleModal v-model:open="createOpen" @confirmed="onCreated" />
     <GeneratePeriodSettleModal v-model:open="periodOpen" @confirmed="onCreated" />
     <PurchaseSettlePrintModal v-model:open="printModalOpen" :settles="printSettles" />
+    <PurchaseSettleInvoicePaymentModals ref="invoicePaymentModalsRef" />
     <ExportExcelModal
       v-model:open="exportModalOpen"
       v-model:settings="exportFieldSettings"
@@ -330,6 +349,7 @@ import {
 import GeneratePurchaseSettleModal from './components/GeneratePurchaseSettleModal.vue'
 import GeneratePeriodSettleModal from './components/GeneratePeriodSettleModal.vue'
 import PurchaseSettlePrintModal from './components/PurchaseSettlePrintModal.vue'
+import PurchaseSettleInvoicePaymentModals from './components/PurchaseSettleInvoicePaymentModals.vue'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
 import { useListExport } from '@/composables/useListExport'
 import { purchaseSettleExportFields } from '@/utils/exportFields/purchaseSettleExport'
@@ -420,6 +440,7 @@ const statusOpts = [
 const selectedRowKeys = ref([])
 const printModalOpen = ref(false)
 const printSettles = ref([])
+const invoicePaymentModalsRef = ref(null)
 
 const { exportModalOpen, exportFieldSettings, defaultExportFieldSettings, doExport } =
   useListExport({
@@ -548,13 +569,27 @@ const filteredList = computed(() => {
   })
 })
 
-const periodPayableTotal = computed(() => {
+const periodScopedSettles = computed(() => {
   void purchaseSettleState.settles
-  return purchaseSettleState.settles.reduce((sum, row) => {
-    if (!matchPeriodScope(resolveSettleYearMonth(row))) return sum
-    return sum + (Number(row.totalAmount) || 0)
-  }, 0)
+  return purchaseSettleState.settles.filter((row) => matchPeriodScope(resolveSettleYearMonth(row)))
 })
+
+const periodOpeningTotal = computed(() =>
+  periodScopedSettles.value.reduce((sum, row) => {
+    return sum + (Number(resolveSettleFundOverview(row).openingBalance) || 0)
+  }, 0),
+)
+
+const periodPayableTotal = computed(() =>
+  periodScopedSettles.value.reduce((sum, row) => sum + (Number(row.totalAmount) || 0), 0),
+)
+
+/** 本账期对账单上已登记实付（含冲期初） */
+const periodPaidTotal = computed(() =>
+  periodScopedSettles.value.reduce((sum, row) => {
+    return sum + (Number(row.paidAmount) || 0) + (Number(row.openingPaidAmount) || 0)
+  }, 0),
+)
 
 const pagedList = computed(() => {
   const start = (pagination.current - 1) * pagination.pageSize
@@ -688,8 +723,12 @@ function openDetail(record, query = {}) {
   })
 }
 
-function openDetailAction(record, action) {
-  openDetail(record, { action })
+function openListInvoice(record) {
+  invoicePaymentModalsRef.value?.openInvoice(record)
+}
+
+function openListPayment(record) {
+  invoicePaymentModalsRef.value?.openPayment(record)
 }
 
 /** 待确认：草稿 / 对账中 */
@@ -1038,19 +1077,36 @@ resetToCurrentPeriod()
 }
 
 .period-payable {
-  text-align: right;
-  min-width: 180px;
-  padding: 10px 14px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  padding: 10px 4px;
   border-radius: 12px;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(255, 247, 237, 0.9));
   border: 1px solid rgba(194, 65, 12, 0.12);
   animation: period-payable-in 0.35s ease-out;
 }
 
+.period-payable__item {
+  flex: 1;
+  min-width: 120px;
+  padding: 0 14px;
+  text-align: right;
+}
+
+.period-payable__divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 0;
+  background: rgba(194, 65, 12, 0.12);
+}
+
 .period-payable__label {
   font-size: 12px;
   color: var(--ps-muted);
   margin-bottom: 2px;
+  white-space: nowrap;
 }
 
 .period-payable__value {
@@ -1058,20 +1114,28 @@ resetToCurrentPeriod()
   align-items: baseline;
   justify-content: flex-end;
   gap: 2px;
-  color: var(--ps-warm);
+  color: rgba(0, 0, 0, 0.75);
   line-height: 1.1;
 }
 
+.period-payable__value--accent {
+  color: var(--ps-warm);
+}
+
 .period-payable__currency {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 650;
 }
 
 .period-payable__num {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 750;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+.period-payable__value--accent .period-payable__num {
+  font-size: 26px;
 }
 
 @keyframes period-payable-in {
@@ -1115,10 +1179,17 @@ resetToCurrentPeriod()
   }
   .period-payable {
     width: 100%;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .period-payable__item {
     text-align: left;
   }
   .period-payable__value {
     justify-content: flex-start;
+  }
+  .period-payable__divider {
+    display: none;
   }
 }
 </style>

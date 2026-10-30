@@ -218,6 +218,28 @@ export const BLANK_SIZE_ASSIST_DESCRIPTION =
 export const ENABLE_BOM_LEVEL_MTS_DESCRIPTION =
   '开启后，生产计划展开 BOM 时支持子件级按库存MTS：子件主数据为按库存MTS 且库存充足时，可不下推该层生产/采购需求；关闭则生产计划仍按订单展开，仅成品级计划策略生效。默认关闭。'
 
+export const PAYMENT_LINK_MODES = {
+  CONTRACT: 'contract',
+  ORDER: 'order',
+  BOTH: 'both',
+}
+
+export const PAYMENT_LINK_MODE_OPTIONS = [
+  { value: PAYMENT_LINK_MODES.CONTRACT, label: '按合同' },
+  { value: PAYMENT_LINK_MODES.ORDER, label: '按订单' },
+  { value: PAYMENT_LINK_MODES.BOTH, label: '合同与订单均可' },
+]
+
+export const PAYMENT_LINK_MODE_DESCRIPTION =
+  '决定回款管理按谁挂账。按合同：列表以合同回款为主，未挂合同的已审订单仍可作例外登记。' +
+  '按订单：列表与登记默认走销售订单，适合不做合同的企业。' +
+  '合同与订单均可：保留全部 / 合同回款 / 订单回款三个列表。'
+
+function normalizePaymentLinkMode(mode) {
+  if (PAYMENT_LINK_MODE_OPTIONS.some((item) => item.value === mode)) return mode
+  return PAYMENT_LINK_MODES.BOTH
+}
+
 export const ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION =
   '开启：销售订单可使用折扣策略（无折扣 / 仅明细折扣 / 仅整单折扣）、行折扣与整单优惠。' +
   '关闭：新建/编辑订单不展示上述折扣能力，按成交单价计价；合同仍只写入协议单价，不把协议折扣写进行折扣。' +
@@ -396,7 +418,7 @@ export const FUNCTION_PARAM_CATEGORIES = [
   {
     key: 'sales',
     label: '销售',
-    description: '销售订单计价、折扣相关配置。',
+    description: '销售订单计价、折扣与回款挂接相关配置。',
   },
   {
     key: 'production',
@@ -604,6 +626,12 @@ export const FUNCTION_PARAM_ROWS = [
     description: ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION,
   },
   {
+    key: 'paymentLinkMode',
+    category: 'sales',
+    scenario: '回款挂接对象',
+    description: PAYMENT_LINK_MODE_DESCRIPTION,
+  },
+  {
     key: 'enableBomLevelMts',
     category: 'production',
     scenario: '生产计划启用 BOM 级 MTS',
@@ -787,6 +815,7 @@ function loadFromStorage() {
           blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
           enableBomLevelMts: parsed.enableBomLevelMts === true,
           enableSalesOrderDiscount: parsed.enableSalesOrderDiscount !== false,
+          paymentLinkMode: normalizePaymentLinkMode(parsed.paymentLinkMode),
           qcDefaultGatePolicy: normalizeQcGatePolicyParam(parsed.qcDefaultGatePolicy),
           qcGatePolicyByBizScope: normalizeQcGatePolicyMap(parsed.qcGatePolicyByBizScope),
           displayParams: normalizeDisplayParams(parsed.displayParams),
@@ -831,6 +860,7 @@ export const functionParamState = reactive({
     blankSizeAssistToolsVersion: BLANK_SIZE_ASSIST_DEFAULTS_VERSION,
     enableBomLevelMts: false,
     enableSalesOrderDiscount: true,
+    paymentLinkMode: PAYMENT_LINK_MODES.BOTH,
     qcDefaultGatePolicy: 'soft',
     qcGatePolicyByBizScope: normalizeQcGatePolicyMap(),
     displayParams: createDefaultDisplayParams(),
@@ -1117,6 +1147,24 @@ export function isSalesOrderDiscountEnabled() {
 export function setEnableSalesOrderDiscount(enabled) {
   functionParamState.params.enableSalesOrderDiscount = Boolean(enabled)
   return { ok: true }
+}
+
+export function getPaymentLinkMode() {
+  return normalizePaymentLinkMode(functionParamState.params.paymentLinkMode)
+}
+
+export function setPaymentLinkMode(mode) {
+  const normalized = normalizePaymentLinkMode(mode)
+  functionParamState.params.paymentLinkMode = normalized
+  return { ok: true }
+}
+
+export function isPaymentLinkBoth() {
+  return getPaymentLinkMode() === PAYMENT_LINK_MODES.BOTH
+}
+
+export function isPaymentLinkOrderMode() {
+  return getPaymentLinkMode() === PAYMENT_LINK_MODES.ORDER
 }
 
 export function setEnableBomLevelMts(enabled) {

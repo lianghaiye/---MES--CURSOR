@@ -47,7 +47,7 @@ export const WORKBENCH_TODO_ITEMS = [
     key: 'month-payment-due',
     label: '本月待回款',
     tone: 'orange',
-    path: '/sales/payments',
+    path: '/settlement/payments',
     query: { due: 'month' },
     title: '回款管理',
   },

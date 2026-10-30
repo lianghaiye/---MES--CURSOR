@@ -1,7 +1,7 @@
 <template>
   <ListPeriodStatsPanel
     title="回款概览"
-    tip="按生效/已完成合同的回款节点自动汇总，登记回款后实时更新"
+    tip="汇总口径受功能参数「回款挂接对象」影响：按合同、按订单，或合同与订单均可"
     :show-period="false"
     :cards="cards"
     dense
@@ -19,11 +19,13 @@ import {
   salesPaymentState,
 } from '@/store/salesPaymentStore'
 import { salesContractState } from '@/store/salesContractStore'
+import { salesOrderState } from '@/store/salesOrderStore'
 
 const stats = computed(() => {
   void salesPaymentState.payments
   void salesPaymentState.plans
   void salesContractState.contracts
+  void salesOrderState.orders
   return calcPaymentDashboardStats(listContractPaymentSummaries())
 })
 

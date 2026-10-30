@@ -501,15 +501,11 @@ const routes = [
       },
       {
         path: 'sales/payments',
-        name: 'sales-payments',
-        component: () => import('@/views/sales/SalesPaymentView.vue'),
-        meta: { title: '回款管理' },
+        redirect: '/settlement/payments',
       },
       {
         path: 'sales/customer-ledger',
-        name: 'sales-customer-ledger',
-        component: () => import('@/views/sales/CustomerLedgerView.vue'),
-        meta: { title: '客户往来' },
+        redirect: '/settlement/customer-ledger',
       },
       {
         path: 'sales/framework-contracts',
@@ -1087,6 +1083,18 @@ const routes = [
         meta: { title: '采购收货详情' },
       },
       {
+        path: 'settlement/payments',
+        name: 'settlement-payments',
+        component: () => import('@/views/sales/SalesPaymentView.vue'),
+        meta: { title: '回款管理' },
+      },
+      {
+        path: 'settlement/customer-ledger',
+        name: 'settlement-customer-ledger',
+        component: () => import('@/views/sales/CustomerLedgerView.vue'),
+        meta: { title: '客户往来' },
+      },
+      {
         path: 'settlement/purchase-settles',
         name: 'settlement-purchase-settles',
         component: () => import('@/views/procurement/PurchaseSettleView.vue'),
@@ -1109,6 +1117,12 @@ const routes = [
         name: 'settlement-supplier-ledger',
         component: () => import('@/views/settlement/SupplierLedgerView.vue'),
         meta: { title: '供应商往来' },
+      },
+      {
+        path: 'settlement/ticket-fund-flow',
+        name: 'settlement-ticket-fund-flow',
+        component: () => import('@/views/settlement/TicketFundFlowView.vue'),
+        meta: { title: '票款流水' },
       },
       {
         path: 'settlement/settle-rules',
