@@ -79,24 +79,25 @@
       </template>
 
       <template v-else-if="mode === 'invoice'">
-        <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="计划节点">
-              <span>{{ node?.name || '—' }}</span>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="计划金额">
-              <span>¥ {{ formatMoney(node?.planAmount) }}</span>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="已开票">
-              <span>¥ {{ formatMoney(node?.invoiceAmount) }}</span>
-            </a-form-item>
-          </a-col>
-        </a-row>
-        <a-row :gutter="12">
+        <div class="node-summary">
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划节点</div>
+            <div class="node-summary-value">{{ node?.name || '—' }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划金额</div>
+            <div class="node-summary-value">¥ {{ formatMoney(node?.planAmount) }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">已开票</div>
+            <div class="node-summary-value">¥ {{ formatMoney(node?.invoiceAmount) }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">待开票</div>
+            <div class="node-summary-value accent">¥ {{ formatMoney(remainInvoiceAmount) }}</div>
+          </div>
+        </div>
+        <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item label="开票金额" required>
               <a-input-number
@@ -119,9 +120,9 @@
             </a-form-item>
           </a-col>
         </a-row>
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="24">
-            <a-form-item label="备注">
+            <a-form-item label="备注" class="form-item-last">
               <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
             </a-form-item>
           </a-col>
@@ -129,25 +130,26 @@
       </template>
 
       <template v-else>
-        <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="计划节点">
-              <span>{{ node?.name || '—' }}</span>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="计划金额">
-              <span>¥ {{ formatMoney(node?.planAmount) }}</span>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item :label="isExpense ? '待付金额' : '待收金额'">
-              <span>¥ {{ formatMoney(node?.unpaid) }}</span>
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <div class="node-summary">
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划节点</div>
+            <div class="node-summary-value">{{ node?.name || '—' }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划金额</div>
+            <div class="node-summary-value">¥ {{ formatMoney(node?.planAmount) }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">已{{ paymentNoun }}</div>
+            <div class="node-summary-value">¥ {{ formatMoney(node?.paid) }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">{{ isExpense ? '待付金额' : '待收金额' }}</div>
+            <div class="node-summary-value accent">¥ {{ formatMoney(node?.unpaid) }}</div>
+          </div>
+        </div>
 
-        <a-row v-if="!isExpense && !isSalesOrderLink" :gutter="12">
+        <a-row v-if="!isExpense && !isSalesOrderLink" :gutter="16">
           <a-col :span="24">
             <a-form-item label="关联销售订单">
               <a-select
@@ -184,7 +186,7 @@
           </a-col>
         </a-row>
 
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item :label="`${paymentNoun}金额`" required>
               <a-input-number
@@ -214,9 +216,9 @@
           </a-col>
         </a-row>
 
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="24">
-            <a-form-item label="备注">
+            <a-form-item label="备注" class="form-item-last">
               <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
             </a-form-item>
           </a-col>
@@ -328,8 +330,14 @@ const modalTitle = computed(() => {
 const okText = computed(() => (props.mode === 'startDate' ? '保存' : '登记'))
 const modalWidth = computed(() => {
   if (props.mode === 'startDate') return '960px'
-  if (props.mode === 'register') return '780px'
-  return '560px'
+  if (props.mode === 'register') return '720px'
+  return '720px'
+})
+
+const remainInvoiceAmount = computed(() => {
+  const plan = Number(props.node?.planAmount) || 0
+  const invoiced = Number(props.node?.invoiceAmount) || 0
+  return Math.max(0, round2(plan - invoiced))
 })
 
 const linkedOrderOpts = computed(() => {
@@ -517,6 +525,10 @@ function handleOk() {
   :deep(.ant-form-item) {
     margin-bottom: 16px;
   }
+
+  :deep(.form-item-last) {
+    margin-bottom: 0;
+  }
 }
 
 .field-tip {
@@ -529,19 +541,19 @@ function handleOk() {
 
 .node-summary {
   display: flex;
-  gap: 8px;
-  margin: 4px 0 20px;
-  padding: 16px 8px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
+  gap: 0;
+  margin: 0 0 20px;
+  padding: 14px 4px;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f5f5f5 100%);
+  border: 1px solid #ebedf0;
   border-radius: 8px;
 }
 
 .node-summary-item {
   flex: 1;
   min-width: 0;
-  padding: 0 16px;
-  border-right: 1px solid #f0f0f0;
+  padding: 0 18px;
+  border-right: 1px solid #e8e8e8;
 
   &:last-child {
     border-right: none;
@@ -552,15 +564,19 @@ function handleOk() {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .node-summary-value {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
   line-height: 1.4;
   word-break: break-all;
+
+  &.accent {
+    color: #1677ff;
+  }
 }
 
 .selected-order-panel {

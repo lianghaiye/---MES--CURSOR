@@ -130,7 +130,7 @@
 
       <a-row :gutter="16">
         <a-col :span="24">
-          <a-form-item label="备注">
+          <a-form-item label="备注" class="form-item-last">
             <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
           </a-form-item>
         </a-col>
@@ -407,25 +407,29 @@ function handleOk() {
 <style lang="less" scoped>
 .payment-invoice-form {
   :deep(.ant-form-item) {
-    margin-bottom: 18px;
+    margin-bottom: 16px;
+  }
+
+  :deep(.form-item-last) {
+    margin-bottom: 0;
   }
 }
 
 .node-summary {
   display: flex;
-  gap: 8px;
-  margin: 4px 0 20px;
-  padding: 16px 8px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
+  gap: 0;
+  margin: 0 0 20px;
+  padding: 14px 4px;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f5f5f5 100%);
+  border: 1px solid #ebedf0;
   border-radius: 8px;
 }
 
 .node-summary-item {
   flex: 1;
   min-width: 0;
-  padding: 0 16px;
-  border-right: 1px solid #f0f0f0;
+  padding: 0 18px;
+  border-right: 1px solid #e8e8e8;
 
   &:last-child {
     border-right: none;
@@ -436,11 +440,11 @@ function handleOk() {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
   line-height: 1.4;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .node-summary-value {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: rgba(0, 0, 0, 0.88);
   line-height: 1.4;

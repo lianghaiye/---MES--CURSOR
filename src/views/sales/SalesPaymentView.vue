@@ -157,8 +157,8 @@
           <template v-else-if="column.key === 'invoiceTotal'">
             {{ formatMoney(record.invoiceTotal) }}
           </template>
-          <template v-else-if="column.key === 'paymentTermStart'">
-            {{ record.paymentTermStart || '—' }}
+          <template v-else-if="column.key === 'unpaidInvoiceTotal'">
+            {{ formatMoney(record.unpaidInvoiceTotal) }}
           </template>
           <template v-else-if="column.key === 'paymentTermDays'">
             {{
@@ -231,7 +231,7 @@
       @cancel="modalOpen = false"
     >
       <a-form layout="vertical" class="payment-register-form">
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item label="挂接对象" required>
               <a-radio-group
@@ -280,7 +280,7 @@
           </a-col>
         </a-row>
 
-        <a-row v-if="form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo" :gutter="12">
+        <a-row v-if="form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo" :gutter="16">
           <a-col :span="24">
             <a-form-item label="关联销售订单">
               <a-select
@@ -317,7 +317,7 @@
           </a-col>
         </a-row>
 
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item label="回款金额" required>
               <a-input-number
@@ -346,9 +346,9 @@
           </a-col>
         </a-row>
 
-        <a-row :gutter="12">
+        <a-row :gutter="16">
           <a-col :span="24">
-            <a-form-item label="备注">
+            <a-form-item label="备注" class="form-item-last">
               <a-input v-model:value="form.remark" allow-clear placeholder="选填" />
             </a-form-item>
           </a-col>
@@ -493,6 +493,7 @@ const moneyColumns = [
   { title: '已收金额', key: 'paidTotal', width: 120, align: 'right' },
   { title: '待收金额', key: 'unpaidTotal', width: 120, align: 'right' },
   { title: '已开票', key: 'invoiceTotal', width: 120, align: 'right' },
+  { title: '待开票', key: 'unpaidInvoiceTotal', width: 120, align: 'right' },
 ]
 const actionColumn = { title: '操作', key: 'actions', width: 220, fixed: 'right' }
 
@@ -503,7 +504,6 @@ const allBaseColumns = [
   { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
   { title: '合同名称', key: 'contractName', width: 160, ellipsis: true },
   ...moneyColumns,
-  { title: '账期起算', key: 'paymentTermStart', width: 100 },
   { title: '账期天数', key: 'paymentTermDays', width: 90 },
   actionColumn,
 ]
@@ -514,7 +514,6 @@ const contractBaseColumns = [
   { title: '合同名称', key: 'contractName', width: 180, ellipsis: true },
   { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
   ...moneyColumns,
-  { title: '账期起算', key: 'paymentTermStart', width: 110 },
   { title: '账期天数', key: 'paymentTermDays', width: 90 },
   actionColumn,
 ]
@@ -524,20 +523,19 @@ const orderBaseColumns = [
   { title: '销售订单号', key: 'contractNo', width: 180, fixed: 'left' },
   { title: '客户名称', key: 'customerName', width: 160, ellipsis: true },
   ...moneyColumns,
-  { title: '账期起算', key: 'paymentTermStart', width: 110 },
   { title: '账期天数', key: 'paymentTermDays', width: 90 },
   actionColumn,
 ]
 
-const allTable = useTableColumnSettings('sales-payment-all-v2', allBaseColumns, {
-  minScrollX: 1400,
-  defaultHiddenKeys: ['contractName', 'paymentTermStart', 'paymentTermDays'],
+const allTable = useTableColumnSettings('sales-payment-all-v3', allBaseColumns, {
+  minScrollX: 1500,
+  defaultHiddenKeys: ['contractName', 'paymentTermDays'],
 })
-const contractTable = useTableColumnSettings('sales-payment-contract-v2', contractBaseColumns, {
-  minScrollX: 1600,
+const contractTable = useTableColumnSettings('sales-payment-contract-v3', contractBaseColumns, {
+  minScrollX: 1700,
 })
-const orderTable = useTableColumnSettings('sales-payment-order-v2', orderBaseColumns, {
-  minScrollX: 1400,
+const orderTable = useTableColumnSettings('sales-payment-order-v3', orderBaseColumns, {
+  minScrollX: 1500,
 })
 
 const activeColumnTable = computed(() => {
@@ -970,7 +968,11 @@ function handleSave() {
 
 .payment-register-form {
   :deep(.ant-form-item) {
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  :deep(.form-item-last) {
+    margin-bottom: 0;
   }
 }
 

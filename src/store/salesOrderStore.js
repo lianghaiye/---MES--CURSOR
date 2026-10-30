@@ -804,6 +804,19 @@ export function approveSalesOrder(id, opinion = '') {
   order.approver = order.approver || 'admin1'
   order.approvedAt = dayjs().format('YYYY-MM-DD HH:mm')
 
+  // 未挂合同台账：按订单回款节点预设生成回款计划（运行时再取，避免循环依赖）
+  let orderPaymentPlanHint = ''
+  try {
+    // eslint-disable-next-line global-require
+    const { ensurePaymentPlansForSalesOrder } = require('@/store/salesPaymentStore')
+    const payRes = ensurePaymentPlansForSalesOrder(order, { rebuild: false })
+    if (payRes.ok && payRes.created) {
+      orderPaymentPlanHint = `已生成订单回款计划 ${payRes.data?.length || 0} 个节点`
+    }
+  } catch {
+    /* ignore */
+  }
+
   const allocatableLines = [...selfMadeLines, ...purchaseLines].filter((l) => l.productCode)
   const selfTake = {}
   for (const line of selfMadeLines) {
@@ -890,6 +903,7 @@ export function approveSalesOrder(id, opinion = '') {
     hints.push(`维修工单 ${maintenanceWorkOrderCodes.join('、')}`)
   }
   if (industrialLabelHint) hints.push(industrialLabelHint)
+  if (orderPaymentPlanHint) hints.push(orderPaymentPlanHint)
 
   const message = hints.length
     ? `订单「${order.orderNo}」审核通过，${hints.join('；')}`

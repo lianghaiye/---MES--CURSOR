@@ -147,6 +147,7 @@
               <a-menu-item key="完成">完成</a-menu-item>
               <a-menu-item key="终止">终止</a-menu-item>
               <a-menu-item key="需求计算">需求计算</a-menu-item>
+              <a-menu-item key="预设订单回款节点">预设订单回款节点</a-menu-item>
             </a-menu>
           </template>
         </a-dropdown>
@@ -345,6 +346,7 @@
     />
 
     <SalesOrderPrintModal v-model:open="printModalOpen" :sales-orders="printOrders" />
+    <SalesOrderPaymentNodePresetModal v-model:open="orderPaymentPresetOpen" />
 
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
@@ -413,6 +415,7 @@ import {
 import ChangeDeliveryModeModal from './components/ChangeDeliveryModeModal.vue'
 import SalesPriceChangeModal from './components/SalesPriceChangeModal.vue'
 import SalesOrderPrintModal from './components/SalesOrderPrintModal.vue'
+import SalesOrderPaymentNodePresetModal from './components/SalesOrderPaymentNodePresetModal.vue'
 import { buildEligibleDeliveryModeLines } from '@/utils/changeDeliveryMode'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -463,6 +466,7 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedRowKeys = ref([])
 const printModalOpen = ref(false)
+const orderPaymentPresetOpen = ref(false)
 const printOrders = ref([])
 const changeDeliveryModeOpen = ref(false)
 const changeDeliveryModeOrder = ref(null)
@@ -744,6 +748,10 @@ function openBatchPrint() {
 }
 
 function onMoreMenuClick({ key }) {
+  if (key === '预设订单回款节点') {
+    orderPaymentPresetOpen.value = true
+    return
+  }
   stubAction(key)
 }
 

@@ -118,10 +118,13 @@
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 900 }"
+        :scroll="{ x: 1200 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'amount'"> ¥ {{ formatMoney(record.amount) }} </template>
+          <template v-else-if="column.key === 'salesOrderNos'">
+            {{ formatSalesOrderNos(record) }}
+          </template>
           <template v-else-if="column.key === 'receivedAt'">
             {{ record.receivedAt || '—' }}
           </template>
@@ -130,6 +133,12 @@
           </template>
           <template v-else-if="column.key === 'paymentMethod'">
             {{ record.paymentMethod || '—' }}
+          </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || '—' }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ record.createdAt || '—' }}
           </template>
           <template v-else-if="column.key === 'remark'">
             {{ record.remark || '—' }}
@@ -153,12 +162,15 @@
         row-key="id"
         size="small"
         bordered
-        :scroll="{ x: 1100 }"
+        :scroll="{ x: 1400 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'amount'"> ¥ {{ formatMoney(record.amount) }} </template>
           <template v-else-if="column.key === 'nodeName'">
             {{ record.nodeName || '—' }}
+          </template>
+          <template v-else-if="column.key === 'salesOrderNo'">
+            {{ record.salesOrderNo || '—' }}
           </template>
           <template v-else-if="column.dataIndex === 'taxRate'">
             {{ record.taxRate != null && record.taxRate !== '' ? `${record.taxRate}%` : '—' }}
@@ -175,6 +187,12 @@
           </template>
           <template v-else-if="column.key === 'invoiceDate'">
             {{ record.invoiceDate || '—' }}
+          </template>
+          <template v-else-if="column.key === 'creator'">
+            {{ record.creator || '—' }}
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ record.createdAt || '—' }}
           </template>
           <template v-else-if="column.key === 'remark'">
             {{ record.remark || '—' }}
@@ -306,20 +324,26 @@ const columns = [
 const ledgerColumns = [
   { title: '回款单号', dataIndex: 'paymentNo', width: 150 },
   { title: '回款节点', key: 'nodeName', width: 100 },
+  { title: '销售订单号', key: 'salesOrderNos', width: 160 },
   { title: '回款金额', key: 'amount', width: 120, align: 'right' },
   { title: '回款方式', key: 'paymentMethod', width: 100 },
   { title: '到账日期', key: 'receivedAt', width: 110 },
+  { title: '登记人', key: 'creator', width: 90 },
+  { title: '登记时间', key: 'createdAt', width: 140 },
   { title: '备注', key: 'remark', ellipsis: true },
 ]
 
 const invoiceColumns = [
   { title: '开票单号', dataIndex: 'invoiceRecordNo', width: 150 },
   { title: '开票节点', key: 'nodeName', width: 100 },
+  { title: '销售订单号', key: 'salesOrderNo', width: 150 },
   { title: '开票金额', key: 'amount', width: 120, align: 'right' },
   { title: '税率', dataIndex: 'taxRate', width: 80, align: 'right' },
   { title: '税额', dataIndex: 'taxAmount', width: 100, align: 'right' },
   { title: '发票号码', key: 'invoiceNo', width: 140 },
   { title: '开票日期', key: 'invoiceDate', width: 110 },
+  { title: '登记人', key: 'creator', width: 90 },
+  { title: '登记时间', key: 'createdAt', width: 140 },
   { title: '备注', key: 'remark', ellipsis: true },
 ]
 
@@ -342,6 +366,14 @@ function formatMoney(val) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+function formatSalesOrderNos(row) {
+  const nos = Array.isArray(row?.salesOrderNos)
+    ? row.salesOrderNos.map((n) => String(n || '').trim()).filter(Boolean)
+    : []
+  if (nos.length) return nos.join('、')
+  return row?.salesOrderNo || '—'
 }
 
 function formatCompactMoney(val) {

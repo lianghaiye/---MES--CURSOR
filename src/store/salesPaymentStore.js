@@ -26,9 +26,15 @@ import {
   normalizeSalesOrderProgressStatus,
   SALES_ORDER_STATUS,
 } from '@/utils/salesOrderStatus'
+import { getUser } from '@/utils/auth'
+
+function resolvePaymentOperator() {
+  const user = getUser()
+  return user?.displayName || user?.username || user?.name || 'admin'
+}
 
 const STORAGE_KEY = 'i_doms_sales_payments'
-const DATA_VERSION = 5
+const DATA_VERSION = 6
 
 function round2(n) {
   return Math.round((Number(n) || 0) * 100) / 100
@@ -53,6 +59,7 @@ function seedPayments() {
       paymentMethod: '银行转账',
       receivedAt: '2026-10-05',
       remark: '框架合同预付款到账',
+      salesOrderNos: ['1-20260528-001'],
       createdAt: '2026-10-05 14:00',
       creator: 'admin',
     },
@@ -252,6 +259,15 @@ function loadFromStorage() {
       if (version < 4 && !invoices.length) invoices = migrateInvoicesFromPlans(plans)
       // v5：补齐开票流水演示数据
       if (version < 5) invoices = mergeSeedInvoices(invoices)
+      // v6：演示回款补关联销售订单号
+      if (version < 6) {
+        payments = payments.map((p) => {
+          if (p.id !== 'spay-1') return p
+          const nos = normalizeSalesOrderNos(p)
+          if (nos.length) return p
+          return normalizePayment({ ...p, salesOrderNos: ['1-20260528-001'] })
+        })
+      }
       return { payments, plans, invoices, version: Math.max(version, DATA_VERSION) }
     }
   } catch {
@@ -848,6 +864,54 @@ export function ensurePaymentPlansForSalesOrder(order, { rebuild = false } = {})
   return { ok: true, data: merged, created: true }
 }
 
+/** 用本单节点列表整表替换订单回款计划（保留同名节点已开票/回款方式等） */
+export function replaceSalesOrderPaymentPlans(order, { nodes = [], termDays } = {}) {
+  if (!order?.orderNo) return { ok: false, message: '销售订单无效' }
+  if (!isStandaloneReceivableOrder(order)) {
+    return { ok: false, message: '仅未挂合同台账的已审订单可编辑回款计划' }
+  }
+  const named = (Array.isArray(nodes) ? nodes : []).filter((n) => String(n?.name || '').trim())
+  if (!named.length) return { ok: false, message: '请至少保留一条回款节点' }
+  const orderTerm =
+    termDays != null && termDays !== ''
+      ? Number(termDays)
+      : order.paymentTermDays != null && order.paymentTermDays !== ''
+        ? Number(order.paymentTermDays)
+        : 30
+  const source = named.map((n) => ({
+    ...n,
+    name: String(n.name).trim(),
+    termDays: n.termDays != null && n.termDays !== '' ? Number(n.termDays) : orderTerm,
+  }))
+  const drafts = buildPlanDraftsFromSalesOrder(order, source)
+  if (!drafts.length) return { ok: false, message: '无法生成回款计划' }
+  const existing = getPlansBySalesOrderNo(order.orderNo)
+  const prevByName = {}
+  existing.forEach((p) => {
+    prevByName[p.name] = p
+  })
+  const merged = drafts.map((d) => {
+    const prev = prevByName[d.name]
+    if (!prev) return d
+    return normalizePlan({
+      ...d,
+      invoiceAmount: prev.invoiceAmount,
+      invoiceNo: prev.invoiceNo,
+      invoiceDate: prev.invoiceDate,
+      paymentMethod: prev.paymentMethod,
+      createdAt: prev.createdAt || d.createdAt,
+    })
+  })
+  for (let i = salesPaymentState.plans.length - 1; i >= 0; i -= 1) {
+    const p = salesPaymentState.plans[i]
+    if (!p.contractNo && p.salesOrderNo === order.orderNo) {
+      salesPaymentState.plans.splice(i, 1)
+    }
+  }
+  salesPaymentState.plans.push(...merged)
+  return { ok: true, data: merged }
+}
+
 /**
  * 更新计划节点：补写起算日、开票金额、回款方式等
  */
@@ -1026,6 +1090,7 @@ export function buildContractPaymentSummary(contract) {
   const paidTotal = round2(planRows.reduce((s, n) => s + (Number(n.paid) || 0), 0))
   const unpaidTotal = round2(Math.max(0, planTotal - paidTotal))
   const invoiceTotal = round2(planRows.reduce((s, n) => s + (Number(n.invoiceAmount) || 0), 0))
+  const unpaidInvoiceTotal = round2(Math.max(0, planTotal - invoiceTotal))
   const progress = resolveNodeProgress(planRows)
   const clearedNodeCount = planRows.filter((n) => (Number(n.unpaid) || 0) <= 0).length
   const collectionRate = planTotal > 0 ? round2((paidTotal / planTotal) * 100) : 0
@@ -1054,6 +1119,7 @@ export function buildContractPaymentSummary(contract) {
     paidTotal,
     unpaidTotal,
     invoiceTotal,
+    unpaidInvoiceTotal,
     collectionRate,
     paymentTermStart:
       [...new Set(planRows.map((n) => n.termStartType).filter(Boolean))].join(' / ') || '',
@@ -1083,6 +1149,7 @@ export function buildSalesOrderPaymentSummary(order) {
   const paidTotal = round2(planRows.reduce((s, n) => s + (Number(n.paid) || 0), 0))
   const unpaidTotal = round2(Math.max(0, planTotal - paidTotal))
   const invoiceTotal = round2(planRows.reduce((s, n) => s + (Number(n.invoiceAmount) || 0), 0))
+  const unpaidInvoiceTotal = round2(Math.max(0, planTotal - invoiceTotal))
   const progress = resolveNodeProgress(planRows)
   const clearedNodeCount = planRows.filter((n) => (Number(n.unpaid) || 0) <= 0).length
   const collectionRate = planTotal > 0 ? round2((paidTotal / planTotal) * 100) : 0
@@ -1112,6 +1179,7 @@ export function buildSalesOrderPaymentSummary(order) {
     paidTotal,
     unpaidTotal,
     invoiceTotal,
+    unpaidInvoiceTotal,
     collectionRate,
     paymentTermStart:
       [...new Set(planRows.map((n) => n.termStartType).filter(Boolean))].join(' / ') || '',
@@ -1255,6 +1323,7 @@ export function addSalesPayment(payload) {
     invoiceNo: payload.invoiceNo || '',
     receivedAt: payload.receivedAt || dayjs().format('YYYY-MM-DD'),
     createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    creator: payload.creator || resolvePaymentOperator(),
   })
   salesPaymentState.payments.unshift(row)
 
@@ -1383,6 +1452,7 @@ export function addSalesInvoice(payload = {}) {
     invoiceDate,
     remark: payload.remark || payload.invoiceRemark || '',
     createdAt: dayjs().format('YYYY-MM-DD HH:mm'),
+    creator: payload.creator || resolvePaymentOperator(),
   })
   if (!Array.isArray(salesPaymentState.invoices)) salesPaymentState.invoices = []
   salesPaymentState.invoices.unshift(row)
@@ -1412,13 +1482,10 @@ export function listPaymentsForSummary(summary) {
   if (!summary) return []
   const list = salesPaymentState.payments || []
   const isOrder =
-    summary.linkType === PAYMENT_LINK_TYPE.SALES_ORDER || Boolean(summary.salesOrderNo)
+    summary.linkType === PAYMENT_LINK_TYPE.SALES_ORDER ||
+    (!summary.contractNo && Boolean(summary.salesOrderNo))
   const rows = isOrder
-    ? list.filter(
-        (p) =>
-          paymentMatchesSalesOrder(p, summary.salesOrderNo) &&
-          (!p.contractNo || !getSalesContractByNo(p.contractNo)),
-      )
+    ? list.filter((p) => paymentMatchesSalesOrder(p, summary.salesOrderNo))
     : list.filter((p) => p.contractNo && p.contractNo === summary.contractNo)
   return rows
     .slice()

@@ -938,12 +938,7 @@
             />
             <DetailSectionCard v-if="!linkedContractNo" title="回款节点">
               <template v-if="canMaintainStandalonePayment" #extra>
-                <a-space :size="8">
-                  <a-button size="small" @click="orderPlanEditOpen = true">编辑回款计划</a-button>
-                  <a-button type="primary" size="small" @click="openOrderPaymentRegister()">
-                    登记回款
-                  </a-button>
-                </a-space>
+                <a-button size="small" @click="orderPlanEditOpen = true">编辑回款计划</a-button>
               </template>
               <a-table
                 :columns="orderPaymentPlanColumns"
@@ -991,9 +986,6 @@
             </DetailSectionCard>
 
             <DetailSectionCard title="回款流水">
-              <template v-if="canMaintainStandalonePayment" #extra>
-                <a-button size="small" @click="openOrderPaymentRegister()">登记回款</a-button>
-              </template>
               <a-table
                 :columns="orderPaymentLedgerColumns"
                 :data-source="orderPaymentLedger"
@@ -1001,7 +993,7 @@
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: 900 }"
+                :scroll="{ x: 1100 }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'amount'">
@@ -1015,6 +1007,12 @@
                   </template>
                   <template v-else-if="column.key === 'receivedAt'">
                     {{ row.receivedAt || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'creator'">
+                    {{ row.creator || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ row.createdAt || '—' }}
                   </template>
                   <template v-else-if="column.key === 'remark'">
                     {{ row.remark || '—' }}
@@ -1048,7 +1046,7 @@
                 size="small"
                 bordered
                 :pagination="false"
-                :scroll="{ x: 1000 }"
+                :scroll="{ x: 1200 }"
               >
                 <template #bodyCell="{ column, record: row }">
                   <template v-if="column.key === 'amount'">
@@ -1072,6 +1070,12 @@
                   </template>
                   <template v-else-if="column.key === 'invoiceDate'">
                     {{ row.invoiceDate || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'creator'">
+                    {{ row.creator || '—' }}
+                  </template>
+                  <template v-else-if="column.key === 'createdAt'">
+                    {{ row.createdAt || '—' }}
                   </template>
                   <template v-else-if="column.key === 'remark'">
                     {{ row.remark || '—' }}
@@ -1498,6 +1502,8 @@ const orderPaymentLedgerColumns = [
   { title: '回款金额', key: 'amount', width: 120, align: 'right' },
   { title: '回款方式', key: 'paymentMethod', width: 100 },
   { title: '到账日期', key: 'receivedAt', width: 110 },
+  { title: '登记人', key: 'creator', width: 90 },
+  { title: '登记时间', key: 'createdAt', width: 140 },
   { title: '备注', key: 'remark', ellipsis: true },
 ]
 
@@ -1509,23 +1515,15 @@ const orderInvoiceLedgerColumns = [
   { title: '税额', key: 'taxAmount', width: 100, align: 'right' },
   { title: '发票号码', key: 'invoiceNo', width: 140 },
   { title: '开票日期', key: 'invoiceDate', width: 110 },
+  { title: '登记人', key: 'creator', width: 90 },
+  { title: '登记时间', key: 'createdAt', width: 140 },
   { title: '备注', key: 'remark', ellipsis: true },
 ]
 
 function openOrderMaintainNode(row, mode = 'register') {
-  orderPaymentMaintainNode.value = row
+  orderPaymentMaintainNode.value = row || null
   orderPaymentMaintainMode.value = mode
   orderPaymentMaintainOpen.value = true
-}
-
-function openOrderPaymentRegister() {
-  const unpaid = orderPaymentPlan.value.find((n) => (Number(n.unpaid) || 0) > 0)
-  const node = unpaid || orderPaymentPlan.value[0]
-  if (!node) {
-    message.warning('暂无回款节点，请先确认订单已审核且未挂合同')
-    return
-  }
-  openOrderMaintainNode(node, 'register')
 }
 
 function openOrderInvoiceRegister(row) {
