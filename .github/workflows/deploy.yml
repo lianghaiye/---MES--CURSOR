@@ -33,6 +33,8 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          # Pages runner 默认堆偏小，生产构建易 OOM；与本地 8G 对齐
+          NODE_OPTIONS: --max-old-space-size=6144
           VUE_APP_BUILD_SHA: ${{ github.sha }}
           VUE_APP_BUILD_TIME: ${{ github.run_number }}
           # 演示站问答：仓库 Secrets 配公网代理地址（勿把 PAT 写进前端）
