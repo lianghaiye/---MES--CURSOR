@@ -20,6 +20,7 @@
         >
           审批
         </a-button>
+        <a-button v-if="showEditTab" size="small" @click="handleSaveEdit">保存</a-button>
         <a-button v-if="canConfirm" type="primary" size="small" @click="emit('confirm')">
           确认出库
         </a-button>
@@ -43,6 +44,7 @@
       <a-tab-pane v-if="showEditTab" key="edit" tab="编辑出库">
         <div class="edit-tab-body">
           <OutboundOrderFormModal
+            ref="editFormRef"
             :key="`edit-tab-${record.id}`"
             page-mode
             embedded
@@ -760,6 +762,7 @@ const router = useRouter()
 const { openTab } = useTabs()
 
 const internalTab = ref('basic')
+const editFormRef = ref(null) // 编辑出库表单（主从保存）
 
 const record = computed(() => {
   void outboundState.orders
@@ -778,6 +781,18 @@ const activeTab = computed({
     emit('update:detailTab', val)
   },
 })
+
+function handleSaveEdit() {
+  if (activeTab.value !== 'edit') {
+    activeTab.value = 'edit'
+  }
+  const form = editFormRef.value
+  if (!form?.save) {
+    message.warning('编辑表单未就绪，请稍后再试')
+    return
+  }
+  form.save()
+}
 
 watch(
   () => [record.value?.id, showEditTab.value],

@@ -1591,6 +1591,11 @@ function handleSaveAndConfirm() {
     },
   })
 }
+
+defineExpose({
+  save: handleSave,
+  saving,
+})
 </script>
 
 <style lang="less">

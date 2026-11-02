@@ -10,7 +10,26 @@
           </a-space>
         </div>
       </div>
-      <a-space :size="4" class="header-actions">
+      <a-space :size="8" class="header-actions">
+        <template v-if="canApproveInbound(record)">
+          <a-button type="primary" size="small" @click="emit('approve-pass')">通过</a-button>
+          <a-button size="small" danger @click="emit('approve-reject')">拒绝</a-button>
+        </template>
+        <a-button v-if="showEditTab" size="small" @click="handleSaveEdit">保存</a-button>
+        <a-button
+          v-if="canConfirmInbound(record)"
+          type="primary"
+          size="small"
+          @click="emit('confirm')"
+        >
+          确认入库
+        </a-button>
+        <a-button v-if="canRefuseInbound(record)" size="small" danger @click="emit('refuse')">
+          拒绝入库
+        </a-button>
+        <a-button v-if="canDeleteInbound(record)" size="small" danger @click="emit('delete')">
+          删除
+        </a-button>
         <a-button type="link" size="small" class="header-action-btn" @click="emit('print')">
           <PrinterOutlined />
           打印
@@ -18,26 +37,11 @@
       </a-space>
     </div>
 
-    <div v-if="hasActions" class="detail-action-bar">
-      <a-space :size="8">
-        <a-button v-if="canConfirmInbound(record)" type="primary" @click="emit('confirm')">
-          确认入库
-        </a-button>
-        <a-button v-if="canRefuseInbound(record)" danger @click="emit('refuse')">
-          拒绝入库
-        </a-button>
-        <template v-if="canApproveInbound(record)">
-          <a-button type="primary" @click="emit('approve-pass')">通过</a-button>
-          <a-button danger @click="emit('approve-reject')">拒绝</a-button>
-        </template>
-        <a-button v-if="canDeleteInbound(record)" danger @click="emit('delete')"> 删除 </a-button>
-      </a-space>
-    </div>
-
     <a-tabs v-model:activeKey="activeTab" class="detail-tabs detail-tabs-pill">
       <a-tab-pane v-if="showEditTab" key="edit" tab="编辑入库">
         <div class="edit-tab-body">
           <InboundOrderFormModal
+            ref="editFormRef"
             :key="`edit-tab-${record.id}`"
             page-mode
             embedded
@@ -615,6 +619,7 @@
 <script setup>
 import DetailSectionCard from '@/components/DetailSectionCard.vue'
 import { computed, ref, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { PrinterOutlined } from '@ant-design/icons-vue'
 import { formatQty, formatQtyWithUnit } from '@/utils/numberFormat'
@@ -690,6 +695,7 @@ const emit = defineEmits([
 const router = useRouter()
 const { openTab } = useTabs()
 const internalTab = ref('basic')
+const editFormRef = ref(null)
 
 const record = computed(() => {
   void inboundOrderState.orders
@@ -708,6 +714,18 @@ const activeTab = computed({
     emit('update:detailTab', val)
   },
 })
+
+function handleSaveEdit() {
+  if (activeTab.value !== 'edit') {
+    activeTab.value = 'edit'
+  }
+  const form = editFormRef.value
+  if (!form?.save) {
+    message.warning('编辑表单未就绪，请稍后再试')
+    return
+  }
+  form.save()
+}
 
 watch(
   () => [record.value?.id, showEditTab.value],
@@ -1107,12 +1125,6 @@ const logColumns = [
   { title: '说明', dataIndex: 'remark', ellipsis: true },
 ]
 
-const hasActions = computed(() => {
-  const r = record.value
-  if (!r) return false
-  return canConfirmInbound(r) || canRefuseInbound(r) || canDeleteInbound(r) || canApproveInbound(r)
-})
-
 function statusColor(status) {
   return inboundStatusColor(status)
 }
@@ -1190,39 +1202,6 @@ export default { name: 'InboundOrderDetailPanel' }
   .header-tags {
     display: inline-flex;
     align-items: center;
-  }
-}
-
-.detail-action-bar {
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  box-sizing: border-box;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-
-  :deep(.ant-space) {
-    display: inline-flex;
-    align-items: center;
-  }
-
-  :deep(.ant-space-item) {
-    margin-bottom: 0 !important;
-  }
-
-  :deep(.ant-btn) {
-    height: 32px;
-    padding: 0 15px;
-    font-size: 14px;
-    border-radius: 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
   }
 }
 
