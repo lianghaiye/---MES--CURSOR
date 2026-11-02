@@ -287,7 +287,8 @@ function getNextProcessName(processes, currentName) {
 }
 
 /**
- * 根据 PC 工单生成小程序任务（标准模式串行锁定；极简报工并行下发）
+ * 根据 PC 工单生成小程序任务
+ * （功能参数「工序任务时序下发」开启时串行锁定；关闭或极简报工则并行下发）
  */
 export function generateMobileTasksFromWorkOrder(workOrder, orderCategory) {
   const processes = getProcessesForOrder(workOrder, orderCategory)

@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import { isSequentialProcessTaskEnabled } from '@/store/functionParamStore'
 
 const STORAGE_KEY = 'i_doms_business_rules'
 
@@ -16,7 +17,7 @@ export const MINIMAL_REPORT_TYPE_OPTIONS = [
 
 export const PRODUCTION_MODE_DESCRIPTIONS = {
   standard:
-    '完整生产流程：工单下发 → 任务领取 → 时序报工 → 审核 → 工时核算 → 工资推送。适用于需严格管控进度与审核的常规生产。',
+    '完整生产流程：工单下发 → 任务领取 → 报工 → 审核 → 工时核算 → 工资推送。工序是否按时序放开由功能参数「工序任务时序下发」控制。',
   minimal:
     '简化报工确认环节，保留现场报工数据采集。选择下方报工方式后，小程序与 Web 工序报工仅启用对应入口。',
   minimal_salary: '工单下发后自动视为已报工，跳过现场报工与确认环节。',
@@ -95,9 +96,14 @@ export function isMinimalReportMode() {
   return getProductionMode() === 'minimal'
 }
 
-/** 极简报工：工序任务并行下发，不做串行锁定 */
+/**
+ * 工序任务是否并行下发（不做串行锁定）
+ * - 极简报工：始终并行
+ * - 其他：由功能参数「工序任务时序下发」控制；关闭=并行，开启=时序
+ */
 export function isParallelTaskDispatch() {
-  return isMinimalReportMode()
+  if (isMinimalReportMode()) return true
+  return !isSequentialProcessTaskEnabled()
 }
 
 export function isQuickReportEnabled() {

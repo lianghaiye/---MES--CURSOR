@@ -127,6 +127,14 @@
     />
 
     <a-switch
+      v-else-if="record.key === 'enableSequentialProcessTask'"
+      :checked="enableSequentialProcessTask"
+      checked-children="开"
+      un-checked-children="关"
+      @change="onEnableSequentialProcessTaskChange"
+    />
+
+    <a-switch
       v-else-if="record.key === 'enableSalesOrderDiscount'"
       :checked="enableSalesOrderDiscount"
       checked-children="开"
@@ -253,6 +261,8 @@ import {
   setBlankSizeAssistTools,
   isBomLevelMtsEnabled,
   setEnableBomLevelMts,
+  isSequentialProcessTaskEnabled,
+  setEnableSequentialProcessTask,
   isSalesOrderDiscountEnabled,
   setEnableSalesOrderDiscount,
   getPaymentLinkMode,
@@ -278,6 +288,7 @@ const salesOutboundIssueRule = computed(() => getSalesOutboundIssueRule())
 const shipAttachmentDecideStage = computed(() => getShipAttachmentDecideStage())
 const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
+const enableSequentialProcessTask = computed(() => isSequentialProcessTaskEnabled())
 const enableSalesOrderDiscount = computed(() => isSalesOrderDiscountEnabled())
 const paymentLinkMode = computed(() => getPaymentLinkMode())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
@@ -352,6 +363,12 @@ function onEnableBomLevelMtsChange(checked) {
   toastSave(
     setEnableBomLevelMts(checked),
     checked ? '已开启生产计划 BOM 级 MTS' : '已关闭生产计划 BOM 级 MTS',
+  )
+}
+function onEnableSequentialProcessTaskChange(checked) {
+  toastSave(
+    setEnableSequentialProcessTask(checked),
+    checked ? '已开启工序任务时序下发' : '已关闭工序任务时序下发（各工序并行可见）',
   )
 }
 function onEnableSalesOrderDiscountChange(checked) {
