@@ -16,6 +16,7 @@
             <a-radio-group
               v-model:value="form.linkType"
               :options="paymentLinkTypeOptions"
+              :disabled="targetLocked"
               @change="onLinkTypeChange"
             />
           </a-form-item>
@@ -28,6 +29,7 @@
               :options="contractOpts"
               placeholder="选择合同"
               style="width: 100%"
+              :disabled="targetLocked"
               @change="onContractChange"
             />
           </a-form-item>
@@ -38,6 +40,7 @@
               :options="orderOpts"
               placeholder="选择销售订单"
               style="width: 100%"
+              :disabled="targetLocked"
               @change="onOrderChange"
             />
           </a-form-item>
@@ -163,6 +166,8 @@ const props = defineProps({
   summary: { type: Object, default: null },
   node: { type: Object, default: null },
   preferOrderTab: { type: Boolean, default: false },
+  /** 从列表操作列进入时锁定挂接对象与合同/订单 */
+  lockTarget: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:open', 'saved'])
@@ -185,6 +190,7 @@ const form = reactive({
 const taxEdited = ref(false)
 
 const showTarget = computed(() => !props.node)
+const targetLocked = computed(() => Boolean(props.lockTarget && props.summary))
 
 const isOrderLink = computed(() => form.linkType === PAYMENT_LINK_TYPE.SALES_ORDER)
 

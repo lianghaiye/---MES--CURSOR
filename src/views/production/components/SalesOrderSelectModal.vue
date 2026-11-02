@@ -57,7 +57,7 @@
           :pagination="{ pageSize: 8, size: 'small', showTotal: (t) => `共 ${t} 条` }"
           :row-selection="rowSelection"
           :scroll="{ x: 720, y: 360 }"
-          :custom-row="customRow"
+          :custom-row="multiple ? undefined : customRow"
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'productNames'">
@@ -72,9 +72,9 @@
 
       <div class="selected-panel">
         <div class="selected-head">
-          <span class="selected-title">已选 {{ selectedRow ? 1 : 0 }} 项</span>
+          <span class="selected-title">已选 {{ selectedCount }} 项</span>
           <a-button
-            v-if="selectedRow"
+            v-if="selectedCount"
             type="link"
             size="small"
             class="clear-btn"
@@ -83,7 +83,21 @@
             清空
           </a-button>
         </div>
-        <div v-if="selectedRow" class="selected-list">
+        <div v-if="multiple && selectedRows.length" class="selected-list">
+          <div v-for="row in selectedRows" :key="row.id || row.orderNo" class="selected-item">
+            <div class="selected-item-main">
+              <span class="selected-code">{{ row.orderNo }}</span>
+              <span class="selected-name" :title="row.customerName">
+                {{ row.customerName || '—' }}
+              </span>
+              <span class="selected-meta">{{ formatSalesOrderProductNames(row) }}</span>
+            </div>
+            <a-button type="text" size="small" class="remove-btn" @click="removeSelected(row)">
+              <CloseOutlined />
+            </a-button>
+          </div>
+        </div>
+        <div v-else-if="!multiple && selectedRow" class="selected-list">
           <div class="selected-item">
             <div class="selected-item-main">
               <span class="selected-code">{{ selectedRow.orderNo }}</span>
@@ -103,7 +117,7 @@
 
     <template #footer>
       <a-button @click="handleCancel">取消</a-button>
-      <a-button type="primary" :disabled="!selectedRow" @click="handleConfirm">确定</a-button>
+      <a-button type="primary" :disabled="!selectedCount" @click="handleConfirm">确定</a-button>
     </template>
   </a-modal>
 </template>
@@ -122,6 +136,10 @@ import {
 const props = defineProps({
   open: { type: Boolean, default: false },
   excludeStatuses: { type: Array, default: undefined },
+  multiple: { type: Boolean, default: false },
+  preferredCustomerName: { type: String, default: '' },
+  preferredOrderNos: { type: Array, default: () => [] },
+  selectedOrderNos: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:open', 'confirm'])
@@ -138,6 +156,7 @@ const applied = reactive({
 })
 const selectedRowKeys = ref([])
 const selectedRow = ref(null)
+const selectedRows = ref([])
 
 const columns = [
   { title: '销售订单号', dataIndex: 'orderNo', width: 140, ellipsis: true },
@@ -147,25 +166,62 @@ const columns = [
   { title: '创建时间', key: 'createdAt', width: 150 },
 ]
 
-const filteredList = computed(() =>
-  filterSalesOrdersForPicker(salesOrderState.orders, {
+const preferredNoSet = computed(() => {
+  const set = new Set(
+    (props.preferredOrderNos || []).map((n) => String(n || '').trim()).filter(Boolean),
+  )
+  return set
+})
+
+const filteredList = computed(() => {
+  const preferredCustomer = String(props.preferredCustomerName || '').trim()
+  let list = filterSalesOrdersForPicker(salesOrderState.orders, {
     ...applied,
     excludeStatuses: props.excludeStatuses,
   })
-    .slice()
-    .sort((a, b) => {
-      const ta = resolveSalesOrderCreatedAt(a)
-      const tb = resolveSalesOrderCreatedAt(b)
-      return tb.localeCompare(ta)
-    }),
+  const byTimeDesc = (a, b) =>
+    resolveSalesOrderCreatedAt(b).localeCompare(resolveSalesOrderCreatedAt(a))
+  if (preferredNoSet.value.size) {
+    const preferred = list.filter((o) => preferredNoSet.value.has(o.orderNo)).sort(byTimeDesc)
+    const rest = list.filter((o) => !preferredNoSet.value.has(o.orderNo))
+    if (preferredCustomer && !applied.customerName) {
+      const sameCustomer = rest
+        .filter((o) => String(o.customerName || '').includes(preferredCustomer))
+        .sort(byTimeDesc)
+      const other = rest
+        .filter((o) => !String(o.customerName || '').includes(preferredCustomer))
+        .sort(byTimeDesc)
+      return [...preferred, ...sameCustomer, ...other]
+    }
+    return [...preferred, ...rest.sort(byTimeDesc)]
+  }
+  if (preferredCustomer && !applied.customerName) {
+    return list.slice().sort((a, b) => {
+      const aHit = String(a.customerName || '').includes(preferredCustomer) ? 0 : 1
+      const bHit = String(b.customerName || '').includes(preferredCustomer) ? 0 : 1
+      if (aHit !== bHit) return aHit - bHit
+      return byTimeDesc(a, b)
+    })
+  }
+  return list.slice().sort(byTimeDesc)
+})
+
+const selectedCount = computed(() =>
+  props.multiple ? selectedRows.value.length : selectedRow.value ? 1 : 0,
 )
 
 const rowSelection = computed(() => ({
-  type: 'radio',
+  type: props.multiple ? 'checkbox' : 'radio',
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys, rows) => {
     selectedRowKeys.value = keys
-    selectedRow.value = rows[0] || null
+    if (props.multiple) {
+      selectedRows.value = rows || []
+      selectedRow.value = null
+    } else {
+      selectedRow.value = rows[0] || null
+      selectedRows.value = []
+    }
   },
 }))
 
@@ -181,6 +237,13 @@ function customRow(record) {
 function clearSelection() {
   selectedRowKeys.value = []
   selectedRow.value = null
+  selectedRows.value = []
+}
+
+function removeSelected(row) {
+  const key = row?.id
+  selectedRows.value = selectedRows.value.filter((r) => r.id !== key)
+  selectedRowKeys.value = selectedRows.value.map((r) => r.id)
 }
 
 watch(
@@ -188,13 +251,24 @@ watch(
   (visible) => {
     if (!visible) return
     filters.orderNo = ''
-    filters.customerName = ''
+    filters.customerName = props.preferredCustomerName || ''
     filters.salesperson = ''
     applied.orderNo = ''
     applied.customerName = ''
     applied.salesperson = ''
-    selectedRowKeys.value = []
-    selectedRow.value = null
+    const nos = new Set(
+      (props.selectedOrderNos || []).map((n) => String(n || '').trim()).filter(Boolean),
+    )
+    if (props.multiple && nos.size) {
+      const rows = (salesOrderState.orders || []).filter((o) => nos.has(o.orderNo))
+      selectedRows.value = rows
+      selectedRowKeys.value = rows.map((r) => r.id)
+      selectedRow.value = null
+    } else {
+      selectedRowKeys.value = []
+      selectedRow.value = null
+      selectedRows.value = []
+    }
   },
 )
 
@@ -218,6 +292,15 @@ function handleCancel() {
 }
 
 function handleConfirm() {
+  if (props.multiple) {
+    if (!selectedRows.value.length) {
+      message.warning('请选择销售订单')
+      return
+    }
+    emit('confirm', selectedRows.value.slice())
+    emit('update:open', false)
+    return
+  }
   if (!selectedRow.value) {
     message.warning('请选择销售订单')
     return

@@ -63,7 +63,13 @@ export function filterSalesOrderOptions(options, keyword) {
   )
 }
 
-export function buildSalesOrderDisplayOptions({ options, keyword, selectedValue, quickLimit }) {
+export function buildSalesOrderDisplayOptions({
+  options,
+  keyword,
+  selectedValue,
+  selectedValues,
+  quickLimit,
+}) {
   const filtered = filterSalesOrderOptions(options, keyword)
   const limit = keyword.trim() ? SALES_ORDER_DROPDOWN_SEARCH_LIMIT : quickLimit
   const sliced = filtered.slice(0, limit)
@@ -71,13 +77,20 @@ export function buildSalesOrderDisplayOptions({ options, keyword, selectedValue,
     label: opt.label,
     value: opt.value,
   }))
-  if (selectedValue && !display.some((opt) => opt.value === selectedValue)) {
-    const hit = options.find((opt) => opt.value === selectedValue)
-    display.unshift({
-      label: hit?.label || selectedValue,
-      value: selectedValue,
+  const ensure = []
+  if (Array.isArray(selectedValues)) ensure.push(...selectedValues)
+  else if (selectedValue) ensure.push(selectedValue)
+  ensure
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .forEach((val) => {
+      if (display.some((opt) => opt.value === val)) return
+      const hit = options.find((opt) => opt.value === val)
+      display.unshift({
+        label: hit?.label || val,
+        value: val,
+      })
     })
-  }
   return display
 }
 

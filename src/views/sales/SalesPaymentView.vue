@@ -204,6 +204,7 @@
       v-model:open="invoiceModalOpen"
       :summary="invoiceSummary"
       :prefer-order-tab="preferOrderLink"
+      :lock-target="Boolean(invoiceSummary)"
       @saved="tick += 1"
     />
 
@@ -224,7 +225,8 @@
     <a-modal
       v-model:open="modalOpen"
       title="登记回款"
-      width="780px"
+      ok-text="登记"
+      width="1100px"
       destroy-on-close
       :mask-closable="false"
       @ok="handleSave"
@@ -237,6 +239,7 @@
               <a-radio-group
                 v-model:value="form.linkType"
                 :options="paymentLinkTypeOptions"
+                :disabled="paymentTargetLocked"
                 @change="onLinkTypeChange"
               />
             </a-form-item>
@@ -249,6 +252,7 @@
                 :options="contractOpts"
                 placeholder="选择合同"
                 style="width: 100%"
+                :disabled="paymentTargetLocked"
                 @change="onContractChange"
               />
             </a-form-item>
@@ -259,6 +263,7 @@
                 :options="orderOpts"
                 placeholder="选择销售订单"
                 style="width: 100%"
+                :disabled="paymentTargetLocked"
                 @change="onOrderChange"
               />
             </a-form-item>
@@ -275,47 +280,34 @@
                     : '请选择节点'
                 "
                 style="width: 100%"
+                @change="onRegisterNodeChange"
               />
             </a-form-item>
           </a-col>
         </a-row>
 
-        <a-row v-if="form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo" :gutter="16">
-          <a-col :span="24">
-            <a-form-item label="关联销售订单">
-              <a-select
-                v-model:value="form.salesOrderNos"
-                mode="multiple"
-                show-search
-                allow-clear
-                :options="linkedOrderOpts"
-                placeholder="可选，支持多选"
-                style="width: 100%"
-                option-filter-prop="label"
-              />
-              <div v-if="!linkedOrderOpts.length" class="field-tip">该合同暂无关联销售订单</div>
-              <div v-if="selectedLinkedOrders.length" class="selected-order-panel">
-                <a-table
-                  size="small"
-                  bordered
-                  :pagination="false"
-                  :columns="selectedOrderColumns"
-                  :data-source="selectedLinkedOrders"
-                  row-key="orderNo"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'amount'">
-                      ¥ {{ formatMoney(record.amount) }}
-                    </template>
-                  </template>
-                </a-table>
-                <div class="selected-order-total">
-                  合计金额（含税）：¥ {{ formatMoney(selectedLinkedOrderTotal) }}
-                </div>
-              </div>
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <div v-if="registerSummaryCards" class="node-summary">
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划节点</div>
+            <div class="node-summary-value">{{ registerSummaryCards.nodeLabel }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">计划金额</div>
+            <div class="node-summary-value">
+              ¥ {{ formatMoney(registerSummaryCards.planAmount) }}
+            </div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">已回</div>
+            <div class="node-summary-value">¥ {{ formatMoney(registerSummaryCards.paid) }}</div>
+          </div>
+          <div class="node-summary-item">
+            <div class="node-summary-label">待收</div>
+            <div class="node-summary-value accent">
+              ¥ {{ formatMoney(registerSummaryCards.unpaid) }}
+            </div>
+          </div>
+        </div>
 
         <a-row :gutter="16">
           <a-col :span="8">
@@ -346,6 +338,29 @@
           </a-col>
         </a-row>
 
+        <div
+          v-if="form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo"
+          class="order-alloc-wrap"
+        >
+          <PaymentLinkedOrderAllocPanel
+            v-model="form.orderAllocs"
+            :contract-no="form.contractNo"
+            :payment-amount="form.amount"
+            :preferred-customer-name="registerContractCustomer"
+          />
+        </div>
+
+        <div
+          v-if="form.linkType === PAYMENT_LINK_TYPE.SALES_ORDER && form.salesOrderNo"
+          class="order-alloc-wrap"
+        >
+          <PaymentOrderDeliveryPanel
+            v-model="form.deliveryAllocs"
+            :sales-order-no="form.salesOrderNo"
+            :customer-name="registerPlanSummary?.customerName || ''"
+          />
+        </div>
+
         <a-row :gutter="16">
           <a-col :span="24">
             <a-form-item label="备注" class="form-item-last">
@@ -366,14 +381,12 @@ import { message } from 'ant-design-vue'
 import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import {
   addSalesPayment,
+  buildContractPaymentSummary,
+  buildSalesOrderPaymentSummary,
   listContractPaymentSummaries,
   salesPaymentState,
 } from '@/store/salesPaymentStore'
-import {
-  salesContractState,
-  getSalesContractByNo,
-  getOrdersLinkedToContract,
-} from '@/store/salesContractStore'
+import { salesContractState, getSalesContractByNo } from '@/store/salesContractStore'
 import { salesOrderState, findSalesOrderByOrderNo } from '@/store/salesOrderStore'
 import {
   CONTRACT_CASH_DIRECTION,
@@ -393,6 +406,10 @@ import PaymentDetailDrawer from './components/PaymentDetailDrawer.vue'
 import PaymentInvoiceRegisterModal from './components/PaymentInvoiceRegisterModal.vue'
 import PaymentNodeMaintainModal from './components/PaymentNodeMaintainModal.vue'
 import SalesOrderPaymentNodePresetModal from './components/SalesOrderPaymentNodePresetModal.vue'
+import PaymentLinkedOrderAllocPanel from './components/PaymentLinkedOrderAllocPanel.vue'
+import PaymentOrderDeliveryPanel from './components/PaymentOrderDeliveryPanel.vue'
+import { positiveAllocations, sumAllocAmounts } from '@/utils/paymentOrderAlloc'
+import { toPaymentDeliveryAllocs } from '@/utils/paymentDeliveryAlloc'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -456,6 +473,10 @@ watch(
   { immediate: true },
 )
 const modalOpen = ref(false)
+/** 从列表操作列进入时锁定挂接对象与合同/订单 */
+const paymentTargetLocked = ref(false)
+/** 列表行带入的节点计划（用于合计展示，避免订单侧计划未生成时摘要空白） */
+const lockedPlanRows = ref([])
 const detailOpen = ref(false)
 const detailRecord = ref(null)
 const invoiceModalOpen = ref(false)
@@ -469,18 +490,14 @@ const form = reactive({
   contractNo: undefined,
   salesOrderNo: undefined,
   salesOrderNos: [],
+  orderAllocs: [],
+  deliveryAllocs: [],
   nodeName: undefined,
   amount: null,
   paymentMethod: undefined,
   receivedAt: dayjs(),
   remark: '',
 })
-
-const selectedOrderColumns = [
-  { title: '销售单号', dataIndex: 'orderNo', width: 140 },
-  { title: '客户', dataIndex: 'customerName', ellipsis: true },
-  { title: '金额（含税）', key: 'amount', width: 120, align: 'right' },
-]
 
 const statusColumns = [
   { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
@@ -649,38 +666,55 @@ const orderOpts = computed(() =>
   })),
 )
 
-/** 挂接合同时：仅可选该合同关联的销售订单 */
-const linkedOrderOpts = computed(() => {
-  void salesOrderState.orders
-  if (!form.contractNo) return []
-  return getOrdersLinkedToContract(form.contractNo).map((o) => {
-    const amt = Number(o.totalAmountInTax ?? o.amountInTax) || 0
+const registerContractCustomer = computed(() => {
+  if (!form.contractNo) return ''
+  return getSalesContractByNo(form.contractNo)?.customerName || ''
+})
+
+const registerPlanSummary = computed(() => {
+  void salesPaymentState.payments
+  void salesPaymentState.plans
+  void salesPaymentState.invoices
+  if (form.linkType === PAYMENT_LINK_TYPE.CONTRACT && form.contractNo) {
+    const c = getSalesContractByNo(form.contractNo)
+    return c ? buildContractPaymentSummary(c) : null
+  }
+  if (form.linkType === PAYMENT_LINK_TYPE.SALES_ORDER && form.salesOrderNo) {
+    const o = findSalesOrderByOrderNo(form.salesOrderNo)
+    return o ? buildSalesOrderPaymentSummary(o) : null
+  }
+  return null
+})
+
+const registerActiveNode = computed(() => {
+  if (!form.nodeName) return null
+  const fromLock = lockedPlanRows.value || []
+  const fromSummary = registerPlanSummary.value?.planRows || []
+  const rows = fromLock.length ? fromLock : fromSummary
+  return rows.find((n) => n.name === form.nodeName) || null
+})
+
+/** 选中合同/销售订单后展示回款统计；已选节点则切到该节点金额 */
+const registerSummaryCards = computed(() => {
+  const summary = registerPlanSummary.value
+  if (!summary) return null
+  const node = registerActiveNode.value
+  if (node) {
     return {
-      label: `${o.orderNo} · ¥${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      value: o.orderNo,
+      nodeLabel: node.name || '—',
+      planAmount: node.planAmount,
+      paid: node.paid,
+      unpaid: node.unpaid,
     }
-  })
+  }
+  const nodeTotal = Number(summary.nodeTotal) || (summary.planRows || []).length || 0
+  return {
+    nodeLabel: nodeTotal > 0 ? `全部（${summary.nodeProgress || `${nodeTotal} 节点`}）` : '全部',
+    planAmount: summary.planTotal,
+    paid: summary.paidTotal,
+    unpaid: summary.unpaidTotal,
+  }
 })
-
-const selectedLinkedOrders = computed(() => {
-  void salesOrderState.orders
-  const nos = Array.isArray(form.salesOrderNos) ? form.salesOrderNos : []
-  return nos
-    .map((no) => {
-      const o = findSalesOrderByOrderNo(no)
-      if (!o) return { orderNo: no, customerName: '—', amount: 0 }
-      return {
-        orderNo: o.orderNo,
-        customerName: o.customerName || '—',
-        amount: Number(o.totalAmountInTax ?? o.amountInTax) || 0,
-      }
-    })
-    .filter(Boolean)
-})
-
-const selectedLinkedOrderTotal = computed(() =>
-  selectedLinkedOrders.value.reduce((s, r) => s + (Number(r.amount) || 0), 0),
-)
 
 function nodeSelectOptions(nodes = []) {
   const seen = new Set()
@@ -756,10 +790,14 @@ function openMaintainStart(record) {
 }
 
 function openCreate() {
+  paymentTargetLocked.value = false
+  lockedPlanRows.value = []
   form.linkType = preferOrderLink.value ? PAYMENT_LINK_TYPE.SALES_ORDER : PAYMENT_LINK_TYPE.CONTRACT
   form.contractNo = undefined
   form.salesOrderNo = undefined
   form.salesOrderNos = []
+  form.orderAllocs = []
+  form.deliveryAllocs = []
   form.nodeName = undefined
   form.amount = null
   form.paymentMethod = undefined
@@ -780,12 +818,16 @@ function openInvoiceForRecord(record) {
 
 function openCreateForContract(record, node) {
   openCreate()
+  paymentTargetLocked.value = true
+  lockedPlanRows.value = Array.isArray(record?.planRows) ? record.planRows.slice() : []
   if (record.linkType === PAYMENT_LINK_TYPE.SALES_ORDER) {
     form.linkType = PAYMENT_LINK_TYPE.SALES_ORDER
-    form.salesOrderNo = record.salesOrderNo
+    form.salesOrderNo = record.salesOrderNo || record.displayNo || record.contractNo
     form.contractNo = undefined
   } else {
+    form.linkType = PAYMENT_LINK_TYPE.CONTRACT
     form.contractNo = record.contractNo
+    form.salesOrderNo = undefined
   }
   if (node?.name) {
     form.nodeName = node.name
@@ -797,10 +839,19 @@ function openCreateForContract(record, node) {
   if (unpaid?.unpaid) form.amount = unpaid.unpaid
 }
 
+function onRegisterNodeChange() {
+  const node = registerActiveNode.value
+  if (node && (Number(node.unpaid) || 0) > 0) {
+    form.amount = Number(node.unpaid)
+  }
+}
+
 function onLinkTypeChange() {
   form.contractNo = undefined
   form.salesOrderNo = undefined
   form.salesOrderNos = []
+  form.orderAllocs = []
+  form.deliveryAllocs = []
   form.nodeName = undefined
   form.amount = null
 }
@@ -810,12 +861,16 @@ function onContractChange() {
   form.amount = null
   form.salesOrderNo = undefined
   form.salesOrderNos = []
+  form.deliveryAllocs = []
+  // orderAllocs 由 PaymentLinkedOrderAllocPanel 监听 contractNo 自动带出
 }
 
 function onOrderChange() {
   form.nodeName = undefined
   form.amount = null
   form.contractNo = undefined
+  form.orderAllocs = []
+  // deliveryAllocs 由 PaymentOrderDeliveryPanel 监听 salesOrderNo 自动带出
 }
 
 function handleSave() {
@@ -823,22 +878,76 @@ function handleSave() {
     message.warning('请选择回款节点')
     return Promise.reject()
   }
-  const salesOrderNos =
-    form.linkType === PAYMENT_LINK_TYPE.CONTRACT
-      ? form.salesOrderNos || []
-      : form.salesOrderNo
-        ? [form.salesOrderNo]
-        : []
-  const res = addSalesPayment({
+  if (!(Number(form.amount) > 0)) {
+    message.warning('请填写回款金额')
+    return Promise.reject()
+  }
+
+  const receivedAt = form.receivedAt ? form.receivedAt.format('YYYY-MM-DD') : ''
+  const base = {
     linkType: form.linkType,
-    contractNo: form.linkType === PAYMENT_LINK_TYPE.CONTRACT ? form.contractNo : '',
+    nodeName: form.nodeName || '',
+    paymentMethod: form.paymentMethod || '',
+    receivedAt,
+    remark: form.remark,
+  }
+
+  if (form.linkType === PAYMENT_LINK_TYPE.CONTRACT) {
+    const splits = positiveAllocations(form.orderAllocs)
+    if (splits.length) {
+      const allocSum = sumAllocAmounts(form.orderAllocs)
+      if (Math.abs(allocSum - Number(form.amount)) > 0.009) {
+        message.warning(
+          `各订单「本次回款」合计 ¥${allocSum.toFixed(2)} 须等于回款金额 ¥${Number(form.amount).toFixed(2)}`,
+        )
+        return Promise.reject()
+      }
+      for (const split of splits) {
+        const res = addSalesPayment({
+          ...base,
+          contractNo: form.contractNo,
+          salesOrderNos: [split.salesOrderNo],
+          salesOrderNo: split.salesOrderNo,
+          amount: split.amount,
+          remark: form.remark
+            ? `${form.remark}（订单 ${split.salesOrderNo}）`
+            : `合同回款拆分 · ${split.salesOrderNo}`,
+        })
+        if (!res.ok) {
+          message.warning(res.message)
+          return Promise.reject()
+        }
+      }
+      message.success(`回款已登记（按 ${splits.length} 张销售订单拆分）`)
+      modalOpen.value = false
+      tick.value += 1
+      return Promise.resolve()
+    }
+    const res = addSalesPayment({
+      ...base,
+      contractNo: form.contractNo,
+      salesOrderNos: [],
+      salesOrderNo: '',
+      amount: form.amount,
+    })
+    if (!res.ok) {
+      message.warning(res.message)
+      return Promise.reject()
+    }
+    message.success('回款已登记')
+    modalOpen.value = false
+    tick.value += 1
+    return Promise.resolve()
+  }
+
+  const salesOrderNos = form.salesOrderNo ? [form.salesOrderNo] : []
+  const res = addSalesPayment({
+    ...base,
+    contractNo: '',
     salesOrderNos,
     salesOrderNo: salesOrderNos[0] || '',
-    nodeName: form.nodeName || '',
     amount: form.amount,
-    paymentMethod: form.paymentMethod || '',
-    receivedAt: form.receivedAt ? form.receivedAt.format('YYYY-MM-DD') : '',
-    remark: form.remark,
+    deliveryAllocs: toPaymentDeliveryAllocs(form.deliveryAllocs),
   })
   if (!res.ok) {
     message.warning(res.message)
@@ -952,18 +1061,10 @@ function handleSave() {
     font-size: 12px;
     color: rgba(0, 0, 0, 0.45);
   }
+}
 
-  .selected-order-panel {
-    margin-top: 8px;
-  }
-
-  .selected-order-total {
-    margin-top: 8px;
-    text-align: right;
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(0, 0, 0, 0.88);
-  }
+.order-alloc-wrap {
+  margin: 0 0 16px;
 }
 
 .payment-register-form {
@@ -973,6 +1074,46 @@ function handleSave() {
 
   :deep(.form-item-last) {
     margin-bottom: 0;
+  }
+}
+
+.node-summary {
+  display: flex;
+  gap: 0;
+  margin: 0 0 16px;
+  padding: 14px 4px;
+  background: linear-gradient(180deg, #f7f9fc 0%, #f5f5f5 100%);
+  border: 1px solid #ebedf0;
+  border-radius: 8px;
+}
+
+.node-summary-item {
+  flex: 1;
+  min-width: 0;
+  padding: 0 18px;
+  border-right: 1px solid #e8e8e8;
+
+  &:last-child {
+    border-right: none;
+  }
+}
+
+.node-summary-label {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.node-summary-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+  line-height: 1.4;
+  word-break: break-all;
+
+  &.accent {
+    color: #1677ff;
   }
 }
 

@@ -301,8 +301,26 @@ function normalizeSalesOrderNos(row = {}) {
   return []
 }
 
+function normalizeDeliveryAllocs(row = {}) {
+  const list = Array.isArray(row.deliveryAllocs) ? row.deliveryAllocs : []
+  return list
+    .map((a) => {
+      const deliveryCode = String(a?.deliveryCode || '').trim()
+      if (!deliveryCode) return null
+      const amount =
+        a?.amount != null && a.amount !== '' && Number(a.amount) > 0 ? round2(a.amount) : null
+      return {
+        deliveryId: a?.deliveryId || '',
+        deliveryCode,
+        amount,
+      }
+    })
+    .filter(Boolean)
+}
+
 export function normalizePayment(row = {}) {
   const salesOrderNos = normalizeSalesOrderNos(row)
+  const deliveryAllocs = normalizeDeliveryAllocs(row)
   return {
     id: row.id || `spay-${Date.now()}`,
     paymentNo: row.paymentNo || '',
@@ -312,6 +330,8 @@ export function normalizePayment(row = {}) {
     salesOrderNo: salesOrderNos[0] || row.salesOrderNo || '',
     /** 可挂多张销售订单 */
     salesOrderNos,
+    /** 关联发货单分配（本次回款可空） */
+    deliveryAllocs,
     customerName: row.customerName || '',
     nodeName: row.nodeName || '',
     amount: round2(row.amount),
@@ -1515,12 +1535,37 @@ export function sumPaymentsByContract(contractNo) {
 export function sumPaymentsBySalesOrder(salesOrderNo) {
   if (!salesOrderNo) return 0
   return round2(
-    salesPaymentState.payments
-      .filter((p) => {
-        const nos = Array.isArray(p.salesOrderNos) ? p.salesOrderNos : []
-        return p.salesOrderNo === salesOrderNo || nos.includes(salesOrderNo)
-      })
-      .reduce((s, p) => s + (Number(p.amount) || 0), 0),
+    salesPaymentState.payments.reduce((s, p) => {
+      const nos = Array.isArray(p.salesOrderNos)
+        ? p.salesOrderNos.map((n) => String(n || '').trim()).filter(Boolean)
+        : []
+      // 多订单共挂同一笔时，仅计入主销售订单号，避免金额被重复累加
+      if (nos.length > 1) {
+        return p.salesOrderNo === salesOrderNo ? s + (Number(p.amount) || 0) : s
+      }
+      if (p.salesOrderNo === salesOrderNo || nos.includes(salesOrderNo)) {
+        return s + (Number(p.amount) || 0)
+      }
+      return s
+    }, 0),
+  )
+}
+
+/** 发货单已回款合计（按登记时 deliveryAllocs 累计） */
+export function sumPaymentsByDeliveryCode(deliveryCode) {
+  const code = String(deliveryCode || '').trim()
+  if (!code) return 0
+  return round2(
+    salesPaymentState.payments.reduce((s, p) => {
+      const allocs = Array.isArray(p.deliveryAllocs) ? p.deliveryAllocs : []
+      return (
+        s +
+        allocs.reduce((ss, a) => {
+          if (String(a?.deliveryCode || '').trim() !== code) return ss
+          return ss + (Number(a.amount) > 0 ? Number(a.amount) : 0)
+        }, 0)
+      )
+    }, 0),
   )
 }
 

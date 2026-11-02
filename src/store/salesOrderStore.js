@@ -73,10 +73,12 @@ import { ensureSalesLineShipInfoDemoSalesOrders } from '@/mock/salesLineShipInfo
 import { ensureShipAccessoryDemoSalesOrders } from '@/mock/shipAccessoryDemoSeed'
 import { ensureShipAccessoryProduceDemoSalesOrders } from '@/mock/shipAccessoryProduceDemoSeed'
 import { ensureSalesApprovalDemoSalesOrders } from '@/mock/salesApprovalDemoSeed'
+import { ensurePaymentLinkDemoSalesOrders } from '@/mock/paymentLinkDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_sales_orders'
-const DATA_VERSION = 12
+/** v13：回款登记联动演示（合同→订单、订单→发货） */
+const DATA_VERSION = 13
 let orderSeq = 20
 let deliverySeq = 113
 
@@ -111,7 +113,9 @@ function loadFromStorage() {
         (parsed.version === DATA_VERSION ||
           parsed.version === 8 ||
           parsed.version === 9 ||
-          parsed.version === 10)
+          parsed.version === 10 ||
+          parsed.version === 11 ||
+          parsed.version === 12)
       ) {
         return migrateSalesOrderStatuses(parsed.orders)
       }
@@ -129,13 +133,15 @@ function persist() {
 function loadInitialSalesOrders() {
   ensureEcnDemoBootstrap()
   const orders = migrateSalesOrderStatuses(loadFromStorage() || buildMockSalesOrders(mockProducts))
-  return ensureSalesApprovalDemoSalesOrders(
-    ensureShipAccessoryProduceDemoSalesOrders(
-      ensureShipAccessoryDemoSalesOrders(
-        ensureIndustrialLabelDemoSalesOrder(
-          ensureScatterEbomShipDemoSalesOrders(
-            ensureDedicatedShipDemoSalesOrders(
-              ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+  return ensurePaymentLinkDemoSalesOrders(
+    ensureSalesApprovalDemoSalesOrders(
+      ensureShipAccessoryProduceDemoSalesOrders(
+        ensureShipAccessoryDemoSalesOrders(
+          ensureIndustrialLabelDemoSalesOrder(
+            ensureScatterEbomShipDemoSalesOrders(
+              ensureDedicatedShipDemoSalesOrders(
+                ensureSalesLineShipInfoDemoSalesOrders(hydrateApprovedSelfProdOrders(orders)),
+              ),
             ),
           ),
         ),

@@ -25,8 +25,8 @@ import { sumSelectedShipQty } from '@/utils/shipEbom'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
-/** v6：散件发运行补齐单价/仓库/材质等，详情与申请单表单列对齐 */
-const DATA_VERSION = 6
+/** v7：回款登记联动演示发货单（随销售订单申请同步） */
+const DATA_VERSION = 7
 
 function migrateOrders(orders) {
   return (orders || []).map((o) => {
@@ -116,6 +116,9 @@ export function syncFromSalesOrders() {
   }
   refreshOutboundQtyAll()
 }
+
+// 销售订单上的演示发货申请同步进发货单台账，供回款登记「关联发货」自动带出
+syncFromSalesOrders()
 
 watch(
   () => deliveryOrderState.orders,

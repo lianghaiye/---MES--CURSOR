@@ -97,12 +97,36 @@
             />
           </a-form-item>
         </a-col>
+      </a-row>
+
+      <a-row v-if="form.scanWindowType === 'fixed'" :gutter="12">
         <a-col :span="8">
           <a-form-item label="扫描窗口" required>
             <a-select v-model:value="form.scanWindowType" :options="scanOpts" />
           </a-form-item>
         </a-col>
-        <a-col v-if="form.executeFreq !== 'weekly' && form.executeFreq !== 'monthly'" :span="8">
+        <a-col :span="8">
+          <a-form-item label="开始日期" required>
+            <a-date-picker
+              v-model:value="form.scanStart"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="结束日期" required>
+            <a-date-picker
+              v-model:value="form.scanEnd"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
+
+      <a-row v-if="form.scanWindowType === 'fixed'" :gutter="12">
+        <a-col :span="8">
           <a-form-item label="适用结算周期">
             <a-select
               v-model:value="form.settlementCycles"
@@ -118,15 +142,12 @@
         </a-col>
       </a-row>
 
-      <a-row
-        v-if="
-          form.scanWindowType === 'last_n_days' ||
-          form.scanWindowType === 'fixed' ||
-          form.executeFreq === 'weekly' ||
-          form.executeFreq === 'monthly'
-        "
-        :gutter="12"
-      >
+      <a-row v-else :gutter="12">
+        <a-col :span="8">
+          <a-form-item label="扫描窗口" required>
+            <a-select v-model:value="form.scanWindowType" :options="scanOpts" />
+          </a-form-item>
+        </a-col>
         <a-col v-if="form.scanWindowType === 'last_n_days'" :span="8">
           <a-form-item label="近 N 天">
             <a-input-number
@@ -137,25 +158,7 @@
             />
           </a-form-item>
         </a-col>
-        <a-col v-if="form.scanWindowType === 'fixed'" :span="8">
-          <a-form-item label="开始日期" required>
-            <a-date-picker
-              v-model:value="form.scanStart"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="form.scanWindowType === 'fixed'" :span="8">
-          <a-form-item label="结束日期" required>
-            <a-date-picker
-              v-model:value="form.scanEnd"
-              value-format="YYYY-MM-DD"
-              style="width: 100%"
-            />
-          </a-form-item>
-        </a-col>
-        <a-col v-if="form.executeFreq === 'weekly' || form.executeFreq === 'monthly'" :span="8">
+        <a-col :span="8">
           <a-form-item label="适用结算周期">
             <a-select
               v-model:value="form.settlementCycles"
@@ -396,19 +399,51 @@ function onConflictConfirm(resolution) {
     margin-bottom: 12px;
   }
 
-  /* 多选结算周期保持与普通选择框同高 */
+  /* 多选结算周期强制与 a-select / a-date-picker 同高（32px） */
   .cycle-select {
     width: 100%;
 
     :deep(.ant-select-selector) {
+      box-sizing: border-box !important;
       min-height: 32px !important;
       height: 32px !important;
-      align-items: center;
-      overflow: hidden;
+      padding: 0 11px !important;
+      display: flex !important;
+      align-items: center !important;
+      overflow: hidden !important;
     }
 
     :deep(.ant-select-selection-overflow) {
-      flex-wrap: nowrap;
+      flex-wrap: nowrap !important;
+      align-items: center !important;
+      max-width: 100%;
+    }
+
+    :deep(.ant-select-selection-overflow-item) {
+      align-self: center;
+    }
+
+    :deep(.ant-select-selection-item) {
+      height: 22px !important;
+      line-height: 20px !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding-inline: 6px !important;
+    }
+
+    :deep(.ant-select-selection-search) {
+      margin-inline-start: 0 !important;
+      height: 22px !important;
+      line-height: 22px !important;
+    }
+
+    :deep(.ant-select-selection-search-input) {
+      height: 22px !important;
+    }
+
+    :deep(.ant-select-selection-placeholder) {
+      inset-inline-start: 11px !important;
+      line-height: 30px !important;
     }
   }
 

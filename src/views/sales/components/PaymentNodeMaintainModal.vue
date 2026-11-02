@@ -149,43 +149,6 @@
           </div>
         </div>
 
-        <a-row v-if="!isExpense && !isSalesOrderLink" :gutter="16">
-          <a-col :span="24">
-            <a-form-item label="关联销售订单">
-              <a-select
-                v-model:value="form.salesOrderNos"
-                mode="multiple"
-                show-search
-                allow-clear
-                :options="linkedOrderOpts"
-                placeholder="可选，支持多选"
-                style="width: 100%"
-                option-filter-prop="label"
-              />
-              <div v-if="!linkedOrderOpts.length" class="field-tip">该合同暂无关联销售订单</div>
-              <div v-if="selectedLinkedOrders.length" class="selected-order-panel">
-                <a-table
-                  size="small"
-                  bordered
-                  :pagination="false"
-                  :columns="selectedOrderColumns"
-                  :data-source="selectedLinkedOrders"
-                  row-key="orderNo"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'amount'">
-                      ¥ {{ formatMoney(record.amount) }}
-                    </template>
-                  </template>
-                </a-table>
-                <div class="selected-order-total">
-                  合计金额（含税）：¥ {{ formatMoney(selectedLinkedOrderTotal) }}
-                </div>
-              </div>
-            </a-form-item>
-          </a-col>
-        </a-row>
-
         <a-row :gutter="16">
           <a-col :span="8">
             <a-form-item :label="`${paymentNoun}金额`" required>
@@ -216,6 +179,26 @@
           </a-col>
         </a-row>
 
+        <div v-if="!isExpense && !isSalesOrderLink && summary?.contractNo" class="order-alloc-wrap">
+          <PaymentLinkedOrderAllocPanel
+            v-model="form.orderAllocs"
+            :contract-no="summary.contractNo"
+            :payment-amount="form.amount"
+            :preferred-customer-name="summary?.customerName || ''"
+          />
+        </div>
+
+        <div
+          v-if="!isExpense && isSalesOrderLink && summary?.salesOrderNo"
+          class="order-alloc-wrap"
+        >
+          <PaymentOrderDeliveryPanel
+            v-model="form.deliveryAllocs"
+            :sales-order-no="summary.salesOrderNo"
+            :customer-name="summary?.customerName || ''"
+          />
+        </div>
+
         <a-row :gutter="16">
           <a-col :span="24">
             <a-form-item label="备注" class="form-item-last">
@@ -245,8 +228,10 @@ import {
   calcDueDate,
   updatePaymentPlanNode,
 } from '@/store/salesPaymentStore'
-import { getOrdersLinkedToContract } from '@/store/salesContractStore'
-import { findSalesOrderByOrderNo, salesOrderState } from '@/store/salesOrderStore'
+import PaymentLinkedOrderAllocPanel from './PaymentLinkedOrderAllocPanel.vue'
+import PaymentOrderDeliveryPanel from './PaymentOrderDeliveryPanel.vue'
+import { positiveAllocations, sumAllocAmounts } from '@/utils/paymentOrderAlloc'
+import { toPaymentDeliveryAllocs } from '@/utils/paymentDeliveryAlloc'
 
 defineOptions({ name: 'PaymentNodeMaintainModal' })
 
@@ -270,16 +255,12 @@ const form = reactive({
   invoiceDate: null,
   paymentMethod: undefined,
   salesOrderNos: [],
+  orderAllocs: [],
+  deliveryAllocs: [],
   amount: null,
   receivedAt: dayjs(),
   remark: '',
 })
-
-const selectedOrderColumns = [
-  { title: '销售单号', dataIndex: 'orderNo', width: 140 },
-  { title: '客户', dataIndex: 'customerName', ellipsis: true },
-  { title: '金额（含税）', key: 'amount', width: 120, align: 'right' },
-]
 
 const isExpense = computed(() => props.cashDirection === CONTRACT_CASH_DIRECTION.EXPENSE)
 const isSalesOrderLink = computed(
@@ -330,7 +311,7 @@ const modalTitle = computed(() => {
 const okText = computed(() => (props.mode === 'startDate' ? '保存' : '登记'))
 const modalWidth = computed(() => {
   if (props.mode === 'startDate') return '960px'
-  if (props.mode === 'register') return '720px'
+  if (props.mode === 'register') return '1100px'
   return '720px'
 })
 
@@ -339,37 +320,6 @@ const remainInvoiceAmount = computed(() => {
   const invoiced = Number(props.node?.invoiceAmount) || 0
   return Math.max(0, round2(plan - invoiced))
 })
-
-const linkedOrderOpts = computed(() => {
-  void salesOrderState.orders
-  const no = props.summary?.contractNo
-  if (!no) return []
-  return getOrdersLinkedToContract(no).map((o) => {
-    const amt = Number(o.totalAmountInTax ?? o.amountInTax) || 0
-    return {
-      label: `${o.orderNo} · ¥${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      value: o.orderNo,
-    }
-  })
-})
-
-const selectedLinkedOrders = computed(() => {
-  void salesOrderState.orders
-  const nos = Array.isArray(form.salesOrderNos) ? form.salesOrderNos : []
-  return nos.map((no) => {
-    const o = findSalesOrderByOrderNo(no)
-    if (!o) return { orderNo: no, customerName: '—', amount: 0 }
-    return {
-      orderNo: o.orderNo,
-      customerName: o.customerName || '—',
-      amount: Number(o.totalAmountInTax ?? o.amountInTax) || 0,
-    }
-  })
-})
-
-const selectedLinkedOrderTotal = computed(() =>
-  selectedLinkedOrders.value.reduce((s, r) => s + (Number(r.amount) || 0), 0),
-)
 
 function applyStartNode(node) {
   form.nodeName = node?.name || undefined
@@ -411,6 +361,8 @@ watch(
     form.invoiceDate = props.node.invoiceDate ? dayjs(props.node.invoiceDate) : dayjs()
     form.paymentMethod = props.node.paymentMethod || undefined
     form.salesOrderNos = []
+    form.orderAllocs = []
+    form.deliveryAllocs = []
     form.amount =
       props.mode === 'register' && (Number(props.node.unpaid) || 0) > 0
         ? Number(props.node.unpaid)
@@ -497,17 +449,56 @@ function handleOk() {
     message.warning('销售订单号缺失')
     return Promise.reject()
   }
-  const salesOrderNos = isOrder ? [props.summary.salesOrderNo] : form.salesOrderNos || []
-  const payRes = addSalesPayment({
+
+  const receivedAt = form.receivedAt ? form.receivedAt.format('YYYY-MM-DD') : ''
+  const basePay = {
     linkType: isOrder ? PAYMENT_LINK_TYPE.SALES_ORDER : PAYMENT_LINK_TYPE.CONTRACT,
     contractNo: isOrder ? '' : props.summary.contractNo,
+    nodeName: props.node.name,
+    paymentMethod: form.paymentMethod || '',
+    receivedAt,
+    remark: form.remark,
+  }
+
+  if (!isOrder) {
+    const splits = positiveAllocations(form.orderAllocs)
+    if (splits.length) {
+      const allocSum = sumAllocAmounts(form.orderAllocs)
+      if (Math.abs(allocSum - Number(form.amount)) > 0.009) {
+        message.warning(
+          `各订单「本次回款」合计 ¥${allocSum.toFixed(2)} 须等于${paymentNoun.value}金额 ¥${Number(form.amount).toFixed(2)}`,
+        )
+        return Promise.reject()
+      }
+      for (const split of splits) {
+        const payRes = addSalesPayment({
+          ...basePay,
+          salesOrderNos: [split.salesOrderNo],
+          salesOrderNo: split.salesOrderNo,
+          amount: split.amount,
+          remark: form.remark
+            ? `${form.remark}（订单 ${split.salesOrderNo}）`
+            : `合同回款拆分 · ${split.salesOrderNo}`,
+        })
+        if (!payRes.ok) {
+          message.warning(payRes.message)
+          return Promise.reject()
+        }
+      }
+      message.success(`${paymentNoun.value}已登记（按 ${splits.length} 张销售订单拆分）`)
+      emit('saved')
+      emit('update:open', false)
+      return Promise.resolve()
+    }
+  }
+
+  const salesOrderNos = isOrder ? [props.summary.salesOrderNo] : []
+  const payRes = addSalesPayment({
+    ...basePay,
     salesOrderNos,
     salesOrderNo: salesOrderNos[0] || '',
-    nodeName: props.node.name,
     amount: form.amount,
-    paymentMethod: form.paymentMethod || '',
-    receivedAt: form.receivedAt ? form.receivedAt.format('YYYY-MM-DD') : '',
-    remark: form.remark,
+    deliveryAllocs: isOrder ? toPaymentDeliveryAllocs(form.deliveryAllocs) : [],
   })
   if (!payRes.ok) {
     message.warning(payRes.message)
@@ -579,15 +570,7 @@ function handleOk() {
   }
 }
 
-.selected-order-panel {
-  margin-top: 8px;
-}
-
-.selected-order-total {
-  margin-top: 8px;
-  text-align: right;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(0, 0, 0, 0.88);
+.order-alloc-wrap {
+  margin: 0 0 16px;
 }
 </style>
