@@ -218,7 +218,7 @@ export default { name: 'ArrivalTrackingView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { useTabs } from '@/composables/useTabs'
@@ -235,10 +235,11 @@ import {
 import { keyPartArrivalState } from '@/store/keyPartArrivalStore'
 import { purchaseOrderState } from '@/store/purchaseOrderStore'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
-const activeTab = ref('arrived')
+const activeTab = ref(route.query.tab === 'expected' ? 'expected' : 'arrived')
 const refreshTick = ref(0)
 const arrivedRangeOptions = ARRIVED_RANGE_OPTIONS
 const filters = reactive({

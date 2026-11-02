@@ -23,7 +23,7 @@ import { normalizeInboundStatus } from '@/mock/inboundOptions'
 import { normalizeOutboundStatus } from '@/mock/outboundOptions'
 import { PENDING_INBOUND_STATUSES } from '@/utils/pendingInboundLines'
 import { PENDING_OUTBOUND_STATUSES } from '@/utils/pendingOutboundLines'
-import { countUnreadKeyPartArrivals, keyPartArrivalState } from '@/store/keyPartArrivalStore'
+import { countTodayKeyPartArrivals, keyPartArrivalState } from '@/store/keyPartArrivalStore'
 
 export const ECN_TODO_STATUSES = [ECN_STATUS.PENDING, ECN_STATUS.APPROVING, ECN_STATUS.EXECUTING]
 
@@ -114,11 +114,9 @@ export const WORKBENCH_TODO_ITEMS = [
     key: 'key-part-arrival',
     label: '关键件到货',
     tone: 'volcano',
-    path: '',
-    query: {},
-    title: '关键件到货',
-    /** 点开明细抽屉，不直接跳列表 */
-    openDrawer: true,
+    path: '/production/arrival-tracking',
+    query: { tab: 'arrived' },
+    title: '到货跟踪',
   },
 ]
 
@@ -264,7 +262,7 @@ export function countWorkbenchTodo(key) {
     case 'ecn-todo':
       return countEcnTodos()
     case 'key-part-arrival':
-      return countUnreadKeyPartArrivals()
+      return countTodayKeyPartArrivals()
     default:
       return 0
   }
@@ -286,7 +284,7 @@ export function touchWorkbenchTodoSources() {
     factoryQcState.records?.length,
     ecnState.items?.length,
     keyPartArrivalState.messages?.length,
-    keyPartArrivalState.messages?.filter((m) => !m.readAt).length,
+    keyPartArrivalState.messages?.map((m) => m.confirmedAt).join('|'),
   ]
 }
 

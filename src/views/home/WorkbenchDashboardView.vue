@@ -387,7 +387,6 @@
     <WorkbenchProcessConfigModal v-model:open="processModalOpen" />
     <WorkbenchTodoConfigModal v-model:open="todoConfigOpen" />
     <WorkbenchReleaseMessageModal v-model:open="releaseModalOpen" :release="activeRelease" />
-    <WorkbenchKeyPartArrivalDrawer v-model:open="keyPartArrivalOpen" />
   </div>
 </template>
 
@@ -449,7 +448,6 @@ import WorkbenchFavoriteModal from '@/views/home/components/WorkbenchFavoriteMod
 import WorkbenchProcessConfigModal from '@/views/home/components/WorkbenchProcessConfigModal.vue'
 import WorkbenchTodoConfigModal from '@/views/home/components/WorkbenchTodoConfigModal.vue'
 import WorkbenchReleaseMessageModal from '@/views/home/components/WorkbenchReleaseMessageModal.vue'
-import WorkbenchKeyPartArrivalDrawer from '@/views/home/components/WorkbenchKeyPartArrivalDrawer.vue'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -462,7 +460,6 @@ const woTab = ref('notStarted')
 const favoriteModalOpen = ref(false)
 const processModalOpen = ref(false)
 const todoConfigOpen = ref(false)
-const keyPartArrivalOpen = ref(false)
 const qcFlyoutKey = ref('')
 const feedbackText = ref('')
 const feedbackSubmitting = ref(false)
@@ -634,10 +631,6 @@ function goTodo(item) {
 
 function onTodoCardClick(item) {
   if (item?.hoverExpand) return
-  if (item?.openDrawer && item.key === 'key-part-arrival') {
-    keyPartArrivalOpen.value = true
-    return
-  }
   goTodo(item)
 }
 

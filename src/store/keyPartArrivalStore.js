@@ -1,6 +1,6 @@
 /**
  * 关键件到货消息（站内提醒，非业务单据）
- * 入库确认后，命中主数据「关键件标识」的明细写入本列表；工作台待办展示未读。
+ * 入库确认后，命中主数据「关键件标识」的明细写入本列表；工作台待办展示今日到货数。
  */
 import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
@@ -166,6 +166,17 @@ export function isMasterItemKeyPart(itemCode) {
 
 export function countUnreadKeyPartArrivals() {
   return (keyPartArrivalState.messages || []).filter((m) => !m.readAt).length
+}
+
+/** 今日关键件到货条数（按 confirmedAt 日期 = 当天） */
+export function countTodayKeyPartArrivals() {
+  const today = dayjs().format('YYYY-MM-DD')
+  return (keyPartArrivalState.messages || []).filter((m) => {
+    const t = String(m.confirmedAt || '').trim()
+    if (!t) return false
+    const d = dayjs(t)
+    return d.isValid() && d.format('YYYY-MM-DD') === today
+  }).length
 }
 
 export function listKeyPartArrivals({ unreadOnly = false } = {}) {
