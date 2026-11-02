@@ -15,6 +15,8 @@ function createLineItem(partial = {}) {
     drawingNo: '',
     deliveryDate: '',
     unit: '件',
+    /** 外部工号（客户侧工号，选填） */
+    externalJobNo: '',
     issueQty: 0,
     bomName: '',
     bomVersion: '',

@@ -417,7 +417,6 @@ const baseColumns = [
     ellipsis: true,
   },
   { title: '业务类型', key: 'businessType', dataIndex: 'businessType', width: 110 },
-  { title: '产品属性', key: 'productAttr', dataIndex: 'productAttr', width: 90 },
   { title: '规格型号', key: 'specModel', dataIndex: 'specModel', width: 100, ellipsis: true },
   { title: '材质', key: 'material', dataIndex: 'material', width: 80, ellipsis: true },
   {
@@ -478,6 +477,13 @@ const baseColumns = [
   },
   { title: '交货日期', key: 'deliveryDate', dataIndex: 'deliveryDate', width: 110 },
   { title: '单位', key: 'unit', dataIndex: 'unit', width: 70 },
+  {
+    title: '外部工号',
+    key: 'externalJobNo',
+    dataIndex: 'externalJobNo',
+    width: 120,
+    ellipsis: true,
+  },
   { title: 'Bom名称', key: 'bomName', dataIndex: 'bomName', width: 110, ellipsis: true },
   { title: 'Bom版本', key: 'bomVersion', dataIndex: 'bomVersion', width: 90 },
   {

@@ -7,7 +7,6 @@ export const salesOrderLineExportFields = [
   { key: 'productName', title: '产品名称', getValue: (row) => cell(row, 'productName') },
   { key: 'productCode', title: '产品编码', getValue: (row) => cell(row, 'productCode') },
   { key: 'businessType', title: '业务类型', getValue: (row) => cell(row, 'businessType') },
-  { key: 'productAttr', title: '产品属性', getValue: (row) => cell(row, 'productAttr') },
   { key: 'specModel', title: '规格型号', getValue: (row) => cell(row, 'specModel') },
   { key: 'material', title: '材质', getValue: (row) => cell(row, 'material') },
   { key: 'variantSummary', title: '变体属性', getValue: (row) => cell(row, 'variantSummary') },
@@ -55,6 +54,7 @@ export const salesOrderLineExportFields = [
   { key: 'planProduceQty', title: '排产数量', getValue: (row) => numCell(row.planProduceQty, 0) },
   { key: 'deliveryDate', title: '交货日期', getValue: (row) => cell(row, 'deliveryDate') },
   { key: 'unit', title: '单位', getValue: (row) => cell(row, 'unit') },
+  { key: 'externalJobNo', title: '外部工号', getValue: (row) => cell(row, 'externalJobNo') },
   { key: 'bomName', title: 'Bom名称', getValue: (row) => cell(row, 'bomName') },
   { key: 'bomVersion', title: 'Bom版本', getValue: (row) => cell(row, 'bomVersion') },
   {

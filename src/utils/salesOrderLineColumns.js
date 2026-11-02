@@ -19,7 +19,6 @@ export const salesOrderDetailLineColumns = [
   },
   { key: 'businessType', title: '业务类型', width: 110 },
   { key: 'shipAccessories', title: '随货配件', width: 130 },
-  { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 100 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 80 },
   {
@@ -58,6 +57,13 @@ export const salesOrderDetailLineColumns = [
   },
   { key: 'deliveryDate', title: '交货日期', dataIndex: 'deliveryDate', width: 110 },
   { key: 'unit', title: '单位', dataIndex: 'unit', width: 70 },
+  {
+    key: 'externalJobNo',
+    title: '外部工号',
+    dataIndex: 'externalJobNo',
+    width: 120,
+    ellipsis: true,
+  },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 110, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
   {

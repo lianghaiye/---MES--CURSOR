@@ -44,10 +44,6 @@
               <span>{{ draft.variantSummary || '—' }}</span>
             </div>
             <div class="preview-row">
-              <span class="preview-label">产品属性</span>
-              <span>{{ draft.productAttr || '—' }}</span>
-            </div>
-            <div class="preview-row">
               <span class="preview-label">BOM</span>
               <span>{{ bomNameVersionDisplay }}</span>
             </div>
@@ -120,6 +116,17 @@
         <a-col :span="8">
           <a-form-item label="单位" required>
             <a-input v-model:value="draft.unit" size="small" placeholder="如 件" />
+          </a-form-item>
+        </a-col>
+        <a-col :span="8">
+          <a-form-item label="外部工号">
+            <a-input
+              v-model:value="draft.externalJobNo"
+              size="small"
+              allow-clear
+              placeholder="选填"
+              :maxlength="100"
+            />
           </a-form-item>
         </a-col>
         <a-col :span="8">
@@ -565,6 +572,7 @@ function createDraft(line = {}) {
     specModel: line.specModel || '',
     material: line.material || '',
     unit: line.unit || '件',
+    externalJobNo: line.externalJobNo || '',
     salesQty: line.salesQty ?? line.qty ?? 1,
     deliveryMode: line.deliveryMode || '整件',
     stockFulfillmentMode: normalizeStockFulfillmentMode(line.stockFulfillmentMode),
@@ -790,6 +798,7 @@ function handleSave() {
     specModel: draft.specModel || '',
     material: draft.material || '',
     unit: draft.unit.trim(),
+    externalJobNo: String(draft.externalJobNo || '').trim(),
     salesQty: Number(draft.salesQty),
     qty: Number(draft.salesQty),
     deliveryMode: draft.deliveryMode,

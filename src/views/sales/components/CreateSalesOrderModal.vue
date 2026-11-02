@@ -403,10 +403,6 @@
                   <span v-else class="readonly-cell">{{ record.productCode || '—' }}</span>
                 </template>
 
-                <template v-else-if="column.key === 'productAttr'">
-                  <span>{{ record.productAttr || '—' }}</span>
-                </template>
-
                 <template v-else-if="column.key === 'specModel'">
                   <a-input
                     v-if="record.isManualLine"
@@ -553,6 +549,14 @@
 
                 <template v-else-if="column.key === 'unit'">
                   <a-input v-model:value="record.unit" size="small" />
+                </template>
+
+                <template v-else-if="column.key === 'externalJobNo'">
+                  <SalesLineLongTextCell
+                    :value="record.externalJobNo"
+                    :max-preview-len="16"
+                    @edit="openLongTextEdit(record, 'externalJobNo')"
+                  />
                 </template>
 
                 <template v-else-if="column.key === 'lineDiscountPercent'">
@@ -759,13 +763,22 @@
     <a-modal
       v-model:open="longTextEdit.open"
       :title="`编辑${longTextEdit.title}`"
-      width="640px"
+      :width="longTextEdit.singleLine ? 480 : 640"
       :mask-closable="false"
       destroy-on-close
       @ok="confirmLongTextEdit"
       @cancel="longTextEdit.open = false"
     >
+      <a-input
+        v-if="longTextEdit.singleLine"
+        v-model:value="longTextEdit.draft"
+        allow-clear
+        :placeholder="`请输入${longTextEdit.title}（选填）`"
+        :maxlength="100"
+        show-count
+      />
       <a-textarea
+        v-else
         v-model:value="longTextEdit.draft"
         :rows="10"
         :placeholder="`请输入${longTextEdit.title}`"
@@ -1067,7 +1080,10 @@ const LONG_TEXT_FIELD_LABELS = {
   matchingRequirements: '配套要求',
   packagingForm: '包装形式',
   supplementDesc: '补充说明',
+  externalJobNo: '外部工号',
 }
+
+const SINGLE_LINE_EDIT_FIELDS = new Set(['externalJobNo'])
 
 const longTextEdit = reactive({
   open: false,
@@ -1075,6 +1091,7 @@ const longTextEdit = reactive({
   fieldKey: '',
   record: null,
   draft: '',
+  singleLine: false,
 })
 
 const MAX_FILE_SIZE = 200 * 1024 * 1024
@@ -1101,7 +1118,6 @@ const columnDefs = [
     fixed: 'left',
   },
   { key: 'businessType', title: '业务类型', width: 130 },
-  { key: 'productAttr', title: '产品属性', dataIndex: 'productAttr', width: 90 },
   { key: 'specModel', title: '规格型号', dataIndex: 'specModel', width: 120 },
   { key: 'material', title: '材质', dataIndex: 'material', width: 100 },
   {
@@ -1120,6 +1136,13 @@ const columnDefs = [
   { key: 'preferStockTakeQty', title: '占用现货数', width: 118 },
   { key: 'deliveryDate', title: '交货日期', width: 120 },
   { key: 'unit', title: '单位', width: 70 },
+  {
+    key: 'externalJobNo',
+    title: '外部工号',
+    dataIndex: 'externalJobNo',
+    width: 130,
+    ellipsis: true,
+  },
   { key: 'bomName', title: 'Bom名称', dataIndex: 'bomName', width: 100, ellipsis: true },
   { key: 'bomVersion', title: 'Bom版本', dataIndex: 'bomVersion', width: 90 },
   { key: 'unitPriceExTax', title: '单价（不含税）', width: 120 },
@@ -1678,6 +1701,7 @@ function normalizeLineItem(item, orderBusinessType = '自产销售') {
       issueQty: item.issueQty ?? 0,
       unit: item.unit || '件',
       productAttr: item.productAttr || '',
+      externalJobNo: item.externalJobNo || '',
       deliveryMode: item.deliveryMode || '整件',
       businessType: item.businessType || orderBusinessType || '自产销售',
       lineAttachments: Array.isArray(item.lineAttachments) ? [...item.lineAttachments] : [],
@@ -2171,6 +2195,7 @@ function openLongTextEdit(record, fieldKey) {
   longTextEdit.fieldKey = fieldKey
   longTextEdit.title = LONG_TEXT_FIELD_LABELS[fieldKey] || '内容'
   longTextEdit.draft = record[fieldKey] || ''
+  longTextEdit.singleLine = SINGLE_LINE_EDIT_FIELDS.has(fieldKey)
   longTextEdit.open = true
 }
 

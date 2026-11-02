@@ -63,6 +63,7 @@ export function flattenSalesOrderLines(orders = []) {
         productCode: line.productCode || '',
         businessType: line.businessType || order.businessType || '',
         productAttr: line.productAttr || '',
+        externalJobNo: line.externalJobNo || '',
         specModel: line.specModel || '',
         material: line.material || '',
         variantSummary: line.variantSummary || '',
