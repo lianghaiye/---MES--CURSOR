@@ -109,6 +109,11 @@ export const sideMenus = {
       label: '成品入库',
       path: '/production/finished-inbound',
     },
+    {
+      key: 'arrival-tracking',
+      label: '到货跟踪',
+      path: '/production/arrival-tracking',
+    },
   ],
   'report-management': [
     { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
@@ -497,6 +502,7 @@ export const routeTitles = {
   '/production/finished-inbound': '成品入库',
   '/production/finished-inbound/create': '申请成品入库',
   '/production/finished-inbound/:id': '成品入库申请详情',
+  '/production/arrival-tracking': '到货跟踪',
   '/inventory/deduct-records': '库存扣减记录',
   '/inventory/deduct-records/:id/edit': '编辑扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',

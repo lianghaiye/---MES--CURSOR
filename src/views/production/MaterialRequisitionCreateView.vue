@@ -342,8 +342,8 @@ export default { name: 'MaterialRequisitionCreateView' }
 </script>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { workCenterOptions } from '@/mock/workOrderOptions'
 import { getWorkOrders } from '@/store/workOrderStore'
@@ -368,7 +368,135 @@ import {
   validateLinesSkuResolved,
 } from '@/utils/spuLineResolve'
 
+const route = useRoute()
 const router = useRouter()
+
+/** 从到货跟踪带入的关键件（跨模式保留） */
+const arrivalKeyParts = ref([])
+
+function parseArrivalKeyPartsFromQuery() {
+  const q = route.query || {}
+  const itemCode = String(q.itemCode || '').trim()
+  if (!itemCode) return []
+  const qty = Number(q.qty)
+  const unitUsage = Number(q.unitUsage)
+  return [
+    {
+      itemCode,
+      itemName: String(q.itemName || '').trim(),
+      specModel: String(q.specModel || '').trim(),
+      unit: String(q.unit || '').trim() || '件',
+      qty: qty > 0 ? qty : 1,
+      unitUsage: unitUsage > 0 ? unitUsage : null,
+      warehouse: String(q.warehouse || '').trim() || '原料仓',
+    },
+  ]
+}
+
+function buildArrivalKeyPartLines() {
+  return arrivalKeyParts.value.map((part) => {
+    const line = createManualMaterialLine(
+      {
+        code: part.itemCode,
+        itemCode: part.itemCode,
+        name: part.itemName,
+        itemName: part.itemName,
+        spec: part.specModel,
+        specModel: part.specModel,
+        unit: part.unit,
+        unitUsage: part.unitUsage != null ? part.unitUsage : 1,
+        lineSource: '关键件到货',
+      },
+      part.qty,
+      part.warehouse,
+    )
+    line.fromArrivalKeyPart = true
+    return line
+  })
+}
+
+function seedArrivalKeyPartLines() {
+  if (!arrivalKeyParts.value.length) return
+  lines.value = buildArrivalKeyPartLines()
+}
+
+/**
+ * 工单 EBOM 下级物料 + 关键件：
+ * - 命中关键件：写入关键件单位用量（有预填用预填，否则用 EBOM 单位用量）并按工单数量重算领料量
+ * - 未命中的关键件：追加在明细末尾
+ */
+function mergeEbomLinesWithArrivalKeyParts(ebomLines = []) {
+  const prefills = arrivalKeyParts.value
+  if (!prefills.length) return ebomLines
+
+  const prefByCode = new Map(prefills.map((p) => [String(p.itemCode || '').trim(), p]))
+  const hitCodes = new Set()
+
+  const merged = (ebomLines || []).map((line) => {
+    const code = String(line.itemCode || '').trim()
+    const pref = prefByCode.get(code)
+    if (!pref) return line
+
+    hitCodes.add(code)
+    const oldUnitUsage = Number(line.unitUsage) || 1
+    const scheduleQty =
+      oldUnitUsage > 0 ? (Number(line.suggestedQty) || Number(line.shipQty) || 0) / oldUnitUsage : 1
+    const unitUsage =
+      pref.unitUsage != null && Number(pref.unitUsage) > 0 ? Number(pref.unitUsage) : oldUnitUsage
+    const demand = unitUsage * (Number.isFinite(scheduleQty) && scheduleQty > 0 ? scheduleQty : 1)
+    return {
+      ...line,
+      unitUsage,
+      suggestedQty: demand,
+      shipQty: demand,
+      fromArrivalKeyPart: true,
+      lineSource: line.lineSource ? `${line.lineSource}·关键件` : 'EBOM·关键件',
+    }
+  })
+
+  prefills.forEach((pref) => {
+    const code = String(pref.itemCode || '').trim()
+    if (!code || hitCodes.has(code)) return
+    const extra = createManualMaterialLine(
+      {
+        code: pref.itemCode,
+        itemCode: pref.itemCode,
+        name: pref.itemName,
+        itemName: pref.itemName,
+        spec: pref.specModel,
+        specModel: pref.specModel,
+        unit: pref.unit,
+        unitUsage: pref.unitUsage != null ? pref.unitUsage : 1,
+        lineSource: '关键件到货',
+      },
+      pref.qty,
+      pref.warehouse,
+    )
+    extra.fromArrivalKeyPart = true
+    merged.push(extra)
+  })
+
+  return merged
+}
+
+function initFromArrivalTracking() {
+  arrivalKeyParts.value = parseArrivalKeyPartsFromQuery()
+  if (!arrivalKeyParts.value.length) return
+  mode.value = MATERIAL_REQ_MODES.WORK_ORDER
+  workOrderRows.value = [createEmptyWoRow()]
+  form.salesOrderNo = ''
+  form.salesOrderProductIds = []
+  seedArrivalKeyPartLines()
+  const wh = arrivalKeyParts.value[0]?.warehouse
+  if (wh) {
+    /* 到货仓作领料仓候选提示；线边仓仍由车间同步 */
+  }
+  syncReceiveWarehouse()
+}
+
+onMounted(() => {
+  initFromArrivalTracking()
+})
 
 function toReqWorkOrderSnapshot(wo) {
   return {
@@ -605,16 +733,21 @@ watch(
 
 function onModeChange() {
   workOrderRows.value = [createEmptyWoRow()]
-  lines.value = []
   form.salesOrderNo = ''
   form.salesOrderProductIds = []
+  // 切换工单/订单/快速领料时，始终保留到货跟踪带入的关键件
+  seedArrivalKeyPartLines()
+  if (!arrivalKeyParts.value.length) {
+    lines.value = []
+  }
   syncReceiveWarehouse()
 }
 
 function onSalesOrderChange(code) {
   form.salesOrderNo = code || ''
   form.salesOrderProductIds = []
-  lines.value = []
+  seedArrivalKeyPartLines()
+  if (!arrivalKeyParts.value.length) lines.value = []
   if (!form.salesOrderNo) return
   const order = findSalesOrderByOrderNo(form.salesOrderNo)
   if (!order) {
@@ -633,7 +766,8 @@ function onSalesOrderChange(code) {
 }
 
 function onSalesOrderProductsChange() {
-  lines.value = []
+  seedArrivalKeyPartLines()
+  if (!arrivalKeyParts.value.length) lines.value = []
   if (!form.salesOrderNo) return
   if (!(form.salesOrderProductIds || []).length) {
     message.warning('请至少选择一个订单产品')
@@ -710,11 +844,13 @@ function onWorkshopChange() {
 function loadEbomLines() {
   const selected = selectedWorkOrders.value
   if (!selected.length) {
-    lines.value = []
+    // 尚未选工单：若有到货关键件则只展示关键件
+    seedArrivalKeyPartLines()
+    if (!arrivalKeyParts.value.length) lines.value = []
     return
   }
   const { lines: merged, emptyWorkOrders } = resolveBatchWorkOrderMaterialLines(selected)
-  lines.value = merged
+  lines.value = mergeEbomLinesWithArrivalKeyParts(merged)
   if (emptyWorkOrders.length) {
     message.warning(`${emptyWorkOrders.map((w) => w.code).join('、')} 无 EBOM，请手工补料`)
   }

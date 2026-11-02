@@ -652,6 +652,12 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
       }
       recomputeInboundOrderStatus(order, operator)
       syncTransferOrderFromInbound(order, { operator })
+      try {
+        const { recordKeyPartArrivalsFromInbound } = require('@/store/keyPartArrivalStore')
+        recordKeyPartArrivalsFromInbound(order, pendingLines, { operator })
+      } catch {
+        /* ignore */
+      }
       appendInboundConfirmLog(order, operator, pendingLines)
       count += 1
       return
@@ -687,6 +693,12 @@ export function confirmInboundOrders(ids, operator = 'admin1') {
           purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId),
         )
       }
+    } catch {
+      /* ignore */
+    }
+    try {
+      const { recordKeyPartArrivalsFromInbound } = require('@/store/keyPartArrivalStore')
+      recordKeyPartArrivalsFromInbound(order, pendingLines, { operator })
     } catch {
       /* ignore */
     }
@@ -734,6 +746,12 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
     if (!res.ok) return res
     recomputeInboundOrderStatus(order, operator)
     syncTransferOrderFromInbound(order, { operator })
+    try {
+      const { recordKeyPartArrivalsFromInbound } = require('@/store/keyPartArrivalStore')
+      recordKeyPartArrivalsFromInbound(order, [line], { operator })
+    } catch {
+      /* ignore */
+    }
     appendInboundConfirmLog(order, operator, [line])
     return { ok: true, order, line }
   }
@@ -759,6 +777,12 @@ export function confirmInboundLine(orderId, lineId, operator = 'admin1') {
         purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId),
       )
     }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const { recordKeyPartArrivalsFromInbound } = require('@/store/keyPartArrivalStore')
+    recordKeyPartArrivalsFromInbound(order, [line], { operator })
   } catch {
     /* ignore */
   }

@@ -246,10 +246,10 @@ export function createManualMaterialLine(item, qty = 1, warehouse = '原料仓')
     unit: isVL
       ? item.stockUnit || item.inventoryUnit || '米'
       : item.unit || item.inventoryUnit || '件',
-    unitUsage: 1,
+    unitUsage: Number(item.unitUsage) > 0 ? Number(item.unitUsage) : 1,
     suggestedQty: 0,
     shipQty: Number(qty) || 1,
-    lineSource: '手工添加',
+    lineSource: item.lineSource || '手工添加',
     itemId: item.id || item.itemId || '',
     itemType: item.itemType || '物料',
     shipWarehouse: warehouse,

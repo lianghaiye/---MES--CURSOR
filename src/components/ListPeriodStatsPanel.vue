@@ -36,7 +36,12 @@
         >
           <div class="stat-card" :class="[dense ? 'is-dense' : '', card.iconClass || 'icon-blue']">
             <div class="stat-body">
-              <div class="stat-card-title">{{ card.title }}</div>
+              <div class="stat-card-title">
+                <span class="stat-card-title-text">{{ card.title }}</span>
+                <a-tooltip v-if="card.tip" :title="card.tip">
+                  <QuestionCircleOutlined class="stat-card-tip-icon" />
+                </a-tooltip>
+              </div>
               <div class="stat-value">
                 {{ card.value }}<span v-if="card.unit" class="stat-unit">{{ card.unit }}</span>
               </div>
@@ -70,7 +75,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { DownOutlined, UpOutlined } from '@ant-design/icons-vue'
+import { DownOutlined, QuestionCircleOutlined, UpOutlined } from '@ant-design/icons-vue'
 import { STAT_PERIOD_OPTIONS } from '@/utils/deliveryStats'
 
 const props = defineProps({
@@ -346,9 +351,27 @@ export default { name: 'ListPeriodStatsPanel' }
 }
 
 .stat-card-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
   font-size: 13px;
   color: rgba(0, 0, 0, 0.55);
   margin-bottom: 8px;
+}
+
+.stat-card-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-card-tip-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.35);
+  cursor: help;
 }
 
 .stat-value {

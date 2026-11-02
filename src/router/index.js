@@ -632,6 +632,12 @@ const routes = [
         meta: { title: '成品入库申请详情', listPath: '/production/finished-inbound' },
       },
       {
+        path: 'production/arrival-tracking',
+        name: 'production-arrival-tracking',
+        component: () => import('@/views/production/ArrivalTrackingView.vue'),
+        meta: { title: '到货跟踪' },
+      },
+      {
         path: 'report-management/report-work',
         name: 'report-management-report-work',
         component: () => import('@/views/production/ReportWorkManagementView.vue'),

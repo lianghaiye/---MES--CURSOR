@@ -48,8 +48,8 @@ function nowText() {
   return dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
 
-const TODO_APPEND_ONCE_KEY = 'i_doms_workbench_todo_append_v2'
-const TODO_KEYS_TO_APPEND_ONCE = ['contract-approve', 'month-payment-due']
+const TODO_APPEND_ONCE_KEY = 'i_doms_workbench_todo_append_v3'
+const TODO_KEYS_TO_APPEND_ONCE = ['key-part-arrival']
 
 function normalizeTodoVisibleKeys(keys) {
   const defaults = getDefaultWorkbenchTodoKeys()
