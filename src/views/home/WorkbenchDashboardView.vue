@@ -263,6 +263,12 @@
                   <template v-else-if="column.key === 'status'">
                     <a-badge :status="statusBadge(record.status)" :text="record.status" />
                   </template>
+                  <template v-else-if="column.key === 'planStart'">
+                    {{ formatYmd(record.planStart) }}
+                  </template>
+                  <template v-else-if="column.key === 'planEnd'">
+                    {{ formatYmd(record.planEnd) }}
+                  </template>
                   <template v-else-if="column.key === 'planQty'">
                     {{ formatNum(record.planQty) }}
                   </template>
@@ -545,8 +551,8 @@ const woColumns = [
   { title: '产品规格', dataIndex: 'specModel', width: 120, ellipsis: true },
   { title: '单位', dataIndex: 'unit', width: 60 },
   { title: '状态', key: 'status', dataIndex: 'status', width: 90 },
-  { title: '计划开始', dataIndex: 'planStart', width: 140 },
-  { title: '计划结束', dataIndex: 'planEnd', width: 140 },
+  { title: '计划开始', key: 'planStart', dataIndex: 'planStart', width: 110 },
+  { title: '计划结束', key: 'planEnd', dataIndex: 'planEnd', width: 110 },
   { title: '计划数', key: 'planQty', dataIndex: 'planQty', width: 80, align: 'right' },
   { title: '排产数', key: 'scheduleQty', dataIndex: 'scheduleQty', width: 80, align: 'right' },
   { title: '良品数', key: 'goodQty', dataIndex: 'goodQty', width: 80, align: 'right' },
@@ -607,6 +613,14 @@ function formatMd(dateStr) {
   const parts = String(dateStr).split('-')
   if (parts.length >= 3) return `${parts[1]}-${parts[2]}`
   return dateStr
+}
+
+/** 计划开始/结束仅展示年月日 */
+function formatYmd(dateStr) {
+  if (!dateStr) return '—'
+  const raw = String(dateStr).trim()
+  const m = raw.match(/^(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : raw
 }
 
 function goPath(path, title) {
