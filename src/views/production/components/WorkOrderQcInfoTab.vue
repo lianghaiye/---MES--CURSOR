@@ -8,7 +8,7 @@
       :columns="columns"
       :data-source="rows"
       :pagination="false"
-      :scroll="{ x: 1200 }"
+      :scroll="{ x: 1100 }"
       :locale="{ emptyText: '暂无质检信息' }"
     >
       <template #bodyCell="{ column, record }">
@@ -46,12 +46,12 @@ const rows = computed(() => buildWorkOrderQcInfoRows(props.workOrder))
 const columns = [
   { title: '序号', dataIndex: 'index', width: 64 },
   { title: '状态', key: 'status', width: 90 },
+  { title: '质检类型', dataIndex: 'qcType', width: 110 },
   { title: '质检结果', key: 'result', width: 100 },
   { title: '质检单号', dataIndex: 'qcNo', width: 140 },
   { title: '质检方式', dataIndex: 'qcMode', width: 90 },
   { title: '工序', dataIndex: 'processName', width: 100 },
-  { title: '任务编号', dataIndex: 'taskNo', width: 180, ellipsis: true },
-  { title: '任务执行人', dataIndex: 'taskExecutor', width: 100 },
+  { title: '排产批次', dataIndex: 'scheduleBatch', width: 100 },
   { title: '质检时间', dataIndex: 'qcAt', width: 140 },
   { title: '质检人', dataIndex: 'qcBy', width: 90 },
 ]

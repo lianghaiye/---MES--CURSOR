@@ -29,6 +29,9 @@ import {
   resolveProcessOpOutsource,
   resolveScheduleProcessOutsourceStatusLabel,
 } from '@/utils/workOrderProcessOutsource'
+import { listQcTasks, QC_TASK_STATUS } from '@/store/qcTaskStore'
+import { formatScheduleBatchLabel } from '@/constants/reworkOrder'
+import { resolveProcessQcConfigs } from '@/utils/qcTriggerService'
 
 function sumLineQty(lines) {
   return (lines || []).reduce((s, l) => s + (Number(l.qty ?? l.applyQty ?? l.reqQty) || 0), 0)
@@ -562,36 +565,89 @@ export function flattenFinishedInboundDetailLines(record) {
   return rows
 }
 
-/** 质检信息 */
+function mapQcTaskDisplayStatus(qcStatus) {
+  if (qcStatus === QC_TASK_STATUS.COMPLETED || qcStatus === '已完成') return '已完成'
+  if (qcStatus === QC_TASK_STATUS.CANCELLED || qcStatus === '已终止') return '已终止'
+  return '待质检'
+}
+
+function collectWorkOrderQcTasks(workOrder) {
+  if (!workOrder) return []
+  const byId = workOrder.id ? listQcTasks({ workOrderId: workOrder.id }) : []
+  const code = workOrder.code || workOrder.workOrderNo || workOrder.orderNo || ''
+  const byNo = code ? listQcTasks({ workOrderNo: code }) : []
+  const map = new Map()
+  ;[...byId, ...byNo].forEach((t) => {
+    if (t?.id) map.set(t.id, t)
+  })
+  return [...map.values()].sort((a, b) =>
+    String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+  )
+}
+
+/** 质检信息（优先真实质检任务；无则按排产工序演示） */
 export function buildWorkOrderQcInfoRows(workOrder) {
+  const realTasks = collectWorkOrderQcTasks(workOrder)
+  if (realTasks.length) {
+    return realTasks.map((t, idx) => ({
+      id: t.id,
+      index: idx + 1,
+      status: mapQcTaskDisplayStatus(t.qcStatus),
+      qcType: t.bizScope || '—',
+      result: t.qcResult || '—',
+      qcNo: t.qcNo || '—',
+      qcMode: t.inspectMethod || '—',
+      processName: t.processName || '—',
+      scheduleBatch: formatScheduleBatchLabel(t.scheduleBatchNo ?? t),
+      qcAt: t.inspectedAt || t.inspectDate || '—',
+      qcBy: t.inspector || '—',
+    }))
+  }
+
   const scheduleRows = buildWorkOrderScheduleInfoRows(workOrder)
   if (!scheduleRows.length) return []
-  return scheduleRows.map((r, idx) => {
+
+  const rows = []
+  scheduleRows.forEach((r, idx) => {
+    const process = (workOrder.processes || []).find(
+      (p) =>
+        (r.processId && String(p.id) === String(r.processId)) ||
+        (r.processName && p.name === r.processName),
+    )
+    const qcConfigs = resolveProcessQcConfigs(process || { name: r.processName })
+    const types = qcConfigs.length ? qcConfigs.map((c) => c.bizScope) : ['生产过程检']
     const done = r.status === '已报工'
-    return {
-      id: `qc-${r.id}`,
-      index: idx + 1,
-      status: done ? '已完成' : '待质检',
-      result: done ? '质检通过' : '—',
-      qcNo: done ? `ZJ${dayjs().format('YYYYMMDD')}${String(idx + 1).padStart(3, '0')}` : '—',
-      qcMode: idx % 2 === 0 ? '抽检' : '全检',
-      processName: r.processName,
-      taskNo: r.taskNo,
-      taskExecutor: r.executor,
-      qcAt: done ? r.reportedAt : '—',
-      qcBy: done ? '质检员' : '—',
-    }
+    types.forEach((qcType, ti) => {
+      rows.push({
+        id: `qc-${r.id}-${ti}`,
+        index: rows.length + 1,
+        status: done ? '已完成' : '待质检',
+        qcType,
+        result: done ? '质检通过' : '—',
+        qcNo: done
+          ? `ZJ${dayjs().format('YYYYMMDD')}${String(idx + 1).padStart(3, '0')}${ti + 1}`
+          : '—',
+        qcMode: idx % 2 === 0 ? '抽检' : '全检',
+        processName: r.processName,
+        scheduleBatch: formatScheduleBatchLabel(r.batchNo ?? r),
+        qcAt: done ? r.reportedAt : '—',
+        qcBy: done ? '质检员' : '—',
+      })
+    })
   })
+  return rows
 }
 
 export function qcInfoStatusColor(status) {
-  return status === '已完成' ? 'success' : 'warning'
+  if (status === '已完成') return 'success'
+  if (status === '已终止') return 'default'
+  return 'warning'
 }
 
 export function qcInfoResultColor(result) {
   if (result === '质检通过') return 'success'
   if (result === '部分通过') return 'processing'
-  if (result === '不通过') return 'error'
+  if (result === '不通过' || result === '质检不通过') return 'error'
   return 'default'
 }
 
