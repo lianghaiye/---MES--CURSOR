@@ -119,7 +119,7 @@ export function createCrossDemoWorkOrders() {
       workCenter: '机加车间',
       bom: '离心泵部件',
       warehouse: CROSS_DEMO.warehouse,
-      urgency: '加急',
+      urgency: '特急',
       planDateRange: [dayjs().format('YYYY-MM-DD'), dayjs().add(10, 'day').format('YYYY-MM-DD')],
       remark: '演示工单占用：未领完的标准件仍占可用库存',
       processRouteName: routeName,

@@ -9,6 +9,7 @@ import {
 } from '@/constants/procurementDocSource'
 import { updateWorkOrder } from '@/store/workOrderStore'
 import { updateAssemblyWorkOrder } from '@/store/assemblyWorkOrderStore'
+import { normalizeUrgency } from '@/constants/urgency'
 
 const CONVERTIBLE_STATUSES = ['待下发', '已下发', '执行中']
 const DONE_BATCH_STATUSES = new Set(['完成', '已完成'])
@@ -45,7 +46,7 @@ export function buildConvertMaterialFromWorkOrder(wo, supplyType = '外购件') 
     stockQty: 0,
     warehouse: wo.warehouse || '',
     workCenter: wo.workCenter || '',
-    urgency: wo.urgency || '普通',
+    urgency: normalizeUrgency(wo.urgency),
     isTopLevel: true,
     productId: wo.productId || '',
     bomId: wo.bomId || '',
@@ -59,7 +60,7 @@ export function buildConvertSyntheticOrder(wo, actionLabel = '采购') {
   return {
     id: `wo-convert-order-${wo.id || Date.now()}`,
     orderNo: wo.sourceOrderNo || wo.code || '',
-    urgency: wo.urgency || '普通',
+    urgency: normalizeUrgency(wo.urgency),
     remark: `工单 ${wo.code || ''} 一键转${actionLabel}`,
     productQty: getWorkOrderConvertQty(wo),
     planSource: 'work-order-convert',

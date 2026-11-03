@@ -51,7 +51,7 @@ export function useReplenishExecute(options = {}) {
     return {
       id: `replenish-${action}-${Date.now()}`,
       orderNo: `BH${dayjs().format('YYYYMMDDHHmmss')}`,
-      urgency: '普通',
+      urgency: '正常',
       remark: `${remarkTag}${label}`,
       productQty: 1,
       planSource: PLAN_SOURCE.STOCK_REPLENISH,

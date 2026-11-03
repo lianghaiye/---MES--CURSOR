@@ -4,8 +4,8 @@ import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { catalogBomIdForProduct, hydrateCatalogBom } from '@/mock/productBomSeed'
 
 function mapUrgencyToPlan(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return urgency === '加急' ? '加急' : '紧急'
-  return '普通'
+  const { normalizeUrgency } = require('@/constants/urgency')
+  return normalizeUrgency(urgency)
 }
 
 function resolveDeliveryDate(lineItems, fallback) {

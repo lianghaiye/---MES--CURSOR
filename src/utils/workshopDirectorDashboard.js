@@ -16,6 +16,7 @@ import { ecnState } from '@/store/ecnStore'
 import { stockState } from '@/store/stockStore'
 import { calcPeriodStats } from '@/store/laborHourStore'
 import { calcProcessReportStats } from '@/utils/processReportWorkOrder'
+import { urgencyRank, URGENCY } from '@/constants/urgency'
 
 const STOCK_ALERT_THRESHOLD = 10
 const PLAN_RISK_DAYS = 7
@@ -158,7 +159,12 @@ function buildTodos(workshop, workOrders) {
           title: `${wo.code} · ${wo.name || wo.productName || ''}`,
           subtitle: `${wo.woType} · ${wo.workCenter || '—'}`,
           time: wo.submittedAt || wo.createdAt || '',
-          urgency: wo.urgency === '紧急' ? 'high' : 'normal',
+          urgency:
+            urgencyRank(wo.urgency) >= urgencyRank(URGENCY.CRITICAL)
+              ? 'critical'
+              : urgencyRank(wo.urgency) >= urgencyRank(URGENCY.URGENT)
+                ? 'high'
+                : 'normal',
           route: wo.listPath,
           query: { status: '待下发' },
           payload: wo,
@@ -322,9 +328,9 @@ function buildTodos(workshop, workOrders) {
       )
     })
 
-  const urgencyRank = { high: 0, normal: 1, low: 2 }
+  const todoUrgencyOrder = { critical: 0, high: 1, normal: 2, low: 3 }
   return todos.sort((a, b) => {
-    const ur = (urgencyRank[a.urgency] ?? 1) - (urgencyRank[b.urgency] ?? 1)
+    const ur = (todoUrgencyOrder[a.urgency] ?? 1) - (todoUrgencyOrder[b.urgency] ?? 1)
     if (ur !== 0) return ur
     return String(b.time).localeCompare(String(a.time))
   })

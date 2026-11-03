@@ -72,7 +72,7 @@ const form = reactive({
   toLineId: '',
   qty: 1,
   requireRepay: true,
-  urgency: '普通',
+  urgency: '正常',
   deliveryDate: '',
 })
 
@@ -95,7 +95,7 @@ watch(
       Number(toLine?.salesQty ?? toLine?.qty) || form.fromAllocQty,
     )
     form.requireRepay = true
-    form.urgency = toOrder?.urgency || '普通'
+    form.urgency = toOrder?.urgency || '正常'
     form.deliveryDate = toLine?.deliveryDate || ''
   },
 )

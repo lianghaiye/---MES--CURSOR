@@ -15,47 +15,246 @@
 
     <!-- 列表层：Tab 在上，搜索在 Tab 下 -->
     <template v-if="!drillStack.length">
-      <a-tabs v-model:activeKey="activeTab" class="main-tabs">
-        <a-tab-pane v-for="tab in KIT_SUPPLY_TABS" :key="tab.key" :tab="tab.label" />
-      </a-tabs>
-
-      <div class="filter-bar">
-        <a-input-search
-          v-model:value="keyword"
-          allow-clear
-          placeholder="搜索当前报表：订单号 / 客户 / 物料 / 工序 / 供应商"
-          class="search"
-          @search="refresh"
-        />
-        <span class="view-count">当前视图 {{ currentViewCount }} 行</span>
+      <div class="view-tabs-bar">
+        <a-tabs v-model:activeKey="activeTab" class="view-tabs" :tab-bar-style="{ margin: 0 }">
+          <a-tab-pane v-for="tab in KIT_SUPPLY_TABS" :key="tab.key" :tab="tab.label" />
+        </a-tabs>
       </div>
 
-      <!-- 装配齐套 -->
+      <div class="filter-card">
+        <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
+          <a-row :gutter="[12, 8]" style="width: 100%">
+            <template v-if="activeTab === 'kitting'">
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="单号">
+                  <a-input
+                    v-model:value="filters.docNo"
+                    allow-clear
+                    placeholder="计划单号 / 销售单号"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="客户">
+                  <a-input
+                    v-model:value="filters.customerName"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="产品编码">
+                  <a-input
+                    v-model:value="filters.productCode"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="产品名称">
+                  <a-input
+                    v-model:value="filters.productName"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="规格型号">
+                  <a-input
+                    v-model:value="filters.specModel"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="材质">
+                  <a-input
+                    v-model:value="filters.material"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="图号">
+                  <a-input
+                    v-model:value="filters.drawingNo"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="外部工号">
+                  <a-input
+                    v-model:value="filters.externalWorkNo"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <template v-else-if="activeTab === 'part-process'">
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料编码">
+                  <a-input
+                    v-model:value="filters.itemCode"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料名称">
+                  <a-input
+                    v-model:value="filters.itemName"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="工单号">
+                  <a-input
+                    v-model:value="filters.workOrderNo"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="当前工序">
+                  <a-input
+                    v-model:value="filters.currentProcess"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <template v-else-if="activeTab === 'outsourcing'">
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="外协厂商">
+                  <a-input
+                    v-model:value="filters.vendor"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="协作类型">
+                  <a-input
+                    v-model:value="filters.collabType"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <template v-else-if="activeTab === 'long-lead'">
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料编码">
+                  <a-input
+                    v-model:value="filters.itemCode"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料名称">
+                  <a-input
+                    v-model:value="filters.itemName"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="供应型态">
+                  <a-input
+                    v-model:value="filters.supplyType"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <template v-else>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="工单号">
+                  <a-input
+                    v-model:value="filters.workOrderNo"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </template>
+            <a-col :xs="24" :sm="12" :md="6">
+              <a-form-item class="filter-actions-item">
+                <a-space>
+                  <a-button type="primary" size="small" @click="refresh">查询</a-button>
+                  <a-button size="small" @click="resetFilters">重置</a-button>
+                </a-space>
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </a-form>
+      </div>
+
+      <!-- 齐套进度 -->
       <section v-show="activeTab === 'kitting'" class="panel">
         <div class="panel-toolbar">
           <a-radio-group v-model:value="kitView" button-style="solid" size="small">
+            <a-radio-button :value="KIT_VIEW_MODE.PRODUCTION_WORK_ORDER">按生产工单</a-radio-button>
+            <a-radio-button :value="KIT_VIEW_MODE.ASSEMBLY_WORK_ORDER">按总装工单</a-radio-button>
             <a-radio-button :value="KIT_VIEW_MODE.PLAN">按生产计划</a-radio-button>
-            <a-radio-button :value="KIT_VIEW_MODE.SALES">按销售订单</a-radio-button>
           </a-radio-group>
-          <span class="hint">
-            点行下钻缺件明细。按生产计划时每个产品一行；单号为计划单号（销售来源通常同销售订单号）。
-          </span>
+          <span class="hint">点行下钻缺件明细。按生产计划时同计划单号/销售单号/客户合并展示。</span>
         </div>
         <a-table
-          :columns="kittingColumns"
-          :data-source="dashboard.kitting"
-          :pagination="tablePagination"
+          :columns="kittingDisplayColumns"
+          :data-source="kittingPagedRows"
+          :pagination="kittingPagination"
           :scroll="{ x: 1280 }"
           row-key="id"
           size="middle"
+          bordered
           :custom-row="kittingRowProps"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'docNo'">
-              <div class="cell-stack">
-                <span>{{ record.docNo }}</span>
-                <span class="cell-sub">{{ record.docNoLabel }}</span>
-              </div>
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ (kittingPager.current - 1) * kittingPager.pageSize + index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'docNo'">
+              {{ record.docNo || '—' }}
+            </template>
+            <template v-else-if="column.key === 'salesOrderNo'">
+              {{ record.salesOrderNo || '-' }}
             </template>
             <template v-else-if="column.key === 'product'">
               <div class="cell-stack">
@@ -88,16 +287,35 @@
                 record.missingCount
               }}</span>
             </template>
+            <template v-else-if="column.key === 'urgency'">
+              <a-tag :color="urgencyTagColor(record.urgency)">{{
+                urgencyDisplayLabel(record.urgency)
+              }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'createdAt'">
+              {{ formatCreatedAt(record.createdAt) }}
+            </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="statusColor(record.statusKey)">{{ record.statusLabel }}</a-tag>
             </template>
             <template v-else-if="column.key === 'planAssemblyDate'">
               {{ formatShortDate(record.planAssemblyDate) }}
             </template>
+            <template v-else-if="column.key === 'actions'">
+              <a-button
+                v-if="canRequisition(record)"
+                type="link"
+                size="small"
+                @click.stop="goRequisition(record)"
+              >
+                去领料
+              </a-button>
+              <span v-else>—</span>
+            </template>
           </template>
         </a-table>
         <p class="foot-note">
-          齐套按零件项种计；缺件有在途为黄，无来源为红。口径对齐生产计划缺口与按单库存。
+          齐套按零件项种计；缺件有在途为黄，无来源为红。口径对齐生产计划缺口与按单库存。按工单可直接发起领料。
         </p>
       </section>
 
@@ -108,10 +326,14 @@
           :pagination="tablePagination"
           row-key="id"
           size="middle"
+          bordered
           :custom-row="partProcessRowProps"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'processRate'">
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'processRate'">
               <div class="rate-cell">
                 <a-progress :percent="record.processRatePct" size="small" :show-info="false" />
                 <span class="rate-text"
@@ -155,10 +377,14 @@
           :pagination="tablePagination"
           row-key="id"
           size="middle"
+          bordered
           :custom-row="vendorRowProps"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'onTimeRate'">
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'onTimeRate'">
               <div class="rate-cell">
                 <a-progress
                   :percent="record.onTimeRatePct"
@@ -181,10 +407,14 @@
           :pagination="tablePagination"
           row-key="id"
           size="middle"
+          bordered
           :custom-row="longLeadRowProps"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'risk'">
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'risk'">
               <a-tag :color="record.risk === 'high' ? 'error' : 'warning'">{{
                 record.riskLabel
               }}</a-tag>
@@ -203,10 +433,14 @@
           :pagination="tablePagination"
           row-key="id"
           size="middle"
+          bordered
           :custom-row="utilRowProps"
         >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'utilRate'">
+          <template #bodyCell="{ column, record, index }">
+            <template v-if="column.key === 'index'">
+              {{ index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'utilRate'">
               <div class="rate-cell">
                 <a-progress
                   :percent="Math.min(record.utilRatePct, 100)"
@@ -221,29 +455,25 @@
       </section>
     </template>
 
-    <!-- 下钻层：面包屑 + 搜索 + KPI + 明细（参考图1） -->
+    <!-- 下钻层（投屏等场景保留内嵌；业务页齐套下钻已改新标签） -->
     <template v-else>
-      <nav class="breadcrumb">
-        <a
-          v-for="(crumb, idx) in breadcrumbItems"
-          :key="`${crumb.key}-${idx}`"
-          class="crumb"
-          :class="{ current: idx === breadcrumbItems.length - 1 }"
-          @click.prevent="onCrumbClick(idx)"
-        >
-          <span v-if="idx > 0" class="crumb-sep">›</span>
-          {{ crumb.label }}
-        </a>
-      </nav>
-
-      <div class="filter-bar">
-        <a-input-search
-          v-model:value="drillKeyword"
-          allow-clear
-          placeholder="搜索当前报表：订单号 / 客户 / 物料 / 工序 / 供应商"
-          class="search"
-        />
-        <span class="view-count">当前视图 {{ drillViewCount }} 行</span>
+      <div class="crumb-bar">
+        <nav class="breadcrumb">
+          <a
+            v-for="(crumb, idx) in breadcrumbItems"
+            :key="`${crumb.key}-${idx}`"
+            class="crumb"
+            :class="{ current: idx === breadcrumbItems.length - 1 }"
+            @click.prevent="onCrumbClick(idx)"
+          >
+            <span v-if="idx > 0" class="crumb-sep">›</span>
+            {{ crumb.label }}
+          </a>
+        </nav>
+        <a-space>
+          <a-button size="small" @click="refresh">刷新</a-button>
+          <a-button type="primary" ghost size="small" @click="onCrumbClick(0)">返回列表</a-button>
+        </a-space>
       </div>
 
       <!-- 齐套缺件下钻 -->
@@ -270,23 +500,71 @@
             <div class="kpi-sub">项</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">计划装配日</div>
+            <div class="kpi-label">计划日期</div>
             <div class="kpi-value">{{ formatShortDate(currentDrill.row.planAssemblyDate) }}</div>
             <div class="kpi-sub">{{ daysToAssemblyText(currentDrill.row.planAssemblyDate) }}</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">客户 / 型号</div>
+            <div class="kpi-label">客户 / 产品</div>
             <div class="kpi-value kpi-value-sm">{{ currentDrill.row.customerName }}</div>
-            <div class="kpi-sub">
-              {{ currentDrill.row.specModel || currentDrill.row.productName || '—' }}
-            </div>
+            <div class="kpi-sub">{{ currentDrill.row.productName || '—' }}</div>
           </div>
+        </div>
+
+        <div class="filter-card drill-filter-card">
+          <a-form :model="drillFilters" layout="inline" class="filter-form horizontal-form">
+            <a-row :gutter="[12, 8]" style="width: 100%">
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料编码">
+                  <a-input
+                    v-model:value="drillFilters.itemCode"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="物料名称">
+                  <a-input
+                    v-model:value="drillFilters.itemName"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="型号规格">
+                  <a-input
+                    v-model:value="drillFilters.specModel"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="6">
+                <a-form-item label="材质">
+                  <a-input
+                    v-model:value="drillFilters.material"
+                    allow-clear
+                    placeholder="请输入"
+                    size="small"
+                  />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </a-form>
         </div>
 
         <section class="panel">
           <div class="panel-head">
-            <h3 class="sub-title">缺件明细 · {{ currentDrill.row.docNo }}</h3>
-            <span class="hint">点击行下钻到来源单据</span>
+            <h3 class="sub-title">
+              物料明细 · {{ currentDrill.row.productName || '—' }} ·
+              {{ currentDrill.row.specModel || '—' }} · {{ currentDrill.row.material || '—' }} ·
+              外部工号 {{ currentDrill.row.externalWorkNo || '—' }}
+            </h3>
           </div>
           <a-table
             :columns="shortageColumns"
@@ -294,30 +572,55 @@
             :pagination="false"
             row-key="id"
             size="middle"
-            :custom-row="shortageRowProps"
+            bordered
           >
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'status'">
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">
+                <span class="level-no" :style="levelNoStyle(record.levelNo)">{{
+                  record.levelNo || index + 1
+                }}</span>
+              </template>
+              <template v-else-if="column.key === 'demandQty'">
+                {{ formatQtyUnit(record.demandQty, record.unit) }}
+              </template>
+              <template v-else-if="column.key === 'physicalQty'">
+                {{ formatQtyUnit(record.physicalQty ?? record.stockQty, record.unit) }}
+              </template>
+              <template v-else-if="column.key === 'allocatedQty'">
+                {{ formatQtyUnit(record.allocatedQty ?? record.availableQty, record.unit) }}
+              </template>
+              <template v-else-if="column.key === 'othersAllocatedQty'">
+                {{ formatQtyUnit(record.othersAllocatedQty || 0, record.unit) }}
+              </template>
+              <template v-else-if="column.key === 'status'">
                 <a-tag :color="record.statusColor">{{ record.statusLabel }}</a-tag>
               </template>
             </template>
           </a-table>
           <div class="logic-box">
-            下钻逻辑：缺口 = 需求 − 现库存；状态优先级「已齐套 → 待到货（在途可覆盖）→ 部分缺口 →
-            严重缺料」。点面包屑返回上一级。
-          </div>
-          <div v-if="!isScreen" class="drill-actions">
-            <a-space>
-              <a-button @click="goPlan(currentDrill.row.planIds?.[0])">打开生产计划</a-button>
-              <a-button @click="goPath('/procurement/purchase-req')">采购申请</a-button>
-              <a-button @click="goPath('/procurement/outsourcing-orders')">外协订单</a-button>
-            </a-space>
+            <div>
+              缺料状态（缺口 = 需求 − 本单占用）：已齐套：缺口 ≤ 0；待到货：有缺口，且在途 ≥
+              缺口；部分缺口：有缺口，且 0 &lt; 在途 &lt; 缺口；严重缺料：有缺口，且在途 =
+              0；被高优先占用：他单占用 &gt; 0 且在途 = 0
+            </div>
+            <div>
+              占用口径：可用池 = 实物 − 手动锁定；无人手动时按「紧急度 → 计划日期 →
+              创建时间」自动预占。有手动占用后锁定优先保留再重算。抢占/让路见「占用明细」。
+            </div>
           </div>
         </section>
       </template>
 
       <!-- 厂商外协下钻 -->
       <template v-else-if="currentDrill?.type === 'vendor'">
+        <div class="filter-bar">
+          <a-input-search
+            v-model:value="drillKeyword"
+            allow-clear
+            placeholder="搜索外协单号 / 工序"
+            class="search"
+          />
+        </div>
         <section class="panel">
           <div class="panel-head">
             <h3 class="sub-title">外协订单 · {{ currentDrill.vendor }}</h3>
@@ -329,6 +632,7 @@
             :pagination="false"
             row-key="id"
             size="middle"
+            bordered
             :custom-row="(record) => ({ onClick: () => goOutsourcing(record.id) })"
           >
             <template #bodyCell="{ column, record }">
@@ -350,12 +654,21 @@ export default { name: 'KitSupplyProgressView' }
 </script>
 
 <script setup>
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, reactive, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
+import { useTabs } from '@/composables/useTabs'
+import { openCreateTab } from '@/utils/openCreateTab'
+import { formatQty } from '@/utils/numberFormat'
+import {
+  urgencyLabel as sharedUrgencyLabel,
+  urgencyTagColor as sharedUrgencyTagColor,
+} from '@/constants/urgency'
 import {
   KIT_SUPPLY_TABS,
   KIT_VIEW_MODE,
+  isWorkOrderKitView,
   buildKitSupplyDashboard,
   getOutsourcingOrdersForVendor,
 } from '@/utils/kitSupplyDashboard'
@@ -366,22 +679,107 @@ const props = defineProps({
 
 const router = useRouter()
 const route = useRoute()
+const { openTab } = useTabs()
 const isScreen = computed(() => props.mode === 'screen' || route.meta?.standalone === true)
 
-const keyword = ref('')
 const drillKeyword = ref('')
+const drillFilters = ref(createEmptyDrillFilters())
 const activeTab = ref('kitting')
-const kitView = ref(KIT_VIEW_MODE.PLAN)
+const kitView = ref(KIT_VIEW_MODE.PRODUCTION_WORK_ORDER)
+const filters = ref(createEmptyFilters())
 const dashboard = ref(buildKitSupplyDashboard({ kitView: kitView.value }))
 const isFullscreen = ref(false)
 /** @type {import('vue').Ref<Array<{ type: string, row?: object, vendor?: string }>>} */
 const drillStack = ref([])
+
+function createEmptyFilters() {
+  return {
+    docNo: '',
+    customerName: '',
+    productCode: '',
+    productName: '',
+    specModel: '',
+    material: '',
+    drawingNo: '',
+    externalWorkNo: '',
+    itemCode: '',
+    itemName: '',
+    workOrderNo: '',
+    currentProcess: '',
+    vendor: '',
+    collabType: '',
+    supplyType: '',
+  }
+}
+
+function createEmptyDrillFilters() {
+  return {
+    itemCode: '',
+    itemName: '',
+    specModel: '',
+    material: '',
+  }
+}
 
 const tablePagination = computed(() =>
   isScreen.value
     ? { pageSize: 8, showSizeChanger: false }
     : { pageSize: 10, showSizeChanger: true },
 )
+
+const kittingPager = reactive({
+  current: 1,
+  pageSize: isScreen.value ? 8 : 10,
+})
+
+watch(isScreen, (v) => {
+  kittingPager.pageSize = v ? 8 : Math.max(kittingPager.pageSize, 10)
+  kittingPager.current = 1
+})
+
+const kittingPagination = computed(() => ({
+  current: kittingPager.current,
+  pageSize: kittingPager.pageSize,
+  total: dashboard.value.kitting?.length || 0,
+  showSizeChanger: !isScreen.value,
+  pageSizeOptions: ['10', '20', '50'],
+  showTotal: (t) => `共 ${t} 条`,
+  onChange: (page, pageSize) => {
+    kittingPager.current = page
+    kittingPager.pageSize = pageSize
+  },
+}))
+
+const kittingPagedRows = computed(() => {
+  const list = dashboard.value.kitting || []
+  const start = (kittingPager.current - 1) * kittingPager.pageSize
+  return list.slice(start, start + kittingPager.pageSize)
+})
+
+/** 当前页内同计划/销售单号合并（按工单维度不合并） */
+function buildAdjacentDocRowSpans(rows = []) {
+  const spans = new Array(rows.length).fill(1)
+  let i = 0
+  while (i < rows.length) {
+    const key = String(rows[i]?.docNo || '')
+    let j = i + 1
+    while (j < rows.length && String(rows[j]?.docNo || '') === key) j += 1
+    const span = j - i
+    spans[i] = span
+    for (let k = i + 1; k < j; k += 1) spans[k] = 0
+    i = j
+  }
+  return spans
+}
+
+const kittingMergeEnabled = computed(() => kitView.value === KIT_VIEW_MODE.PLAN)
+
+const kittingDocRowSpans = computed(() => {
+  if (!kittingMergeEnabled.value) return kittingPagedRows.value.map(() => 1)
+  return buildAdjacentDocRowSpans(kittingPagedRows.value)
+})
+
+const KITTING_MERGE_KEYS = new Set(['docNo', 'salesOrderNo', 'customerName'])
 
 const currentDrill = computed(() =>
   drillStack.value.length ? drillStack.value[drillStack.value.length - 1] : null,
@@ -407,25 +805,42 @@ const rootTabLabel = computed(() => {
   return hit?.label || '齐套与供应进度'
 })
 
-const currentViewCount = computed(() => {
-  if (activeTab.value === 'kitting') return dashboard.value.kitting?.length || 0
-  if (activeTab.value === 'part-process') return dashboard.value.partProcess?.length || 0
-  if (activeTab.value === 'outsourcing') return dashboard.value.outsourcing?.vendors?.length || 0
-  if (activeTab.value === 'long-lead') return dashboard.value.longLead?.length || 0
-  if (activeTab.value === 'material-util') return dashboard.value.materialUtil?.length || 0
-  return 0
-})
-
 const filteredShortageLines = computed(() => {
-  const lines = currentDrill.value?.row?.shortageLines || []
-  const kw = drillKeyword.value.trim().toLowerCase()
-  if (!kw) return lines
-  return lines.filter((l) =>
-    [l.itemCode, l.itemName, l.specMaterialText, l.supplyType, l.sourceDocNo]
-      .join(' ')
-      .toLowerCase()
-      .includes(kw),
-  )
+  // 含已齐套行，便于打开占用明细看多单争用；缺料项 KPI 仍用 shortageLines
+  const row = currentDrill.value?.row
+  const lines = row?.allLines?.length ? row.allLines : row?.shortageLines || []
+  const f = drillFilters.value
+  return lines.filter((l) => {
+    if (
+      f.itemCode &&
+      !String(l.itemCode || '')
+        .toLowerCase()
+        .includes(f.itemCode.trim().toLowerCase())
+    )
+      return false
+    if (
+      f.itemName &&
+      !String(l.itemName || '')
+        .toLowerCase()
+        .includes(f.itemName.trim().toLowerCase())
+    )
+      return false
+    if (
+      f.specModel &&
+      !String(l.specModel || l.specMaterialText || '')
+        .toLowerCase()
+        .includes(f.specModel.trim().toLowerCase())
+    )
+      return false
+    if (
+      f.material &&
+      !String(l.material || l.specMaterialText || '')
+        .toLowerCase()
+        .includes(f.material.trim().toLowerCase())
+    )
+      return false
+    return true
+  })
 })
 
 const filteredVendorOrders = computed(() => {
@@ -433,35 +848,58 @@ const filteredVendorOrders = computed(() => {
   const kw = drillKeyword.value.trim().toLowerCase()
   if (!kw) return orders
   return orders.filter((o) =>
-    [o.orderNo, o.salesOrderNo, o.processName, o.vendor].join(' ').toLowerCase().includes(kw),
+    [o.orderNo, o.processName, o.vendor].join(' ').toLowerCase().includes(kw),
   )
 })
 
-const drillViewCount = computed(() => {
-  if (currentDrill.value?.type === 'kit') return filteredShortageLines.value.length
-  if (currentDrill.value?.type === 'vendor') return filteredVendorOrders.value.length
-  return 0
+const kittingDocLabel = computed(() => {
+  if (kitView.value === KIT_VIEW_MODE.PRODUCTION_WORK_ORDER) return '生产工单号'
+  if (kitView.value === KIT_VIEW_MODE.ASSEMBLY_WORK_ORDER) return '总装工单号'
+  return '计划单号'
 })
 
-const kittingColumns = computed(() => [
-  {
-    title: kitView.value === KIT_VIEW_MODE.PLAN ? '计划单号' : '销售订单号',
-    key: 'docNo',
-    width: 150,
-  },
-  { title: '客户', dataIndex: 'customerName', key: 'customerName', width: 110, ellipsis: true },
-  { title: '产品型号', key: 'product', width: 260 },
-  { title: '数量', key: 'qty', width: 100, align: 'right' },
-  { title: '计划装配日', key: 'planAssemblyDate', width: 100 },
-  { title: '齐套率', key: 'kitRate', width: 150 },
-  { title: '缺件项', key: 'missingCount', width: 80, align: 'right' },
-  { title: '状态', key: 'status', width: 96 },
-])
+const kittingColumns = computed(() => {
+  const cols = [
+    { title: '序号', key: 'index', width: 56, align: 'center', fixed: 'left' },
+    {
+      title: kittingDocLabel.value,
+      key: 'docNo',
+      width: 160,
+    },
+    { title: '销售单号', key: 'salesOrderNo', width: 150 },
+    { title: '客户', dataIndex: 'customerName', key: 'customerName', width: 110, ellipsis: true },
+    { title: '产品型号', key: 'product', width: 260 },
+    { title: '数量', key: 'qty', width: 100, align: 'right' },
+    { title: '计划日期', key: 'planAssemblyDate', width: 100 },
+    { title: '齐套率', key: 'kitRate', width: 150 },
+    { title: '缺件项', key: 'missingCount', width: 80, align: 'right' },
+    { title: '紧急度', key: 'urgency', width: 88 },
+    { title: '创建时间', key: 'createdAt', width: 120 },
+    { title: '状态', key: 'status', width: 96 },
+  ]
+  if (isWorkOrderKitView(kitView.value)) {
+    cols.push({ title: '操作', key: 'actions', width: 96, fixed: 'right' })
+  }
+  return cols
+})
+
+const kittingDisplayColumns = computed(() =>
+  kittingColumns.value.map((col) => {
+    if (!kittingMergeEnabled.value || !KITTING_MERGE_KEYS.has(col.key)) return col
+    return {
+      ...col,
+      customCell: (_record, index) => ({
+        rowSpan: kittingDocRowSpans.value[index] ?? 1,
+        style: { verticalAlign: 'middle' },
+      }),
+    }
+  }),
+)
 
 const partProcessColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', ellipsis: true },
-  { title: '销售单', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 130 },
   { title: '工单号', dataIndex: 'workOrderNo', key: 'workOrderNo', width: 130 },
   { title: '当前工序', dataIndex: 'currentProcess', key: 'currentProcess', width: 120 },
   { title: '工序进度', key: 'processRate', width: 160 },
@@ -469,6 +907,7 @@ const partProcessColumns = [
 ]
 
 const vendorColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '外协厂商', dataIndex: 'vendor', key: 'vendor', ellipsis: true },
   { title: '协作类型', dataIndex: 'collabType', key: 'collabType', width: 120 },
   { title: '在外订单', dataIndex: 'activeCount', key: 'activeCount', width: 90, align: 'right' },
@@ -484,7 +923,6 @@ const vendorColumns = [
 
 const vendorOrderColumns = [
   { title: '外协单号', dataIndex: 'orderNo', key: 'orderNo', width: 140 },
-  { title: '销售单', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 120 },
   { title: '工序/名称', dataIndex: 'processName', key: 'processName', ellipsis: true },
   { title: '计划回厂', dataIndex: 'planEndDate', key: 'planEndDate', width: 110 },
   { title: '回货状态', dataIndex: 'returnStatus', key: 'returnStatus', width: 90 },
@@ -492,11 +930,11 @@ const vendorOrderColumns = [
 ]
 
 const longLeadColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '风险', key: 'risk', width: 90 },
   { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', ellipsis: true },
   { title: '供应型态', dataIndex: 'supplyType', key: 'supplyType', width: 90 },
-  { title: '销售单', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 120 },
   { title: '需求日', dataIndex: 'needDate', key: 'needDate', width: 110 },
   {
     title: '供货期(天)',
@@ -510,41 +948,82 @@ const longLeadColumns = [
 ]
 
 const utilColumns = [
+  { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '工单号', dataIndex: 'workOrderNo', key: 'workOrderNo', width: 150 },
-  { title: '销售单', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 130 },
   { title: '理论需求', dataIndex: 'theoryText', key: 'theoryText', width: 110, align: 'right' },
   { title: '实发/实耗', dataIndex: 'actualText', key: 'actualText', width: 110, align: 'right' },
   { title: '利用率', key: 'utilRate', width: 180 },
 ]
 
 const shortageColumns = [
-  { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 120 },
+  { title: '序号', key: 'index', width: 72, align: 'left' },
+  { title: '物料编码', dataIndex: 'itemCode', key: 'itemCode', width: 110 },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', ellipsis: true },
-  { title: '规格 / 材质', dataIndex: 'specMaterialText', key: 'specMaterialText', width: 140 },
-  { title: '需求', dataIndex: 'demandQty', key: 'demandQty', width: 72, align: 'right' },
-  { title: '现库存', dataIndex: 'availableQty', key: 'availableQty', width: 80, align: 'right' },
-  { title: '在途/在制', dataIndex: 'inTransitQty', key: 'inTransitQty', width: 90, align: 'right' },
-  { title: '预计到位', dataIndex: 'etaText', key: 'etaText', width: 90 },
-  { title: '状态', key: 'status', width: 100 },
+  { title: '规格 / 材质', dataIndex: 'specMaterialText', key: 'specMaterialText', width: 120 },
+  { title: '需求', key: 'demandQty', width: 88, align: 'right' },
+  { title: '实物库存', key: 'physicalQty', width: 88, align: 'right' },
+  { title: '本单占用', key: 'allocatedQty', width: 88, align: 'right' },
+  { title: '他单占用', key: 'othersAllocatedQty', width: 88, align: 'right' },
+  { title: '在途/在制', dataIndex: 'inTransitQty', key: 'inTransitQty', width: 88, align: 'right' },
+  { title: '预计到位', dataIndex: 'etaText', key: 'etaText', width: 80 },
+  { title: '状态', key: 'status', width: 110 },
 ]
+
+function levelNoStyle(levelNo) {
+  const parts = String(levelNo || '')
+    .split('.')
+    .filter(Boolean)
+  const depth = Math.max(0, parts.length - 1)
+  return { paddingLeft: `${depth * 12}px`, fontVariantNumeric: 'tabular-nums' }
+}
+
+function formatQtyUnit(qty, unit) {
+  const q = formatQty(qty)
+  const u = String(unit || '').trim()
+  if (q === '—' || q === '') return u ? `— ${u}` : '—'
+  return u ? `${q} ${u}` : q
+}
 
 function refresh() {
   dashboard.value = buildKitSupplyDashboard({
-    keyword: keyword.value,
+    ...filters.value,
     kitView: kitView.value,
   })
+  kittingPager.current = 1
 }
 
-watch([keyword, kitView], () => refresh())
+function resetFilters() {
+  filters.value = createEmptyFilters()
+  refresh()
+}
+
+watch(kitView, () => refresh())
 watch(activeTab, () => {
   drillStack.value = []
   drillKeyword.value = ''
+  filters.value = createEmptyFilters()
+  refresh()
 })
 
 function formatShortDate(v) {
   if (!v) return '—'
   const d = dayjs(v)
   return d.isValid() ? d.format('MM-DD') : String(v).slice(5, 10) || v
+}
+
+function formatCreatedAt(v) {
+  if (!v) return '—'
+  const d = dayjs(v)
+  if (d.isValid()) return d.format(String(v).includes(':') ? 'YYYY-MM-DD HH:mm' : 'YYYY-MM-DD')
+  return String(v)
+}
+
+function urgencyTagColor(urgency) {
+  return sharedUrgencyTagColor(urgency)
+}
+
+function urgencyDisplayLabel(urgency) {
+  return sharedUrgencyLabel(urgency)
 }
 
 function daysToAssemblyText(v) {
@@ -578,6 +1057,7 @@ function toneClass(tone) {
 function pushDrill(frame) {
   drillStack.value = [...drillStack.value, frame]
   drillKeyword.value = ''
+  drillFilters.value = createEmptyDrillFilters()
 }
 
 function onCrumbClick(idx) {
@@ -585,26 +1065,57 @@ function onCrumbClick(idx) {
   if (idx === 0) {
     drillStack.value = []
     drillKeyword.value = ''
+    drillFilters.value = createEmptyDrillFilters()
     return
   }
   drillStack.value = drillStack.value.slice(0, idx)
   drillKeyword.value = ''
+  drillFilters.value = createEmptyDrillFilters()
+}
+
+function openKitShortageDetail(record) {
+  if (!record?.id) return
+  if (isScreen.value) {
+    pushDrill({ type: 'kit', row: record })
+    return
+  }
+  const title = `缺件明细 ${record.docNo || ''}`.trim()
+  openCreateTab(router, openTab, {
+    path: `/production/kit-supply/shortage/${encodeURIComponent(record.id)}`,
+    title,
+    query: { kitView: kitView.value },
+  })
+}
+
+function canRequisition(record) {
+  return (
+    isWorkOrderKitView(kitView.value) &&
+    record?.workOrderId &&
+    record?.docNo &&
+    record.docNo !== '待派工' &&
+    record.docNo !== '—'
+  )
+}
+
+function goRequisition(record) {
+  if (!canRequisition(record)) {
+    message.warning('当前行无有效工单，无法发起领料')
+    return
+  }
+  openCreateTab(router, openTab, {
+    path: '/production/material-requisition/create',
+    title: '申请领料',
+    query: {
+      workOrderId: record.workOrderId,
+      workOrderCode: record.workOrderNo || record.docNo,
+    },
+  })
 }
 
 function kittingRowProps(record) {
   return {
     style: { cursor: 'pointer' },
-    onClick: () => pushDrill({ type: 'kit', row: record }),
-  }
-}
-
-function shortageRowProps(record) {
-  return {
-    style: { cursor: isScreen.value ? 'default' : 'pointer' },
-    onClick: () => {
-      if (isScreen.value) return
-      goPlan(record.planId)
-    },
+    onClick: () => openKitShortageDetail(record),
   }
 }
 
@@ -800,8 +1311,77 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
-.main-tabs {
+.view-tabs-bar {
+  margin-bottom: 8px;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-bottom: none;
+  border-radius: 6px;
+  padding: 0 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.view-tabs-bar :deep(.view-tabs.ant-tabs) {
+  margin: 0;
+}
+
+.view-tabs-bar :deep(.ant-tabs-nav) {
+  margin: 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-nav::before) {
+  left: -16px !important;
+  right: -16px !important;
+  border-bottom: 1px solid var(--divider, #e5e6eb) !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab) {
+  padding: 14px 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab-btn) {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 22px !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+  font-weight: 700 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-ink-bar) {
+  height: 3px !important;
+  bottom: 0 !important;
+}
+
+.view-tabs-bar :deep(.ant-tabs-content-holder) {
+  display: none !important;
+}
+
+.filter-card {
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.horizontal-form :deep(.ant-form-item) {
   margin-bottom: 0;
+}
+
+.horizontal-form :deep(.filter-actions-item) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 32px;
+}
+
+.view-count {
+  font-size: 13px;
+  color: #8c8c8c;
+  white-space: nowrap;
 }
 
 .filter-bar {
@@ -809,41 +1389,54 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin: 12px 0 14px;
+  margin: 0 0 14px;
 }
 
 .search {
   width: min(520px, 100%);
 }
 
-.view-count {
-  font-size: 13px;
-  color: #8c8c8c;
+.crumb-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--divider, #e5e6eb);
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .breadcrumb {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 12px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 16px;
+  line-height: 24px;
 }
 
 .crumb {
   color: #1677ff;
   cursor: pointer;
+  font-weight: 600;
 }
 
 .crumb.current {
   color: #262626;
   cursor: default;
-  font-weight: 500;
 }
 
 .crumb-sep {
-  margin-right: 6px;
+  margin: 0 2px;
   color: #bfbfbf;
+}
+
+.drill-filter-card {
+  margin-bottom: 12px;
 }
 
 .panel {

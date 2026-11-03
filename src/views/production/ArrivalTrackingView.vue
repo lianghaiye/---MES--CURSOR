@@ -5,6 +5,8 @@
       tip="仅关键件；已到货按近7/15/30天查看"
       :show-period="false"
       :cards="statsCards"
+      dense
+      one-row
       storage-key="i_doms_arrival_tracking_stats_collapsed"
     />
 
@@ -372,6 +374,34 @@ const tableScrollX = computed(() => columns.value.reduce((sum, col) => sum + (co
 watch(activeTab, () => {
   pageState.current = 1
 })
+
+function applyFiltersFromRouteQuery() {
+  const tab = String(route.query.tab || '').trim()
+  if (tab === 'expected' || tab === 'arrived') activeTab.value = tab
+
+  const keyword = String(route.query.keyword || route.query.docNo || '').trim()
+  const itemCode = String(route.query.itemCode || '').trim()
+  const itemName = String(route.query.itemName || '').trim()
+  if (!keyword && !itemCode && !itemName) return
+
+  if (keyword) filters.keyword = keyword
+  if (itemCode) filters.itemCode = itemCode
+  if (itemName) filters.itemName = itemName
+  Object.assign(applied, { ...filters })
+  pageState.current = 1
+}
+
+watch(
+  () => [
+    route.query.tab,
+    route.query.keyword,
+    route.query.docNo,
+    route.query.itemCode,
+    route.query.itemName,
+  ],
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 function rowIndex(index) {
   return (pageState.current - 1) * pageState.pageSize + index + 1

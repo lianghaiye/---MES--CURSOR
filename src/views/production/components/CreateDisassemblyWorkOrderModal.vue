@@ -188,9 +188,9 @@ import dayjs from 'dayjs'
 import {
   processRouteOptions,
   workCenterOptions,
-  urgencyOptions,
   personInChargeOptions,
 } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByItemCode } from '@/utils/warehouseResolver'
 import { productInfoState } from '@/store/productInfoStore'
@@ -229,7 +229,7 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const personOpts = personInChargeOptions.map((v) => ({ label: v, value: v }))
 
 const itemOpts = computed(() =>
@@ -266,7 +266,7 @@ const form = reactive({
   standardCycleDays: 3,
   workCenter: undefined,
   personInCharge: undefined,
-  urgency: '普通',
+  urgency: '正常',
   planDateRange: null,
   reminderDate: null,
   remark: '',
@@ -295,7 +295,7 @@ watch(
         standardCycleDays: wo.standardCycleDays ?? 3,
         workCenter: wo.workCenter,
         personInCharge: wo.personInCharge,
-        urgency: wo.urgency || '普通',
+        urgency: wo.urgency || '正常',
         planDateRange:
           wo.planStartDate && wo.planEndDate
             ? [dayjs(wo.planStartDate), dayjs(wo.planEndDate)]
@@ -328,7 +328,7 @@ function resetForm() {
     standardCycleDays: 3,
     workCenter: undefined,
     personInCharge: undefined,
-    urgency: '普通',
+    urgency: '正常',
     planDateRange: null,
     reminderDate: null,
     remark: '',

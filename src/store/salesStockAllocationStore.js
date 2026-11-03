@@ -6,6 +6,7 @@ import { reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { stockState } from '@/store/stockStore'
 import { persistJson } from '@/utils/safeStorage'
+import { normalizeUrgency } from '@/constants/urgency'
 
 /** 延迟取主数据，避免与 productInfo/materialInfo → demo seed → 本 store 循环初始化 */
 function getProductInfoState() {
@@ -172,7 +173,7 @@ function upsertAllocation({
       itemName: itemName || '',
       qty: nextQty,
       status: 'active',
-      urgency: urgency || '普通',
+      urgency: normalizeUrgency(urgency),
       deliveryDate: deliveryDate || '',
       createdAt: now,
       updatedAt: now,
@@ -249,7 +250,7 @@ export function allocateStockOnSalesApprove(salesOrder, lines = [], options = {}
       itemCode: code,
       itemName: line.productName || '',
       qty: take,
-      urgency: salesOrder.urgency || line.urgency || '普通',
+      urgency: normalizeUrgency(salesOrder.urgency || line.urgency),
       deliveryDate: line.deliveryDate || salesOrder.deliveryDate || '',
     })
     results.push(row)
@@ -372,7 +373,7 @@ export function confirmStockTransfer(payload) {
       owedQty: qty,
       repaidQty: 0,
       status: 'open',
-      urgency: payload.urgency || '普通',
+      urgency: normalizeUrgency(payload.urgency),
       deliveryDate: payload.deliveryDate || '',
       createdAt: now,
       updatedAt: now,
@@ -536,7 +537,7 @@ export function confirmBatchOwnershipTransfer(payload = {}) {
       owedQty,
       repaidQty: 0,
       status: 'open',
-      urgency: '普通',
+      urgency: '正常',
       deliveryDate: '',
       createdAt: now,
       updatedAt: now,

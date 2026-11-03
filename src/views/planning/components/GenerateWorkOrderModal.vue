@@ -175,7 +175,8 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { personInChargeOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { personInChargeOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { unitState, getAllEnabledUnitOptions } from '@/store/unitStore'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
@@ -242,7 +243,7 @@ const selectOptions = computed(() => {
       return getAllEnabledUnitOptions()
     })(),
     warehouse: getWarehouseSelectOptions(),
-    urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
+    urgency: getUrgencyOptions(),
   }
 })
 

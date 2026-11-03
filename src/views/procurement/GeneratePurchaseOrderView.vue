@@ -550,8 +550,8 @@ import {
   settlementTypeOptions,
   receivingModeOptions,
   designatedSupplierOptions,
-  urgencyOptions,
 } from '@/mock/purchaseRequisitionOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
@@ -632,7 +632,7 @@ const columnWidths = reactive(
   Object.fromEntries(generatePurchaseOrderColumns.map((c) => [getColumnKey(c), c.width || 100])),
 )
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 
 const purchaseUnitOpts = computed(() => {
   void unitState.units

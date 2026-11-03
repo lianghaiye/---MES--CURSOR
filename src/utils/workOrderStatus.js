@@ -4,8 +4,13 @@
  * 「部分下发」不再作为主状态；未排完用排产进度旁显
  * 返工不改主状态，用「返工」标签旁显
  */
-import { MOBILE_TASK_SYNC_KEY } from '@/utils/mobileTaskDispatch'
 import { getWorkOrderConvertOccupyQty } from '@/utils/workOrderConvertOccupy'
+import { normalizeUrgency } from '@/constants/urgency'
+
+/** 勿顶层 import mobileTaskDispatch：其会再拉 workOrderProcessOutsource → workOrderStore，形成循环依赖 */
+function getMobileTaskSyncKey() {
+  return require('@/utils/mobileTaskDispatch').MOBILE_TASK_SYNC_KEY
+}
 
 export const WORK_ORDER_STATUSES = ['待下发', '已下发', '执行中', '已完成', '暂停', '终止']
 
@@ -114,7 +119,7 @@ export function listMobileTasksForWorkOrder(workOrderId) {
   const stored = readJsonStorage(MOBILE_TASK_STORAGE_KEY)
   if (Array.isArray(stored)) stored.forEach(push)
 
-  const sync = readJsonStorage(MOBILE_TASK_SYNC_KEY)
+  const sync = readJsonStorage(getMobileTaskSyncKey())
   if (Array.isArray(sync)) sync.forEach(push)
 
   return out
@@ -136,7 +141,8 @@ function persistMobileTaskPatches(patchesById) {
     if (changed) writeJsonStorage(MOBILE_TASK_STORAGE_KEY, next)
   }
 
-  const sync = readJsonStorage(MOBILE_TASK_SYNC_KEY)
+  const syncKey = getMobileTaskSyncKey()
+  const sync = readJsonStorage(syncKey)
   if (Array.isArray(sync)) {
     let changed = false
     const next = sync.map((t) => {
@@ -145,7 +151,7 @@ function persistMobileTaskPatches(patchesById) {
       changed = true
       return { ...t, ...patch }
     })
-    if (changed) writeJsonStorage(MOBILE_TASK_SYNC_KEY, next)
+    if (changed) writeJsonStorage(syncKey, next)
   }
 }
 
@@ -241,7 +247,8 @@ export function syncWorkOrderDispatchStatus(workOrder) {
 export function migrateWorkOrderStatusFields(wo) {
   if (!wo || typeof wo !== 'object') return wo
   if (wo.status === '完成') wo.status = '已完成'
-  if (wo.urgency === '正常') wo.urgency = '普通'
+  // 紧急度统一为字典 urgency：特急 / 紧急 / 正常（兼容旧 加急/普通）
+  wo.urgency = normalizeUrgency(wo.urgency)
   if (wo.progressLabel != null) {
     delete wo.progressLabel
   }

@@ -1,8 +1,9 @@
 import { reactive, watch } from 'vue'
 import { topModules } from '@/config/menus'
 
-const STORAGE_KEY = 'i_doms_system_dict_v5'
+const STORAGE_KEY = 'i_doms_system_dict_v6'
 const LEGACY_STORAGE_KEYS = [
+  'i_doms_system_dict_v5',
   'i_doms_system_dict_v4',
   'i_doms_system_dict_v3',
   'i_doms_system_dict_v2',
@@ -20,6 +21,12 @@ export const DICT_MODULE_OPTIONS = topModules
   .map((m) => ({ label: m.label, value: m.label }))
 
 const BUILTIN_SEED = [
+  {
+    code: 'urgency',
+    name: '紧急度',
+    module: '基础数据',
+    values: ['特急', '紧急', '正常'],
+  },
   {
     code: 'scrap_reason',
     name: '报废原因',
@@ -163,7 +170,11 @@ function ensureDictModules(dicts = []) {
     return createDict({
       ...d,
       module: d.module || seed?.module || '',
-      items: d.code === 'purchase_return_type' && seed?.items?.length ? seed.items : items,
+      // 预置字典项以种子为准，避免本地旧缓存卡在过期枚举
+      items:
+        (d.code === 'purchase_return_type' || d.code === 'urgency') && seed?.items?.length
+          ? seed.items
+          : items,
     })
   })
   const existing = new Set(normalized.map((d) => d.code))

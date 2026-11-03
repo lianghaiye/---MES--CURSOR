@@ -411,7 +411,8 @@ import {
 } from '@/utils/workOrderStatus'
 import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
 import { sortWorkOrdersForList } from '@/utils/workOrderListSort'
-import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions, urgencyTagColor, urgencyLabel } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateAssemblyWorkOrderModal from './components/CreateAssemblyWorkOrderModal.vue'
@@ -483,7 +484,7 @@ const scheduleBatchModalOpen = ref(false)
 const scheduleBatchTarget = ref(null)
 const editScheduleQtyModalOpen = ref(false)
 const editScheduleQtyTarget = ref(null)
-const urgencyDraft = ref('普通')
+const urgencyDraft = ref('正常')
 const urgencyTargetId = ref(null)
 const layoutMode = ref(localStorage.getItem(LAYOUT_STORAGE_KEY) || 'split')
 const detailDrawerOpen = ref(false)
@@ -497,7 +498,7 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const bomOpts = bomOptions.map((v) => ({ label: v, value: v }))
 
 const filteredOrders = computed(() =>
@@ -603,16 +604,6 @@ function statusColor(status) {
 function hasOpenRework(wo) {
   void reworkOrderState.orders
   return workOrderHasOpenRework(wo)
-}
-
-function urgencyTagColor(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return 'error'
-  return 'default'
-}
-
-function urgencyLabel(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return '紧急'
-  return '不紧急'
 }
 
 function scheduleQtyOf(wo) {

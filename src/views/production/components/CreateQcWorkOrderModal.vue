@@ -95,7 +95,8 @@
 import { computed, reactive, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { workCenterOptions, urgencyOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { bomOptions } from '@/mock/workOrderMaster'
@@ -144,7 +145,7 @@ const form = reactive({
   workCenter: '质检中心',
   bom: undefined,
   warehouse: undefined,
-  urgency: '普通',
+  urgency: '正常',
   planDateRange: null,
   remark: '',
 })
@@ -159,7 +160,7 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value: v })))
+const urgencyOpts = computed(() => getUrgencyOptions())
 
 watch(
   () => form.productName,
@@ -201,7 +202,7 @@ watch(
     form.workCenter = '质检中心'
     form.bom = undefined
     form.warehouse = undefined
-    form.urgency = '普通'
+    form.urgency = '正常'
     form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
     form.remark = ''
   },

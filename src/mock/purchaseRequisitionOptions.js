@@ -1,4 +1,4 @@
-export const urgencyOptions = ['正常', '紧急', '特急']
+export { urgencyOptions, getUrgencyOptions } from '@/constants/urgency'
 
 export const docStatusOptions = ['草稿', '待处理', '处理中', '处理完成', '已作废']
 

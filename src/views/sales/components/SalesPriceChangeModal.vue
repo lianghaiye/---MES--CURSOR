@@ -598,7 +598,6 @@ import {
 import { getSalesOrderById, salesOrderState } from '@/store/salesOrderStore'
 import { getCustomerOptions } from '@/store/customerStore'
 import {
-  urgencyOptions,
   contractTypeOptions,
   settlementCurrencyOptions,
   orderTypeOptions,
@@ -607,6 +606,7 @@ import {
   paymentRatioOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import { useFormCreateModal } from '@/composables/useFormCreateModal'
 import CustomerSelect from './CustomerSelect.vue'
@@ -697,7 +697,7 @@ const inTaxColumnKeys = new Set([
   'deltaAmountInTax',
 ])
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v }))
 const currencyOpts = settlementCurrencyOptions.map((v) => ({ label: v, value: v }))
 const orderTypeOpts = orderTypeOptions.map((v) => ({ label: v, value: v }))

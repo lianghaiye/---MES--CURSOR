@@ -827,7 +827,7 @@ import {
   warehouseOptions,
   applyTypeOptions,
 } from '@/mock/purchaseOrderOptions'
-import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { mockInventory } from '@/mock/inventory'
 import { createPoLineItem } from '@/mock/purchaseOrders'
 import { productInfoState } from '@/store/productInfoStore'
@@ -975,7 +975,7 @@ const applyTypeOpts = applyTypeOptions.map((v) => ({ label: v, value: v }))
 const purchaserOpts = purchaserOptions.map((v) => ({ label: v, value: v }))
 const contactOpts = contactOptions.map((c) => ({ label: c.label, value: c.value, phone: c.phone }))
 const warehouseOpts = warehouseOptions
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 
 const taxModeHint = computed(() =>
   taxModeExcluding.value

@@ -13,6 +13,7 @@ import {
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createLaborDemoQcOrders, isLaborDemoWorkOrder } from '@/mock/laborHourDemoSeed'
 import { persistJson } from '@/utils/safeStorage'
+import { normalizeUrgency } from '@/constants/urgency'
 
 const STORAGE_KEY = 'i_doms_qc_work_orders'
 let codeSeq = 1
@@ -83,7 +84,7 @@ function createInitialOrders() {
       workCenter: '质检中心',
       bom: '潜水电机',
       warehouse: '半成品仓',
-      urgency: '普通',
+      urgency: '正常',
       planDateRange: ['2026-05-25', '2026-06-10'],
       remark: '',
       processRouteName: '装配标准路线',
@@ -107,7 +108,7 @@ function createInitialOrders() {
       workCenter: '质检中心',
       bom: '潜水电机',
       warehouse: '成品仓',
-      urgency: '普通',
+      urgency: '正常',
       planDateRange: ['2026-05-01', '2026-05-20'],
       remark: '',
       processRouteName: '装配标准路线',
@@ -185,7 +186,7 @@ export function createQcWorkOrderPayload(partial) {
     workCenter: partial.workCenter || '质检中心',
     bom: partial.bom || productName,
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
-    urgency: partial.urgency || '普通',
+    urgency: normalizeUrgency(partial.urgency),
     planDateRange: partial.planDateRange || [
       dayjs().format('YYYY-MM-DD'),
       dayjs().add(14, 'day').format('YYYY-MM-DD'),

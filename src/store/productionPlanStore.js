@@ -14,6 +14,7 @@ import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
 import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
 import { ensurePackageConvertDemoOnPlans } from '@/mock/packageConvertPurchaseDemoSeed'
 import { ensureShipAccessoryProduceDemoPlans } from '@/mock/shipAccessoryProduceDemoSeed'
+import { ensureKitMultiAllocDemoPlans } from '@/mock/kitMultiAllocDemoSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
 import { MATERIAL_RELEASE_STATUS } from '@/constants/ecnPlanReschedule'
 import { flattenMaterials } from '@/utils/material'
@@ -79,8 +80,10 @@ function normalizePlanStatuses(orders) {
     firstSales._pendingDemoApplied = true
   }
 
-  return ensureShipAccessoryProduceDemoPlans(
-    ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized)),
+  return ensureKitMultiAllocDemoPlans(
+    ensureShipAccessoryProduceDemoPlans(
+      ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized)),
+    ),
   )
 }
 
@@ -186,8 +189,8 @@ function resolveDeliveryDate(lineItems, fallback) {
 }
 
 function mapUrgencyToPlan(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return urgency === '加急' ? '加急' : '紧急'
-  return '普通'
+  const { normalizeUrgency } = require('@/constants/urgency')
+  return normalizeUrgency(urgency)
 }
 
 /**
@@ -570,7 +573,7 @@ export function createProductionPlanFromStockReplenish(suggestionRows = [], opti
     salesperson: '',
     operator,
     creator: operator,
-    urgency: '普通',
+    urgency: '正常',
     orderStatus: '待下达',
     orderDate: dayjs().format('YYYY-MM-DD'),
     deliveryDate,

@@ -279,7 +279,7 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { InfoCircleOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { urgencyOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { salespersonOptions } from '@/mock/salesOrderOptions'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { getPurchaseUnitOptions, unitState } from '@/store/unitStore'
@@ -346,7 +346,7 @@ const columnDefs = computed(() => [
 const headerForm = reactive({
   receivingWarehouse: undefined,
   expectedArrivalDate: null,
-  urgency: '普通',
+  urgency: '正常',
   salesperson: 'admin1',
   remark: '',
 })
@@ -388,7 +388,7 @@ const purchaseUnitOpts = computed(() => {
   return getPurchaseUnitOptions()
 })
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 const CURRENT_USER = 'admin1'
 
@@ -444,7 +444,7 @@ function resetHeaderForm(order, materials) {
     materials.map((m) => m.warehouse).find(Boolean) || warehouseOpts.value[0]?.value || undefined
   headerForm.receivingWarehouse = defaultWarehouse
   headerForm.expectedArrivalDate = dayjs(defaultArrival)
-  headerForm.urgency = order?.urgency || '普通'
+  headerForm.urgency = order?.urgency || '正常'
   headerForm.salesperson = order?.salesperson || CURRENT_USER
   headerForm.remark = order?.remark || ''
 }

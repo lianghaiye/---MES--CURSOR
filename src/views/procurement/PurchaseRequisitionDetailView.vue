@@ -8,7 +8,9 @@
               <span class="order-no">{{ record.reqNo }}</span>
               <a-tag :color="docStatusColor(record.docStatus)">{{ record.docStatus }}</a-tag>
               <a-tag v-if="activeDraft" color="purple"> 关联草稿 {{ activeDraft.orderNo }} </a-tag>
-              <a-tag :color="urgencyColor(record.urgency)">{{ record.urgency }}</a-tag>
+              <a-tag :color="urgencyColor(record.urgency)">{{
+                urgencyLabel(record.urgency)
+              }}</a-tag>
               <a-tag v-if="record.overdueStatus" :color="overdueStatusColor(record.overdueStatus)">
                 {{ record.overdueStatus }}
               </a-tag>
@@ -212,6 +214,7 @@ import { tabStore, useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import PurchaseRequisitionBasicInfoSection from './components/PurchaseRequisitionBasicInfoSection.vue'
 import PurchaseRequisitionPrintModal from './components/PurchaseRequisitionPrintModal.vue'
+import { urgencyTagColor, urgencyLabel } from '@/constants/urgency'
 
 const route = useRoute()
 const router = useRouter()
@@ -355,12 +358,7 @@ function docStatusColor(status) {
 }
 
 function urgencyColor(urgency) {
-  const map = {
-    紧急: 'error',
-    加急: 'warning',
-    正常: 'default',
-  }
-  return map[urgency] || 'default'
+  return urgencyTagColor(urgency)
 }
 
 function overdueStatusColor(status) {

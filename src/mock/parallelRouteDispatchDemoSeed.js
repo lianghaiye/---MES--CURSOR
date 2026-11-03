@@ -109,7 +109,7 @@ function createParallelRouteDispatchDemoOrder() {
     bomId: '',
     bomLabel: '轴套半成品',
     warehouse: '半成品仓',
-    urgency: '普通',
+    urgency: '正常',
     planDateRange: [today, end],
     remark: '演示：工艺路线「机加并行演示路线」；第2步粗车+钻孔并行（全部完成），步骤列同为 2',
     processRouteName: PARALLEL_ROUTE_DEMO_NAME,

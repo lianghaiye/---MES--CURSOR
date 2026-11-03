@@ -6,7 +6,7 @@ export const businessTypeOptions = [
   '质检服务',
   '定制销售',
 ]
-export const urgencyOptions = ['正常', '紧急', '加急']
+export { urgencyOptions, getUrgencyOptions } from '@/constants/urgency'
 export const contractTypeOptions = ['标准合同', '框架合同', '临时合同']
 export const settlementCurrencyOptions = ['人民币', '美元', '欧元']
 export const orderTypeOptions = ['国内订单', '海外订单']

@@ -16,6 +16,7 @@ import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { productInfoState } from '@/store/productInfoStore'
 import { publishEbomToProductBom } from '@/utils/publishEbomToProductBom'
 import { designTaskCanPublishProductBom } from '@/utils/designTaskProductMaster'
+import { normalizeUrgency } from '@/constants/urgency'
 
 const STORAGE_KEY = 'i_doms_design_tasks'
 /** v4：种子含「待审核」任务，列表操作列可点审核 */
@@ -107,7 +108,7 @@ function buildTaskBase(salesOrder, line, product, source, extras = {}) {
     quantity: Number(line?.quantity ?? line?.salesQty ?? extras.quantity) || 1,
     orderType: salesOrder?.orderType || line?.orderType || '标准订单',
     orderDate: salesOrder?.documentDate || line?.orderDate || dayjs().format('YYYY-MM-DD'),
-    urgency: salesOrder?.urgency || line?.urgency || '普通',
+    urgency: normalizeUrgency(salesOrder?.urgency || line?.urgency),
     deliveryDate: line?.deliveryDate || salesOrder?.documentDate || '',
     productId: line?.productId || product?.id || extras.productId || '',
     productCode: line?.productCode || product?.code || extras.productCode || '',
@@ -357,7 +358,7 @@ function onDesignTaskApproved(task, checker = 'admin1', options = {}) {
       customerName: task.customerName,
       productQty: salesQty,
       salesperson: task.salesperson,
-      urgency: task.urgency === '紧急' || task.urgency === '加急' ? task.urgency : '普通',
+      urgency: normalizeUrgency(task.urgency),
       orderStatus: '待下达',
       orderDate: task.orderDate || dayjs().format('YYYY-MM-DD'),
       deliveryDate,

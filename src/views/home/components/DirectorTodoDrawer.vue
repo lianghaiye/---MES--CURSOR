@@ -55,15 +55,15 @@ const router = useRouter()
 const drawerTitle = computed(() => props.item?.category || '待办详情')
 
 const urgencyColor = computed(() => {
-  if (props.item?.urgency === 'high') return 'red'
-  if (props.item?.urgency === 'low') return 'default'
-  return 'blue'
+  if (props.item?.urgency === 'critical') return 'error'
+  if (props.item?.urgency === 'high') return 'warning'
+  return 'default'
 })
 
 const urgencyLabel = computed(() => {
+  if (props.item?.urgency === 'critical') return '特急'
   if (props.item?.urgency === 'high') return '紧急'
-  if (props.item?.urgency === 'low') return '一般'
-  return '普通'
+  return '正常'
 })
 
 const previewFields = computed(() => {

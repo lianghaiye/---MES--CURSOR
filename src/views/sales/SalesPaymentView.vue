@@ -462,13 +462,15 @@ watch(
 
 function applyFiltersFromRouteQuery() {
   const due = String(route.query.due || '').trim()
+  const contractNo = String(route.query.contractNo || route.query.keyword || '').trim()
   filters.due = due || undefined
+  if (contractNo) filters.contractNo = contractNo
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }
 
 watch(
-  () => route.query.due,
+  () => [route.query.due, route.query.contractNo, route.query.keyword],
   () => applyFiltersFromRouteQuery(),
   { immediate: true },
 )

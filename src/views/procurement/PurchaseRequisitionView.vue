@@ -331,11 +331,11 @@ import {
   purchaseOrderState,
 } from '@/store/purchaseOrderStore'
 import {
-  urgencyOptions,
   docStatusOptions,
   overdueStatusOptions,
   operatorOptions,
 } from '@/mock/purchaseRequisitionOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import {
   PROCUREMENT_DOC_SOURCE_OPTIONS,
   normalizeProcurementDocSource,
@@ -375,7 +375,7 @@ const pagination = reactive({ current: 1, pageSize: 10 })
 const printModalOpen = ref(false)
 const printTargets = ref([])
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const docStatusOpts = docStatusOptions.map((v) => ({ label: v, value: v }))
 const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 const operatorOpts = operatorOptions.map((v) => ({ label: v, value: v }))

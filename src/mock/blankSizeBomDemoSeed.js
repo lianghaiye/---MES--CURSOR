@@ -215,7 +215,7 @@ export function createBlankSizeDemoWorkOrder() {
     bomId: bom.id,
     bomLabel: `${bom.bomName} ${bom.version}`,
     warehouse: '半成品仓',
-    urgency: '普通',
+    urgency: '正常',
     planDateRange: [dayjs().format('YYYY-MM-DD'), dayjs().add(14, 'day').format('YYYY-MM-DD')],
     remark:
       '打开「EBOM」「当前BOM」可查看钢管/钢板/圆钢行的下料尺寸；下发页「下料」工序展示需下料结算物料',

@@ -8,7 +8,20 @@
       :style="fabStyle"
       @pointerdown="onFabPointerDown"
     >
-      <div class="bxz-fab__hover-bubble" aria-hidden="true">
+      <button
+        v-if="notifyBubble"
+        type="button"
+        class="bxz-fab__notify-bubble"
+        :title="notifyBubble.title"
+        @pointerdown.stop
+        @click.stop="openMessageCenter"
+      >
+        <span class="bxz-fab__notify-badge" v-if="unreadCount > 1">{{
+          unreadCount > 99 ? '99+' : unreadCount
+        }}</span>
+        <span class="bxz-fab__notify-text">{{ notifyBubble.preview }}</span>
+      </button>
+      <div v-else class="bxz-fab__hover-bubble" aria-hidden="true">
         <span>我是泵小智，</span>
         <span>有疑问可以问我哦！～</span>
       </div>
@@ -135,9 +148,12 @@
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { streamAgentChat } from '@/api/agent'
 import { effectiveTheme } from '@/store/uiAppearanceStore'
+import { latestUnreadPreview, unreadMessageCount } from '@/store/messageNotifyStore'
+import { useTabs } from '@/composables/useTabs'
 import avatarUrl from '@/assets/agent/beng-xiaozhi-mascot.png'
 
 const FAB_POS_KEY = 'i_doms_bxz_fab_pos'
@@ -153,6 +169,8 @@ const suggestions = [
 ]
 
 const theme = effectiveTheme
+const router = useRouter()
+const { openTab } = useTabs()
 const open = ref(false)
 const sizeMode = ref('small') // small | large
 const input = ref('')
@@ -171,6 +189,22 @@ let dragState = null
 let resizeState = null
 
 const hasUserMessage = computed(() => messages.value.some((m) => m.role === 'user'))
+const unreadCount = computed(() => unreadMessageCount.value)
+const notifyBubble = computed(() => {
+  const list = latestUnreadPreview(1)
+  if (!list.length) return null
+  const top = list[0]
+  const preview = String(top.title || top.body || '你有新的站内提醒').slice(0, 28)
+  return {
+    title: unreadCount.value > 1 ? `${unreadCount.value} 条未读消息` : top.title,
+    preview: unreadCount.value > 1 ? `你有 ${unreadCount.value} 条未读提醒` : preview,
+  }
+})
+
+function openMessageCenter() {
+  openTab('/home/message-center')
+  router.push('/home/message-center')
+}
 
 const fabStyle = computed(() => ({
   right: `${fabPos.value.right}px`,
@@ -461,6 +495,68 @@ onBeforeUnmount(() => {
     }
   }
 
+  &__notify-bubble {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: 220px;
+    min-width: 148px;
+    box-sizing: border-box;
+    padding: 8px 12px 8px 10px;
+    border-radius: 12px;
+    border: none;
+    background: #fff;
+    color: rgba(0, 0, 0, 0.88);
+    font-size: 12px;
+    line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    text-align: left;
+    cursor: pointer;
+    z-index: 3;
+    animation: bxz-notify-pop 0.22s ease;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 100%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: #fff;
+    }
+
+    &:hover {
+      background: #f5f9ff;
+    }
+  }
+
+  &__notify-badge {
+    flex-shrink: 0;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: #ff4d4f;
+    color: #fff;
+    font-size: 11px;
+    line-height: 18px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  &__notify-text {
+    flex: 1;
+    min-width: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
   &:hover:not(.is-dragging) .bxz-fab__hover-bubble {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -479,6 +575,17 @@ onBeforeUnmount(() => {
     object-fit: contain;
     filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.18));
     pointer-events: none;
+  }
+}
+
+@keyframes bxz-notify-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
   }
 }
 

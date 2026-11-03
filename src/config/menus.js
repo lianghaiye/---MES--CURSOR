@@ -31,6 +31,7 @@ export const moreModules = [
 export const sideMenus = {
   home: [
     { key: 'dashboard', label: '工作台', path: '/home/dashboard' },
+    { key: 'message-center', label: '消息中心', path: '/home/message-center' },
     {
       key: 'feedback',
       label: '意见反馈',
@@ -83,7 +84,6 @@ export const sideMenus = {
   ],
   planning: [
     { key: 'production-plan', label: '生产计划', path: '/planning/production-plan' },
-    { key: 'kit-supply', label: '齐套与供应进度', path: '/planning/kit-supply' },
     { key: 'design-task', label: '设计任务', path: '/planning/design-task' },
     { key: 'replenish-center', label: '库存预警', path: '/planning/replenish-center' },
     { key: 'replenish-ledger', label: '补货台账', path: '/planning/replenish-ledger' },
@@ -113,6 +113,11 @@ export const sideMenus = {
       key: 'arrival-tracking',
       label: '到货跟踪',
       path: '/production/arrival-tracking',
+    },
+    {
+      key: 'kit-supply',
+      label: '齐套与供应进度',
+      path: '/production/kit-supply',
     },
   ],
   'report-management': [
@@ -256,6 +261,7 @@ export const sideMenus = {
     { key: 'dict', label: '系统字典', path: '/system/dict' },
     { key: 'business-rules', label: '业务规则', path: '/system/business-rules' },
     { key: 'function-params', label: '功能参数', path: '/system/function-params' },
+    { key: 'message-notify', label: '消息通知配置', path: '/system/message-notify' },
   ],
 
   board: [
@@ -419,6 +425,7 @@ const createPageRouteTitles = Object.fromEntries(
 
 export const routeTitles = {
   '/home/dashboard': '工作台',
+  '/home/message-center': '消息中心',
   '/home/feedback': '意见反馈',
   '/home/workbench-admin': '工作台内容管理',
   '/home/workbench-admin/releases/new': '新增功能发布',
@@ -483,7 +490,6 @@ export const routeTitles = {
   '/contracts/changes/:id/approve': '审核合同变更',
   '/contracts/changes/:id': '变更单详情',
   '/planning/production-plan': '生产计划',
-  '/planning/kit-supply': '齐套与供应进度',
   '/planning/design-task': '设计任务',
   '/planning/replenish-center': '库存预警',
   '/planning/replenish-ledger': '补货台账',
@@ -503,6 +509,8 @@ export const routeTitles = {
   '/production/finished-inbound/create': '申请成品入库',
   '/production/finished-inbound/:id': '成品入库申请详情',
   '/production/arrival-tracking': '到货跟踪',
+  '/production/kit-supply': '齐套与供应进度',
+  '/production/kit-supply/shortage/:rowId': '齐套缺件明细',
   '/inventory/deduct-records': '库存扣减记录',
   '/inventory/deduct-records/:id/edit': '编辑扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',
@@ -553,6 +561,7 @@ export const routeTitles = {
   '/system/dict': '系统字典',
   '/system/business-rules': '业务规则',
   '/system/function-params': '功能参数',
+  '/system/message-notify': '消息通知配置',
   '/procurement/purchase-req': '采购申请',
   '/procurement/purchase-orders': '采购订单',
   '/procurement/purchase-orders/:id/edit': '编辑采购单',

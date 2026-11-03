@@ -186,7 +186,7 @@ export function buildMockSalesOrders(products) {
       progressStatus: '进行中',
       businessType: '自产销售',
       documentDate: '2026-06-01',
-      urgency: '普通',
+      urgency: '正常',
       remark: '定制潜水电泵项目（已生成设计任务）',
       contactPerson: '刘工',
       contactPhone: '13900001234',
@@ -244,7 +244,7 @@ export function buildMockSalesOrders(products) {
       progressStatus: '进行中',
       businessType: '自产销售',
       documentDate: '2026-05-18',
-      urgency: '加急',
+      urgency: '特急',
       lineItems: [
         lineFromProduct(p(20), { id: 'line-seed-4a', salesQty: 6 }),
         lineFromProduct(p(21), { id: 'line-seed-4b', salesQty: 2 }),
@@ -259,7 +259,7 @@ export function buildMockSalesOrders(products) {
       progressStatus: '进行中',
       businessType: '外购销售',
       documentDate: '2026-05-10',
-      urgency: '普通',
+      urgency: '正常',
       remark: '外购销售（审核生成采购申请，不生成计划）',
       lineItems: [
         lineFromProduct(p(30), {

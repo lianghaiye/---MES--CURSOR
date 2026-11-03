@@ -1,4 +1,8 @@
 import dayjs from 'dayjs'
+import {
+  urgencyTagColor as sharedUrgencyTagColor,
+  urgencyLabel as sharedUrgencyLabel,
+} from '@/constants/urgency'
 
 /** 工单编号：CJGD + 年月日 + 3位流水 */
 export function generateDisassemblyOrderCode(existingCodes = [], refDate = dayjs()) {
@@ -50,19 +54,15 @@ export function progressColor(status) {
 }
 
 export function urgencyColor(urgency) {
-  if (urgency === '紧急') return 'error'
-  if (urgency === '加急') return 'warning'
-  return 'default'
+  return sharedUrgencyTagColor(urgency)
 }
 
 export function urgencyTagColor(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return 'error'
-  return 'default'
+  return sharedUrgencyTagColor(urgency)
 }
 
 export function urgencyLabel(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return '紧急'
-  return '不紧急'
+  return sharedUrgencyLabel(urgency)
 }
 
 export function isOverdue(order) {

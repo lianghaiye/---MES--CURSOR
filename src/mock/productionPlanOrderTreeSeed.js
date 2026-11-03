@@ -68,7 +68,7 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
       workCenter: '默认工厂',
       bom: plan.workItems?.[0]?.bomName || '',
       warehouse: '半成品仓',
-      urgency: plan.urgency || '普通',
+      urgency: plan.urgency || '正常',
       planDateRange: [
         dayjs().format('YYYY-MM-DD'),
         plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),
@@ -98,7 +98,7 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
       workCenter: '外协车间',
       bom: '',
       warehouse: '半成品仓',
-      urgency: plan.urgency || '普通',
+      urgency: plan.urgency || '正常',
       planDateRange: [
         dayjs().format('YYYY-MM-DD'),
         plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),
@@ -136,7 +136,7 @@ export function createProductionPlanOrderTreeDemoAssemblyOrders() {
       workCenter: '总装车间',
       bom: wi.bomName || wi.productName,
       warehouse: '成品仓',
-      urgency: plan.urgency || '普通',
+      urgency: plan.urgency || '正常',
       planDateRange: [
         dayjs().format('YYYY-MM-DD'),
         plan.deliveryDate || dayjs().add(14, 'day').format('YYYY-MM-DD'),

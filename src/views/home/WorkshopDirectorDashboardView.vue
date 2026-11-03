@@ -61,7 +61,8 @@
                   item.category
                 }}</a-tag>
                 <span class="todo-title">{{ item.title }}</span>
-                <a-tag v-if="item.urgency === 'high'" color="red" size="small">紧急</a-tag>
+                <a-tag v-if="item.urgency === 'critical'" color="red" size="small">特急</a-tag>
+                <a-tag v-else-if="item.urgency === 'high'" color="orange" size="small">紧急</a-tag>
               </div>
               <div class="todo-sub">{{ item.subtitle }}</div>
               <div class="todo-time">{{ item.time || '—' }}</div>

@@ -327,7 +327,7 @@ import dayjs from 'dayjs'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { PlusOutlined, CheckOutlined, UpOutlined, DownOutlined } from '@ant-design/icons-vue'
-import { urgencyOptions } from '@/mock/purchaseRequisitionOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { salespersonOptions } from '@/mock/salesOrderOptions'
 import { mockInventory } from '@/mock/inventory'
 import { createLineItem } from '@/mock/purchaseRequisitions'
@@ -402,7 +402,7 @@ const {
   lineVariantDisplay,
 } = useSpuVariantConfig()
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 const CURRENT_USER = 'admin1'
 

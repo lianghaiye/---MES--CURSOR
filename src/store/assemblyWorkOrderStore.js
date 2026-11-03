@@ -25,6 +25,7 @@ import {
 } from '@/utils/workOrderScheduleBatch'
 import { migrateWorkOrderStatusFields, canContinueSchedule } from '@/utils/workOrderStatus'
 import { persistJson } from '@/utils/safeStorage'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -126,7 +127,7 @@ function createInitialOrders() {
       workCenter: '总装车间',
       bom: '立式多级泵',
       warehouse: '成品仓',
-      urgency: '加急',
+      urgency: '特急',
       planDateRange: ['2026-05-25', '2026-06-10'],
       remark: '加急总装',
       processRouteName: routeName,
@@ -149,7 +150,7 @@ function createInitialOrders() {
       workCenter: '总装车间',
       bom: '深井潜水泵',
       warehouse: '成品仓',
-      urgency: '普通',
+      urgency: '正常',
       planDateRange: ['2026-05-01', '2026-05-20'],
       remark: '',
       processRouteName: routeName,
@@ -242,7 +243,7 @@ export function createAssemblyWorkOrderPayload(partial) {
     bomId: partial.bomId || '',
     bomLabel: partial.bomLabel || '',
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
-    urgency: partial.urgency || '普通',
+    urgency: normalizeUrgency(partial.urgency),
     planDateRange: partial.planDateRange || [
       dayjs().format('YYYY-MM-DD'),
       dayjs().add(14, 'day').format('YYYY-MM-DD'),

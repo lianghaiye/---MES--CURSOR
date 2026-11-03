@@ -26,9 +26,8 @@ import { convertStockDemandToPurchase } from '@/utils/purchaseUomConvert'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 
 function mapSalesUrgency(urgency) {
-  if (urgency === '紧急') return '紧急'
-  if (urgency === '加急') return '特急'
-  return '正常'
+  const { normalizeUrgency } = require('@/constants/urgency')
+  return normalizeUrgency(urgency)
 }
 
 function resolveEarliestDeliveryDate(lineItems, fallback) {
@@ -532,8 +531,7 @@ export function buildRequisitionFromMaterials(materials, sourceOrder, form = {})
     salesOrderNo,
     docStatus: '待处理',
     overdueStatus: '未逾期',
-    urgency:
-      sourceOrder.urgency === '紧急' ? '紧急' : sourceOrder.urgency === '加急' ? '特急' : '正常',
+    urgency: mapSalesUrgency(sourceOrder.urgency),
     orderDate: now.format('YYYY-MM-DD'),
     deliveryDate,
     estimatedArrivalDate,

@@ -65,7 +65,9 @@
                   {{ formatQty(line.stockQty) }}
                 </template>
                 <template v-else-if="column.key === 'urgency'">
-                  <a-tag :color="urgencyColor(line.urgency)">{{ line.urgency || '正常' }}</a-tag>
+                  <a-tag :color="urgencyColor(line.urgency)">{{
+                    urgencyLabel(line.urgency)
+                  }}</a-tag>
                 </template>
                 <template v-else-if="column.key === 'orderSizeText'">
                   {{ line.orderSizeText || line.blankSizeText || '—' }}
@@ -165,6 +167,7 @@ import {
 } from '@/utils/purchaseLineInbound'
 import { resolveLineInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import PurchaseOrderBasicInfoSection from './components/PurchaseOrderBasicInfoSection.vue'
+import { urgencyTagColor, urgencyLabel } from '@/constants/urgency'
 
 const route = useRoute()
 const router = useRouter()
@@ -265,13 +268,7 @@ function inboundColor(status) {
 }
 
 function urgencyColor(urgency) {
-  const map = {
-    特急: 'error',
-    紧急: 'error',
-    加急: 'warning',
-    正常: 'default',
-  }
-  return map[urgency] || 'default'
+  return urgencyTagColor(urgency)
 }
 
 function approvalResultColor(result) {

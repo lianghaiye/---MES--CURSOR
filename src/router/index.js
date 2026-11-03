@@ -519,9 +519,7 @@ const routes = [
       },
       {
         path: 'planning/kit-supply',
-        name: 'planning-kit-supply',
-        component: () => import('@/views/planning/KitSupplyProgressView.vue'),
-        meta: { title: '齐套与供应进度' },
+        redirect: '/production/kit-supply',
       },
       {
         path: 'planning/design-task',
@@ -636,6 +634,18 @@ const routes = [
         name: 'production-arrival-tracking',
         component: () => import('@/views/production/ArrivalTrackingView.vue'),
         meta: { title: '到货跟踪' },
+      },
+      {
+        path: 'production/kit-supply',
+        name: 'production-kit-supply',
+        component: () => import('@/views/planning/KitSupplyProgressView.vue'),
+        meta: { title: '齐套与供应进度' },
+      },
+      {
+        path: 'production/kit-supply/shortage/:rowId',
+        name: 'production-kit-supply-shortage',
+        component: () => import('@/views/planning/KitSupplyShortageDetailView.vue'),
+        meta: { title: '齐套缺件明细', listPath: '/production/kit-supply' },
       },
       {
         path: 'report-management/report-work',
@@ -1604,6 +1614,22 @@ const routes = [
         name: 'system-function-params',
         component: () => import('@/views/basic-config/FunctionParamView.vue'),
         meta: { title: '功能参数' },
+      },
+      {
+        path: 'system/message-notify',
+        name: 'system-message-notify',
+        component: () => import('@/views/system/MessageNotifyConfigView.vue'),
+        meta: { title: '消息通知配置' },
+      },
+      {
+        path: 'home/message-center',
+        name: 'home-message-center',
+        component: () => import('@/views/system/MessageCenterView.vue'),
+        meta: { title: '消息中心' },
+      },
+      {
+        path: 'system/message-center',
+        redirect: '/home/message-center',
       },
       {
         path: 'industrial-id',

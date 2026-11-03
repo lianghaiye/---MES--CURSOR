@@ -110,7 +110,7 @@ function createSerialRouteDispatchDemoOrder() {
     bomId: '',
     bomLabel: '轴套半成品',
     warehouse: '半成品仓',
-    urgency: '普通',
+    urgency: '正常',
     planDateRange: [today, end],
     remark: '演示：工艺路线「机加串行演示路线」；下发页步骤 1～6 均为串行',
     processRouteName: SERIAL_ROUTE_DEMO_NAME,

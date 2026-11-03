@@ -133,7 +133,7 @@ export function createMaterialReqDemoWorkOrders() {
       bom: '离心泵 EBOM',
       bomId: '',
       warehouse: '原料仓',
-      urgency: '加急',
+      urgency: '特急',
       planDateRange: ['2026-07-12', '2026-07-28'],
       remark: '领料申请演示：与 001 有共用物料，批量合并时可看来源标签',
       processRouteName: '装配标准路线',

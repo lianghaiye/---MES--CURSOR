@@ -3,6 +3,7 @@
 import { resolveOrderSizeFromPlan } from '@/utils/orderSize'
 import { hasSettleUnit, resolveSettleEstimateRate, resolveSettleUnit } from '@/utils/settleUnit'
 import { roundNumber } from '@/utils/numberFormat'
+import { normalizeUrgency, urgencyRank } from '@/constants/urgency'
 
 function roundQty(n) {
   const r = roundNumber(Number(n) || 0, 4)
@@ -22,17 +23,17 @@ function roundSettleQty(n) {
   return roundQty(n)
 }
 
-/** 紧急度优先级：特急 > 紧急/加急 > 正常 */
-export const URGENCY_RANK = { 正常: 1, 紧急: 2, 加急: 2, 特急: 3 }
+/** @deprecated 请用 urgencyRank；保留兼容旧 import */
+export const URGENCY_RANK = { 正常: 1, 紧急: 2, 加急: 2, 特急: 3, 普通: 1 }
 
 export function pickHighestUrgency(...values) {
   let best = '正常'
   let bestRank = 0
   values.forEach((v) => {
-    const u = String(v || '').trim() || '正常'
-    const rank = URGENCY_RANK[u] || 0
+    const u = normalizeUrgency(v)
+    const rank = urgencyRank(u)
     if (rank > bestRank) {
-      best = u === '加急' ? '紧急' : u
+      best = u
       bestRank = rank
     }
   })

@@ -242,6 +242,7 @@ import { useTabs } from '@/composables/useTabs'
 import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { designTaskCanPublishProductBom } from '@/utils/designTaskProductMaster'
+import { getUrgencyOptions } from '@/constants/urgency'
 
 const router = useRouter()
 const { openTab } = useTabs()
@@ -262,7 +263,7 @@ const listTab = ref('all')
 const statusOpts = Object.values(DESIGN_TASK_STATUS)
   .filter((v) => v !== DESIGN_TASK_STATUS.VOIDED)
   .map((v) => ({ label: v, value: v }))
-const urgencyOpts = ['紧急', '加急', '普通'].map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const orderTypeOpts = ['标准订单', '项目订单', '备件订单'].map((v) => ({ label: v, value: v }))
 
 const allColumns = [

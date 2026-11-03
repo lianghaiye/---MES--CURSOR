@@ -19,6 +19,7 @@ import { ECN_CHANGE_ITEM_TYPE } from '@/constants/ecn'
 import { flattenMaterials } from '@/utils/material'
 import { enrichWorkItem } from '@/utils/productionPlanWorkItem'
 import { resolveWorkItemMaterials } from '@/utils/productionPlanMaterial'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function matchProduct(wi, ecn) {
   if (!wi || !ecn) return false
@@ -604,7 +605,7 @@ export function createPhase2PlanFromPending(planId, workItemId, options = {}) {
     customerName: plan.customerName,
     productQty: phase2Materials.reduce((s, m) => s + (Number(m.planQty) || 0), 0),
     salesperson: plan.salesperson || '',
-    urgency: plan.urgency || '普通',
+    urgency: normalizeUrgency(plan.urgency),
     orderStatus: '待下达',
     orderDate: dayjs().format('YYYY-MM-DD'),
     deliveryDate: plan.deliveryDate,

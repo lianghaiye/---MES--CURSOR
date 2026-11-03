@@ -7,6 +7,7 @@ import { getMasterDefaults } from '@/utils/productionPlanMaterial'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
 import { convertStockDemandToPurchase, purchaseQtyToStockQty } from '@/utils/purchaseUomConvert'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function getInTransitOrWipForPlanMaterial(m) {
   return require('@/utils/planPurchaseInTransit').resolveInTransitOrWipForPlanNode(m)
@@ -228,7 +229,7 @@ export function buildWorkOrderRows(materials, order) {
       planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
       unit: m.unit || '件',
       warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
-      urgency: m.urgency || order.urgency || '普通',
+      urgency: normalizeUrgency(m.urgency || order.urgency),
       remark: m.workOrderRemark || m.remark || '',
       workItemId: m.workItemId || '',
       productId: m.productId || '',
@@ -288,7 +289,7 @@ export function buildAssemblyWorkOrderRows(materials, order) {
       planDateRange: m.planDateRange?.length === 2 ? [...m.planDateRange] : [startDate, endDate],
       unit: m.unit || '件',
       warehouse: m.warehouse || resolveDefaultWarehouseByMaterialCode(m.code) || '',
-      urgency: m.urgency || order.urgency || '普通',
+      urgency: normalizeUrgency(m.urgency || order.urgency),
       remark: m.remark || '',
       workItemId: m.workItemId || '',
       productId: m.productId || '',
@@ -383,7 +384,7 @@ export function buildOutsourceWorkOrderRows(materials, order) {
       expectedArrivalDate:
         m.expectedArrivalDate || (m.planDateRange?.[0] ? m.planDateRange[0] : '') || defaultArrival,
       warehouse: resolveDefaultWarehouse(m.code, m),
-      urgency: m.urgency || order?.urgency || '普通',
+      urgency: normalizeUrgency(m.urgency || order?.urgency),
       remark: m.workOrderRemark || m.remark || '',
     }
   })

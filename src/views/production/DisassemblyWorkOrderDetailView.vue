@@ -5,7 +5,7 @@
         <div class="page-header">
           <div class="header-left">
             <span class="order-name">{{ order.name }}</span>
-            <a-tag :color="urgencyColor(order.urgency)">{{ order.urgency || '普通' }}</a-tag>
+            <a-tag :color="urgencyColor(order.urgency)">{{ order.urgency || '正常' }}</a-tag>
             <a-tag :color="statusColor(order.status)">{{ order.status }}</a-tag>
             <a-tag v-if="overdue" color="error">已逾期</a-tag>
             <a-tag v-else-if="order.status !== '完成'" color="default">正常</a-tag>

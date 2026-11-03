@@ -929,7 +929,6 @@ import {
 } from '@ant-design/icons-vue'
 import { formatQty, inputNumberFormatter, inputNumberParser } from '@/utils/numberFormat'
 import {
-  urgencyOptions,
   contractTypeOptions,
   settlementCurrencyOptions,
   orderTypeOptions,
@@ -939,6 +938,7 @@ import {
   paymentRatioOptions,
   salespersonOptions,
 } from '@/mock/salesOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { createLineItem } from '@/mock/salesOrders'
 import { productInfoState } from '@/store/productInfoStore'
 import { materialInfoState } from '@/store/materialInfoStore'
@@ -1313,7 +1313,7 @@ function lineBusinessTypeOpts(record) {
   return base
 }
 
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
+const urgencyOpts = getUrgencyOptions()
 const contractTypeOpts = contractTypeOptions.map((v) => ({ label: v, value: v }))
 
 function isContractPriceLocked(record) {

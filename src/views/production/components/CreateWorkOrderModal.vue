@@ -254,7 +254,8 @@ import { formatNumber } from '@/utils/numberFormat'
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { workCenterOptions, urgencyOptions, resolveWorkCenterOwner } from '@/mock/workOrderOptions'
+import { workCenterOptions, resolveWorkCenterOwner } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { resolveDefaultWarehouseByProductName } from '@/utils/warehouseResolver'
 import { createWorkOrderPayload, workOrderState } from '@/store/workOrderStore'
@@ -341,7 +342,7 @@ const form = reactive({
   workCenter: '默认工厂',
   owner: resolveWorkCenterOwner('默认工厂'),
   warehouse: undefined,
-  urgency: '普通',
+  urgency: '正常',
   planDateRange: null,
   remark: '',
 })
@@ -388,7 +389,7 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-const urgencyOpts = computed(() => urgencyOptions.map((v) => ({ label: v, value: v })))
+const urgencyOpts = computed(() => getUrgencyOptions())
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '-' })
@@ -532,7 +533,7 @@ function resetForm() {
   form.workCenter = '默认工厂'
   form.owner = resolveWorkCenterOwner('默认工厂')
   form.warehouse = undefined
-  form.urgency = '普通'
+  form.urgency = '正常'
   form.planDateRange = [dayjs(), dayjs().add(14, 'day')]
   form.remark = ''
   componentLines.value = []

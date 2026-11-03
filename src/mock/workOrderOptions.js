@@ -18,4 +18,4 @@ export function resolveWorkCenterOwner(workCenter) {
 
 export const unitOptions = ['件', '套', 'kg', 'm', '台']
 export const warehouseOptions = ['原料仓', '半成品仓', '成品仓', '外协仓']
-export const urgencyOptions = ['紧急', '加急', '普通']
+export { urgencyOptions, getUrgencyOptions } from '@/constants/urgency'

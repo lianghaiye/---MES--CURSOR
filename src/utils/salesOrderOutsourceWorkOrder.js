@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { workOrderState, addWorkOrder, createWorkOrderPayload } from '@/store/workOrderStore'
 import { resolveProductDefaultProcessRoute } from '@/utils/workOrderProcessRoute'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function findExistingOutsourceWorkOrder(order, line) {
   return workOrderState.orders.find(
@@ -34,7 +35,7 @@ export function createOutsourcingWorkOrdersFromSalesOrder(order, lines = []) {
       bom: '',
       remark: line.supplementDesc || line.lineRemark || '',
       planDateRange: [deliveryDate, deliveryDate],
-      urgency: order.urgency || '普通',
+      urgency: normalizeUrgency(order.urgency),
       source: 'sales-order',
       sourceOrderNo: order.orderNo,
       salesLineId: line.id,

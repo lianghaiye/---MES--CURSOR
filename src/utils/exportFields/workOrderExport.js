@@ -1,3 +1,4 @@
+import { urgencyLabel } from '@/constants/urgency'
 import {
   formatWorkOrderFieldValue,
   formatWorkOrderPlanDateRange,
@@ -7,8 +8,7 @@ import {
 import { cell } from './exportFieldHelpers'
 
 function urgencyExportLabel(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return '紧急'
-  return '不紧急'
+  return urgencyLabel(urgency)
 }
 
 export const workOrderExportFields = [

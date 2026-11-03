@@ -494,8 +494,39 @@ function initFromArrivalTracking() {
   syncReceiveWarehouse()
 }
 
+/** 从齐套跟踪等入口带入工单 */
+function initFromWorkOrderQuery() {
+  const q = route.query || {}
+  const woId = String(q.workOrderId || '').trim()
+  const woCode = String(q.workOrderCode || '').trim()
+  if (!woId && !woCode) return false
+  mode.value = MATERIAL_REQ_MODES.WORK_ORDER
+  form.salesOrderNo = ''
+  form.salesOrderProductIds = []
+  const wo =
+    (woId && allWorkOrders.value.find((o) => o.id === woId)) ||
+    (woCode && allWorkOrders.value.find((o) => o.code === woCode)) ||
+    null
+  if (!wo) {
+    message.warning('未找到该工单')
+    return false
+  }
+  const row = createEmptyWoRow()
+  row.workOrderCode = wo.code
+  row.workOrderId = wo.id
+  row.productName = wo.productName || wo.name || ''
+  row.specModel = wo.specModel || ''
+  row.material = wo.material || ''
+  row.drawingNo = wo.drawingNo || ''
+  workOrderRows.value = [row]
+  syncReceiveWarehouse()
+  loadEbomLines()
+  return true
+}
+
 onMounted(() => {
   initFromArrivalTracking()
+  if (!arrivalKeyParts.value.length) initFromWorkOrderQuery()
 })
 
 function toReqWorkOrderSnapshot(wo) {

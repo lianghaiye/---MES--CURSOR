@@ -522,7 +522,7 @@ export function createMultiUnitFlowWorkOrders() {
     bomId: '',
     bomLabel: '泵支架总成',
     warehouse: '半成品仓',
-    urgency: '普通',
+    urgency: '正常',
     planDateRange: [d, end],
     remark: '【多单位流程】执行中；含下料工序；BOM 含需下料结算钢管 + 普通轴承',
     processRouteName: '机加标准路线',

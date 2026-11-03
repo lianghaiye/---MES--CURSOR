@@ -24,6 +24,7 @@ import {
   STOCK_FULFILLMENT_MODE,
   normalizeStockFulfillmentMode,
 } from '@/utils/salesStockFulfillment'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function round4(n) {
   return Math.round((Number(n) || 0) * 10000) / 10000
@@ -309,7 +310,7 @@ export function buildRequisitionFromShipAccessoryGaps(salesOrder, accessories, o
     sourceSalesOrderId: salesOrder?.id || '',
     docStatus: '待处理',
     overdueStatus: '未逾期',
-    urgency: salesOrder?.urgency === '紧急' ? '紧急' : '正常',
+    urgency: normalizeUrgency(salesOrder?.urgency),
     orderDate: dayjs().format('YYYY-MM-DD'),
     deliveryDate,
     estimatedArrivalDate: deliveryDate,

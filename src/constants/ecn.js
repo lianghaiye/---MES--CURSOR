@@ -58,9 +58,9 @@ export function ecnChangeItemTypeColor(type) {
 }
 
 export const ECN_URGENCY = {
-  NORMAL: '普通',
-  URGENT: '紧急',
   CRITICAL: '特急',
+  URGENT: '紧急',
+  NORMAL: '正常',
 }
 
 export const ECN_ORIGIN_TYPE = {

@@ -503,7 +503,7 @@ export default { name: 'PendingInboundListView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -553,6 +553,7 @@ import {
 
 const LAYOUT_STORAGE_KEY = 'i_doms_pending_inbound_layout'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -575,6 +576,24 @@ const filters = reactive({
 const appliedFilters = ref({ ...filters })
 const selectedOrderIds = ref([])
 const pagination = reactive({ current: 1, pageSize: 10 })
+
+function applyFiltersFromRouteQuery() {
+  const docNo = String(route.query.docNo || route.query.keyword || '').trim()
+  const itemCode = String(route.query.itemCode || '').trim()
+  const sourceOrderNo = String(route.query.sourceOrderNo || '').trim()
+  if (!docNo && !itemCode && !sourceOrderNo) return
+  if (docNo) filters.docNo = docNo
+  if (itemCode) filters.itemCode = itemCode
+  if (sourceOrderNo) filters.sourceOrderNo = sourceOrderNo
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+watch(
+  () => [route.query.docNo, route.query.keyword, route.query.itemCode, route.query.sourceOrderNo],
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 const refuseModalOpen = ref(false)
 const refuseTargets = ref([])
 const printModalOpen = ref(false)

@@ -231,10 +231,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useTabs } from '@/composables/useTabs'
 import { useReplenishExecute } from '@/composables/useReplenishExecute'
 import {
@@ -259,6 +259,7 @@ defineProps({
 
 const emit = defineEmits(['created'])
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -442,6 +443,26 @@ function applyFilters() {
   Object.assign(appliedFilters, { ...filters })
   pagination.current = 1
 }
+
+function applyFiltersFromRouteQuery() {
+  const productCode = String(route.query.productCode || route.query.itemCode || '').trim()
+  const productName = String(route.query.productName || route.query.keyword || '').trim()
+  if (!productCode && !productName) return
+  if (productCode) filters.productCode = productCode
+  if (productName && !productCode) filters.productName = productName
+  applyFilters()
+}
+
+watch(
+  () => [
+    route.query.productCode,
+    route.query.itemCode,
+    route.query.productName,
+    route.query.keyword,
+  ],
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 function resetFilters() {
   filters.alertSource = undefined

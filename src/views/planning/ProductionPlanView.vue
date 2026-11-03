@@ -31,11 +31,8 @@
                 placeholder="全部"
                 size="small"
                 style="width: 100%"
-              >
-                <a-select-option value="紧急">紧急</a-select-option>
-                <a-select-option value="加急">加急</a-select-option>
-                <a-select-option value="普通">普通</a-select-option>
-              </a-select>
+                :options="planUrgencyOpts"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="24">
@@ -325,7 +322,15 @@
                     @change="onPlanCompleteDateChange"
                   />
                   <span>调整紧急度</span>
-                  <a-select style="width: 100px" placeholder="选择" />
+                  <a-select
+                    :value="selectedOrder?.urgency || '正常'"
+                    :options="planUrgencyOpts"
+                    size="small"
+                    style="width: 100px"
+                    placeholder="选择"
+                    :disabled="!selectedOrder || selectedOrder.orderStatus === '已终止'"
+                    @change="onPlanUrgencyChange"
+                  />
                   <span class="deduct-inventory-label">
                     扣减库存
                     <a-tooltip
@@ -733,6 +738,7 @@ import {
   productionPlanState,
   filterProductionPlans,
   terminateProductionPlan,
+  updateProductionPlan,
 } from '@/store/productionPlanStore'
 import { voidIncompleteDesignTasksForPlan } from '@/store/designTaskStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
@@ -744,6 +750,7 @@ import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrd
 import GenerateOutsourceWorkOrderModal from './components/GenerateOutsourceWorkOrderModal.vue'
 import GeneratePurchaseRequisitionModal from './components/GeneratePurchaseRequisitionModal.vue'
 import { PLAN_SOURCE, PLAN_SOURCE_OPTIONS, planSourceLabel } from '@/utils/planSource'
+import { getUrgencyOptions } from '@/constants/urgency'
 import {
   workOrderState,
   addWorkOrdersFromPlanRows,
@@ -1191,6 +1198,17 @@ function onPlanAssemblyDateChange(date) {
 function onPlanCompleteDateChange(date) {
   if (!selectedOrder.value) return
   selectedOrder.value.planCompleteDate = date ? date.format('YYYY-MM-DD') : ''
+}
+
+/** 与系统/业务字典 urgency 一致：特急 / 紧急 / 正常 */
+const planUrgencyOpts = getUrgencyOptions()
+
+function onPlanUrgencyChange(value) {
+  const order = selectedOrder.value
+  if (!order) return
+  const urgency = value || '正常'
+  updateProductionPlan(order.id, { urgency })
+  message.success(`紧急度已调整为「${urgency}」`)
 }
 
 function onDeductInventoryChange(checked) {

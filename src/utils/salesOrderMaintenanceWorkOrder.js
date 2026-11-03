@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import { workOrderState, addWorkOrder, createWorkOrderPayload } from '@/store/workOrderStore'
 import { resolveProductDefaultProcessRoute } from '@/utils/workOrderProcessRoute'
+import { normalizeUrgency } from '@/constants/urgency'
 
 export const MAINTENANCE_WORK_ORDER_CATEGORY = '维修工单'
 
@@ -42,7 +43,7 @@ export function createMaintenanceWorkOrdersFromSalesOrder(order, lines = []) {
       bom: '',
       remark: line.supplementDesc || line.lineRemark || '',
       planDateRange: [deliveryDate, deliveryDate],
-      urgency: order.urgency || '普通',
+      urgency: normalizeUrgency(order.urgency),
       customerName: order.customerName || '',
       salesperson: order.salesperson || '',
       source: 'sales-order',

@@ -238,13 +238,15 @@ export function recordKeyPartArrivalsFromInbound(order, lines, opts = {}) {
         : Number(line.qty) || 0
     if (qty <= 0) continue
 
+    const itemName = line.itemName || line.productName || ''
+    const unit = line.unit || line.inventoryUnit || ''
     keyPartArrivalState.messages.unshift({
       id: uid(),
       itemCode,
-      itemName: line.itemName || line.productName || '',
+      itemName,
       specModel: line.specModel || '',
       qty,
-      unit: line.unit || line.inventoryUnit || '',
+      unit,
       warehouse: line.warehouse || order.warehouse || '',
       supplier: order.supplier || '',
       inboundOrderId: order.id || '',
@@ -256,6 +258,18 @@ export function recordKeyPartArrivalsFromInbound(order, lines, opts = {}) {
       readAt: '',
     })
     created += 1
+    try {
+      // 延迟加载，避免与消息模块循环依赖
+      // eslint-disable-next-line global-require
+      const { publishMessage } = require('@/store/messageNotifyStore')
+      publishMessage('KEY_PART_ARRIVED', {
+        bizNo: docNo || itemCode,
+        itemCode,
+        vars: { itemName, qty, unit, itemCode },
+      })
+    } catch {
+      /* ignore */
+    }
   }
 
   return { ok: true, created }

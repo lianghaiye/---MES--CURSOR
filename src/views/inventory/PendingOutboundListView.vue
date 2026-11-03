@@ -504,7 +504,7 @@ export default { name: 'PendingOutboundListView' }
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import {
   PlusOutlined,
@@ -562,6 +562,7 @@ import {
 
 const LAYOUT_STORAGE_KEY = 'i_doms_pending_outbound_layout'
 
+const route = useRoute()
 const router = useRouter()
 const { openTab } = useTabs()
 
@@ -791,6 +792,24 @@ function canConfirm(record) {
 function rowIndex(index) {
   return (pagination.current - 1) * pagination.pageSize + index + 1
 }
+
+function applyFiltersFromRouteQuery() {
+  const docNo = String(route.query.docNo || route.query.keyword || '').trim()
+  const itemCode = String(route.query.itemCode || '').trim()
+  const sourceOrderNo = String(route.query.sourceOrderNo || '').trim()
+  if (!docNo && !itemCode && !sourceOrderNo) return
+  if (docNo) filters.docNo = docNo
+  if (itemCode) filters.itemCode = itemCode
+  if (sourceOrderNo) filters.sourceOrderNo = sourceOrderNo
+  appliedFilters.value = { ...filters }
+  pagination.current = 1
+}
+
+watch(
+  () => [route.query.docNo, route.query.keyword, route.query.itemCode, route.query.sourceOrderNo],
+  () => applyFiltersFromRouteQuery(),
+  { immediate: true },
+)
 
 function handleSearch() {
   appliedFilters.value = { ...filters }

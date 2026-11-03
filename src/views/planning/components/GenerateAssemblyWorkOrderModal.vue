@@ -167,7 +167,7 @@ import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { SettingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { urgencyOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import {
   getProcessRouteSelectOptions,
@@ -223,7 +223,7 @@ const selectOptions = computed(() => {
     processRoute: getProcessRouteSelectOptions(),
     workCenter: getWorkCenterSelectOptions(),
     warehouse: getWarehouseSelectOptions(),
-    urgency: urgencyOptions.map((v) => ({ label: v, value: v })),
+    urgency: getUrgencyOptions(),
   }
 })
 

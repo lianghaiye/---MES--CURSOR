@@ -255,7 +255,8 @@ import {
   ReloadOutlined,
   TableOutlined,
 } from '@ant-design/icons-vue'
-import { workCenterOptions, urgencyOptions, personInChargeOptions } from '@/mock/workOrderOptions'
+import { workCenterOptions, personInChargeOptions } from '@/mock/workOrderOptions'
+import { getUrgencyOptions } from '@/constants/urgency'
 import {
   disassemblyWorkOrderState,
   updateDisassemblyWorkOrder,
@@ -310,11 +311,8 @@ const warehouseOpts = computed(() => {
   void warehouseState.warehouses
   return getWarehouseSelectOptions()
 })
-const urgencyOpts = urgencyOptions.map((v) => ({ label: v, value: v }))
-const urgencyFilterOpts = [
-  { label: '全部', value: '全部' },
-  ...urgencyOptions.map((v) => ({ label: v, value: v })),
-]
+const urgencyOpts = getUrgencyOptions()
+const urgencyFilterOpts = [{ label: '全部', value: '全部' }, ...getUrgencyOptions()]
 const personOpts = personInChargeOptions.map((v) => ({ label: v, value: v }))
 const bomOpts = computed(() => {
   const wo = selectedOrder.value

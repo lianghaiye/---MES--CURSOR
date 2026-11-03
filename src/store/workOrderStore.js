@@ -41,6 +41,7 @@ import {
   isScheduleIncomplete,
 } from '@/utils/workOrderStatus'
 import { persistJson } from '@/utils/safeStorage'
+import { normalizeUrgency } from '@/constants/urgency'
 
 function resolvePlanRowBomFields(row, sourceOrder) {
   const wi = findWorkItemForPlanRow(sourceOrder, row)
@@ -163,7 +164,7 @@ function createCompletionDeductDemoWorkOrders() {
       bom: '潜水电机',
       warehouse: '成品仓',
       receiveWarehouse: '库线边仓',
-      urgency: '普通',
+      urgency: '正常',
       planDateRange: ['2026-05-01', '2026-05-20'],
       remark: '完工扣减演示：待确认（领料展示+倒冲预扣）',
       processRouteName: '装配标准路线',
@@ -242,7 +243,7 @@ function createCompletionDeductDemoWorkOrders() {
       bom: '离心泵',
       warehouse: '半成品仓',
       receiveWarehouse: '库线边仓',
-      urgency: '普通',
+      urgency: '正常',
       planDateRange: ['2026-07-01', '2026-07-15'],
       remark: '完工扣减演示：领料+倒冲已确认',
       processRouteName: routeName,
@@ -311,7 +312,7 @@ function createCompletionDeductDemoWorkOrders() {
       bom: '排污泵',
       warehouse: '半成品仓',
       receiveWarehouse: '原料仓',
-      urgency: '加急',
+      urgency: '特急',
       planDateRange: ['2026-07-20', '2026-08-01'],
       remark: '完工扣减演示：倒冲库存不足部分失败',
       processRouteName: routeName,
@@ -425,7 +426,7 @@ function createInitialOrders() {
         workCenter: '机加车间',
         bom: '潜水电机',
         warehouse: '半成品仓',
-        urgency: '加急',
+        urgency: '特急',
         planDateRange: ['2026-05-25', '2026-06-10'],
         remark: '加急排产',
         processRouteName: '装配标准路线',
@@ -610,7 +611,7 @@ export function createWorkOrderPayload(partial) {
     bom: skipEbomCategory ? '' : partial.bom || partial.productName,
     bomId: partial.bomId || '',
     warehouse: partial.warehouse || resolveDefaultWarehouseByProductName(productName) || '',
-    urgency: partial.urgency || '普通',
+    urgency: normalizeUrgency(partial.urgency),
     planDateRange: partial.planDateRange || [
       dayjs().format('YYYY-MM-DD'),
       dayjs().add(14, 'day').format('YYYY-MM-DD'),

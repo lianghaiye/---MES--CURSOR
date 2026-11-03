@@ -17,12 +17,10 @@
               {{ convertSideLabel }}
             </a-tag>
             <a-tag
-              v-if="
-                workOrder.urgency && workOrder.urgency !== '普通' && workOrder.urgency !== '正常'
-              "
-              color="orange"
+              v-if="workOrder.urgency && urgencyLabel(workOrder.urgency) !== '正常'"
+              :color="urgencyTagColor(workOrder.urgency)"
             >
-              {{ workOrder.urgency }}
+              {{ urgencyLabel(workOrder.urgency) }}
             </a-tag>
           </a-space>
         </div>
@@ -195,6 +193,7 @@ import {
 import { canShowEditScheduleQty } from '@/utils/workOrderStatus'
 import { reworkOrderState, workOrderHasOpenRework } from '@/store/reworkOrderStore'
 import { canConvertWorkOrderToPurchaseOrOutsource } from '@/utils/workOrderConvert'
+import { urgencyTagColor, urgencyLabel } from '@/constants/urgency'
 import {
   getWorkOrderConvertSideLabel,
   getWorkOrderConvertSideTagColor,

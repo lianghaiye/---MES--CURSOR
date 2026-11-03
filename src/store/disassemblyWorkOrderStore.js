@@ -7,6 +7,7 @@ import {
   WORK_CENTER_MANAGERS,
 } from '@/utils/disassemblyWorkOrder'
 import { resolveOrderField } from '@/utils/workOrderNaming'
+import { normalizeUrgency } from '@/constants/urgency'
 
 const STORAGE_KEY = 'i_doms_disassembly_work_orders'
 const DATA_VERSION = 2
@@ -15,7 +16,7 @@ function normalizeOrder(row) {
   const legacyStatus = row.status || row.progress
   let status = legacyStatus
   if (status === '新建' || !status) status = '待下发'
-  const normalized = { ...row, status }
+  const normalized = { ...row, status, urgency: normalizeUrgency(row.urgency) }
   delete normalized.progress
   return normalized
 }
@@ -58,7 +59,7 @@ function createSeedOrders() {
       itemCode: 'CP2610002',
       specModel: 'ISG80-160(I)A',
       material: '铸铁',
-      urgency: '普通',
+      urgency: '正常',
       relatedScrapNo: 'BF20260528001',
       processRouteName: '装配标准路线',
       ebomName: '污水泵 EBOM V1.0',
@@ -79,7 +80,7 @@ function createSeedOrders() {
       itemCode: 'CP2610001',
       specModel: 'ISG50-160',
       material: '不锈钢',
-      urgency: '加急',
+      urgency: '特急',
       relatedScrapNo: 'BF20260529002',
       processRouteName: '机加标准路线',
       ebomName: '清水离心泵 EBOM V1.0',
@@ -101,7 +102,7 @@ function createSeedOrders() {
       itemCode: 'CP2610003',
       specModel: 'CDL4-40',
       material: '铸铁',
-      urgency: '普通',
+      urgency: '正常',
       relatedScrapNo: 'BF20260601003',
       processRouteName: '装配标准路线',
       ebomName: '立式多级泵 EBOM V1.0',
@@ -149,7 +150,7 @@ function createSeedOrders() {
       itemCode: 'CP2610002',
       specModel: 'ISG80-160(I)A',
       material: '铸铁',
-      urgency: '普通',
+      urgency: '正常',
       relatedScrapNo: 'BF20260528001',
       processRouteName: '装配标准路线',
       ebomName: '污水泵 EBOM V1.0',
@@ -213,6 +214,7 @@ export function addDisassemblyWorkOrder(payload) {
     id: `dwo-${Date.now()}`,
     code,
     name,
+    urgency: normalizeUrgency(payload.urgency),
     orderCategory: '拆解工单',
     orderType: '拆解工单',
     orderSource: '生产报废',

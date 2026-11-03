@@ -165,6 +165,7 @@ import {
 } from '@/utils/workOrderConvertOccupy'
 import { workOrderStatusColor } from '@/utils/workOrderStatus'
 import { reworkOrderState, workOrderHasOpenRework } from '@/store/reworkOrderStore'
+import { urgencyTagColor, urgencyLabel } from '@/constants/urgency'
 
 const props = defineProps({
   dataSource: { type: Array, default: () => [] },
@@ -292,16 +293,6 @@ function canShowDispatchAction(record) {
   if (record.status === '待下发') return true
   if (!['已下发', '执行中'].includes(record.status)) return false
   return isPartialScheduled(record)
-}
-
-function urgencyTagColor(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return 'error'
-  return 'default'
-}
-
-function urgencyLabel(urgency) {
-  if (urgency === '紧急' || urgency === '加急') return '紧急'
-  return '不紧急'
 }
 </script>
 
