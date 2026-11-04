@@ -9,14 +9,6 @@
         :items="topMenuItems"
         @click="onTopMenuClick"
       />
-      <a-dropdown>
-        <a class="more-btn" @click.prevent>
-          <EllipsisOutlined />
-        </a>
-        <template #overlay>
-          <a-menu :items="moreMenuItems" @click="onMoreMenuClick" />
-        </template>
-      </a-dropdown>
     </div>
     <div class="header-right">
       <AppearanceSettingsDropdown />
@@ -76,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { BellOutlined, EllipsisOutlined } from '@ant-design/icons-vue'
@@ -98,6 +90,9 @@ import {
   unreadMessageCount,
 } from '@/store/messageNotifyStore'
 import AppearanceSettingsDropdown from './AppearanceSettingsDropdown.vue'
+
+/** 顶栏「更多」子菜单（看板/设备/报表），并入 horizontal menu，避免与溢出省略号重复 */
+const MORE_MENU_KEY = '__more__'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,25 +136,25 @@ const moduleKey = computed(() => resolveModuleKey(route.path))
 const selectedTopKeys = computed({
   get: () => {
     const key = moduleKey.value
-    if (moreModules.some((m) => m.key === key)) return []
-    return [key]
+    return key ? [key] : []
   },
   set: () => {},
 })
 
-const topMenuItems = computed(() =>
-  topModules.map((m) => ({
+const topMenuItems = computed(() => [
+  ...topModules.map((m) => ({
     key: m.key,
     label: m.label,
   })),
-)
-
-const moreMenuItems = computed(() =>
-  moreModules.map((m) => ({
-    key: m.key,
-    label: m.label,
-  })),
-)
+  {
+    key: MORE_MENU_KEY,
+    label: h(EllipsisOutlined),
+    children: moreModules.map((m) => ({
+      key: m.key,
+      label: m.label,
+    })),
+  },
+])
 
 function navigateToModule(mod) {
   const path = resolveModuleDefaultPath(mod)
@@ -179,12 +174,8 @@ function navigateToModule(mod) {
 }
 
 function onTopMenuClick({ key }) {
-  const mod = topModules.find((m) => m.key === key)
-  if (mod) navigateToModule(mod)
-}
-
-function onMoreMenuClick({ key }) {
-  const mod = moreModules.find((m) => m.key === key)
+  if (key === MORE_MENU_KEY) return
+  const mod = topModules.find((m) => m.key === key) || moreModules.find((m) => m.key === key)
   if (mod) navigateToModule(mod)
 }
 
@@ -228,20 +219,18 @@ async function handleLogout() {
 }
 
 .top-menu {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   border-bottom: none;
   line-height: 54px;
   overflow: hidden;
-}
 
-.more-btn {
-  font-size: 20px;
-  color: var(--text-2, rgba(0, 0, 0, 0.65));
-  padding: 0 8px;
-  margin-left: 0;
-  flex-shrink: 0;
-  line-height: 56px;
+  /* 「更多」子菜单图标与溢出省略号视觉统一 */
+  :deep(.ant-menu-submenu-title) {
+    .anticon {
+      font-size: 16px;
+    }
+  }
 }
 
 .header-right {
