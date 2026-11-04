@@ -195,13 +195,14 @@
                 <a-button type="link" size="small" @click="openApprove(record)">审批</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.APPROVED">
-                <a-button type="link" size="small" @click="openExecute(record)">执行</a-button>
+                <a-button type="link" size="small" @click="openExecute(record)">
+                  {{ executeActionLabel(record) }}
+                </a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.EXECUTED">
-                <a-button type="link" size="small" @click="openDetailInNewTab(record)"
-                  >详情</a-button
+                <a-button type="link" size="small" @click="goPlanImpact(record)"
+                  >查看执行结果</a-button
                 >
-                <a-button type="link" size="small" @click="goPlanImpact(record)">重排</a-button>
               </template>
               <template v-else-if="record.status === ECN_STATUS.REJECTED">
                 <a-button type="link" size="small" @click="goEdit(record)">编辑</a-button>
@@ -380,6 +381,14 @@ function openExecute(record) {
 
 function goPlanImpact(record) {
   router.push(moduleConfig.executePath(record.id))
+}
+
+/** 待执行：有执行草稿则「继续执行」 */
+function executeActionLabel(record) {
+  if (moduleConfig.store.hasExecutionDraft?.(record) || record?.executionDraft) {
+    return '继续执行'
+  }
+  return '执行'
 }
 
 function handleSubmitApproval(record) {

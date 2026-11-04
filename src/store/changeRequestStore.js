@@ -3,11 +3,21 @@ import dayjs from 'dayjs'
 import { ECN_STATUS, ECN_WIP_HANDLING } from '@/constants/ecn'
 
 export function createChangeRequestStore(options) {
-  const { storageKey, dataVersion, buildMockRecords, docNoField, docNoPrefix, idPrefix } = options
+  const {
+    storageKey,
+    dataVersion,
+    buildMockRecords,
+    docNoField,
+    docNoPrefix,
+    idPrefix,
+    /** 为 true 时不读写 localStorage，刷新即恢复 MOCK 初始态 */
+    ephemeral = false,
+  } = options
 
   let docSeq = 400
 
   function loadFromStorage() {
+    if (ephemeral) return null
     try {
       const raw = localStorage.getItem(storageKey)
       if (raw) {
@@ -28,6 +38,7 @@ export function createChangeRequestStore(options) {
   })
 
   function persist() {
+    if (ephemeral) return
     localStorage.setItem(
       storageKey,
       JSON.stringify({ version: dataVersion, docSeq, items: state.items }),

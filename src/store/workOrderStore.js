@@ -448,34 +448,97 @@ function finalizeOrders(orders) {
   )
 }
 function ensureEcnCoverDemoWorkOrders(orders) {
+  const ecnNo = 'ECN-DEMO-EXECUTED'
   const specs = [
     {
       id: 'wo-ecn-cover-impeller',
       code: 'WO-ECN-COVER-01',
       productName: '叶轮',
       materialCode: '010050003',
-      status: '待下发',
-      planQty: 3,
-      remark: 'ECN演示：叶轮用量变更，待下发可作废',
+      status: '执行中',
+      planQty: 2,
+      scheduleQty: 2,
+      remark: `ECN ${ecnNo}：叶轮改用量后保留在制单据并更新数量`,
     },
     {
       id: 'wo-ecn-cover-seal',
       code: 'WO-ECN-COVER-02',
       productName: '机械密封组件',
       materialCode: '010050004',
-      status: '执行中',
+      status: '终止',
       planQty: 3,
-      scheduleQty: 3,
-      remark: 'ECN演示：旧密封已开工，替换需人工处理',
+      scheduleQty: 0,
+      supersededByEcnNo: ecnNo,
+      remark: `ECN ${ecnNo}：替换·旧单已终止`,
     },
     {
       id: 'wo-ecn-cover-bolt',
       code: 'WO-ECN-COVER-03',
       productName: '地脚螺栓组',
       materialCode: '010050006',
-      status: '待下发',
+      status: '终止',
       planQty: 3,
-      remark: 'ECN演示：取消地脚螺栓，待下发可作废',
+      supersededByEcnNo: ecnNo,
+      remark: `ECN ${ecnNo}：取消·旧单已终止`,
+    },
+    {
+      id: 'wo-ecn-cover-shaft',
+      code: 'WO-ECN-COVER-05',
+      productName: '泵轴',
+      materialCode: '010050005',
+      status: '终止',
+      planQty: 3,
+      supersededByEcnNo: ecnNo,
+      remark: `ECN ${ecnNo}：换料·旧料工单已终止`,
+    },
+    {
+      id: 'wo-ecn-cover-casing',
+      code: 'WO-ECN-COVER-06',
+      productName: '泵体（泵壳）',
+      materialCode: '010050001',
+      status: '待下发',
+      planQty: 2,
+      remark: `ECN ${ecnNo}：泵体改用量后更新待下发数量`,
+    },
+    {
+      id: 'wo-ecn-cover-seal-ring',
+      code: 'WO-ECN-COVER-07',
+      productName: '动环',
+      materialCode: '010050004-A',
+      status: '终止',
+      planQty: 3,
+      supersededByEcnNo: ecnNo,
+      remark: `ECN ${ecnNo}：替换子树·旧下级已终止`,
+    },
+    {
+      id: 'wo-ecn-demo-shaft-new',
+      code: 'WO-ECN-DEMO-SHAFT',
+      productName: '泵轴',
+      materialCode: '010050015',
+      status: '待下发',
+      planQty: 1,
+      remark: `ECN ${ecnNo}：换料·新料工单`,
+      relatedEcnNo: ecnNo,
+    },
+    {
+      id: 'wo-ecn-demo-seal-new',
+      code: 'WO-ECN-DEMO-SEAL',
+      productName: '耐腐机械密封总成',
+      materialCode: '010050024',
+      status: '待下发',
+      planQty: 1,
+      remark: `ECN ${ecnNo}：替换·新料工单`,
+      relatedEcnNo: ecnNo,
+    },
+    {
+      id: 'wo-ecn-demo-sensor',
+      code: 'WO-ECN-DEMO-SENSOR',
+      productName: '温度传感器',
+      materialCode: '010050099',
+      status: '待下发',
+      planQty: 1,
+      remark: `ECN ${ecnNo}：新增物料工单`,
+      relatedEcnNo: ecnNo,
     },
   ]
   specs.forEach((spec) => {
@@ -491,9 +554,59 @@ function ensureEcnCoverDemoWorkOrders(orders) {
       scheduleBatches: [],
       ...spec,
     }
+    // ECN 演示：强制终止旧单写入操作日志
+    if (spec.supersededByEcnNo && !row.operationLogs?.length) {
+      const force = spec.id === 'wo-ecn-cover-seal' || spec.id === 'wo-ecn-cover-seal-ring'
+      row.operationLogs = [
+        {
+          id: `wol-demo-${spec.id}`,
+          action: force ? 'ECN强制终止' : 'ECN终止',
+          operator: '系统',
+          operatedAt: '2026-11-04 15:20:00',
+          remark: force
+            ? `ECN强制终止（${spec.supersededByEcnNo}）`
+            : `ECN变更终止（${spec.supersededByEcnNo}）`,
+        },
+      ]
+    }
+    if (spec.relatedEcnNo && !row.operationLogs?.length) {
+      row.operationLogs = [
+        {
+          id: `wol-demo-${spec.id}`,
+          action: 'ECN生成',
+          operator: '系统',
+          operatedAt: '2026-11-04 15:20:00',
+          remark: `由 ${spec.relatedEcnNo} 生成待下发工单`,
+        },
+      ]
+    }
     const existing = orders.find((o) => o.id === spec.id)
-    if (existing) Object.assign(existing, row)
-    else orders.unshift(row)
+    if (existing) {
+      Object.assign(existing, row)
+      if (row.operationLogs?.length && !existing.operationLogs?.length) {
+        existing.operationLogs = row.operationLogs
+      }
+    } else orders.unshift(row)
+  })
+  // 去掉误加/冲突演示单：同料第二张、泵盖外协工单（与外协订单重复）
+  const dropIds = new Set(['wo-ecn-cover-impeller-pending', 'wo-ecn-cover-cover-wx'])
+  for (let i = orders.length - 1; i >= 0; i -= 1) {
+    if (dropIds.has(orders[i].id)) orders.splice(i, 1)
+  }
+  // 生产计划树演示工单勿占用 ECN 变更组件编码（同 SO 下会表现为一料多单）
+  const coverCodes = new Set([
+    ...specs.map((s) => s.materialCode).filter(Boolean),
+    '010050002', // 泵盖：仅挂外协订单 WX-ECN-COVER-01，勿再挂外协工单
+  ])
+  orders.forEach((o) => {
+    if (o.id !== 'wo-pp-tree-demo-1' && o.id !== 'wo-pp-tree-demo-2') return
+    if (!coverCodes.has(o.materialCode)) return
+    o.materialCode = 'CP2610001'
+    o.productName = 'ISG50-160 立式管道泵'
+    o.remark =
+      o.id === 'wo-pp-tree-demo-2'
+        ? '生产计划树演示外协工单（成品，不与 ECN 泵盖外协订单抢编码）'
+        : '生产计划树演示工单（成品，不与 ECN 组件工单抢编码）'
   })
   return orders
 }

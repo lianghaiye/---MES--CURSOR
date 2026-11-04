@@ -280,6 +280,10 @@
               </a-dropdown>
             </a-space>
             <a-space v-else-if="isBomArchived(record)" :size="0" wrap>
+              <a-button type="link" size="small" @click="handleEnable(record)">
+                <CheckOutlined />
+                启用
+              </a-button>
               <a-button type="link" size="small" @click="handleClone(record)">
                 <CopyOutlined />
                 克隆
@@ -378,7 +382,12 @@ import {
   isBomActive,
   isBomArchived,
 } from '@/mock/productBomOptions'
-import { isShipBomType, SHIP_KIT_ITEM_TYPE, BOM_TYPE } from '@/mock/bomMaterialColumns'
+import {
+  isShipBomType,
+  normalizeBomType,
+  SHIP_KIT_ITEM_TYPE,
+  BOM_TYPE,
+} from '@/mock/bomMaterialColumns'
 import {
   SHIP_ATTACHMENT_DISPLAY_NAME,
   SHIP_ATTACHMENT_LIST_PATH,
@@ -971,6 +980,16 @@ function doEnable(record, upgradeParentRefs = false, parentRefs = []) {
     upgradeParentRefs && parentRefs.length
       ? `，已同步更新 ${parentRefs.length} 个父级 BOM 的引用版本`
       : ''
+  if (res.fromArchived) {
+    const archivedHint = res.archivedActives?.length
+      ? `，已同步归档同产品生效 BOM（版本 ${res.archivedActives
+          .map((a) => a.version || a.bomNo)
+          .filter(Boolean)
+          .join('、')}）`
+      : ''
+    message.success(`已重新启用${archivedHint}${syncHint}`)
+    return
+  }
   message.success(
     isShipBomType(record.bomType)
       ? `审核发布成功，当前版本已生效可用于发货${syncHint}`
@@ -1012,7 +1031,19 @@ function processNextEnableInQueue() {
   openEnableRefModal(next, refs)
 }
 
-function handleEnable(record) {
+function findActiveBomsForItem(record) {
+  const bomType = normalizeBomType(record.bomType)
+  return productBomState.boms.filter(
+    (b) =>
+      b.itemType === record.itemType &&
+      b.itemId === record.itemId &&
+      b.id !== record.id &&
+      isBomActive(b) &&
+      normalizeBomType(b.bomType) === bomType,
+  )
+}
+
+function proceedEnable(record) {
   const refs = findParentRefsForBomUpgrade(record)
   if (refs.length) {
     enableQueue.value = []
@@ -1020,6 +1051,25 @@ function handleEnable(record) {
     return
   }
   doEnable(record)
+}
+
+function handleEnable(record) {
+  if (isBomArchived(record)) {
+    const actives = findActiveBomsForItem(record)
+    if (actives.length) {
+      const versions = actives
+        .map((a) => a.version || a.bomNo)
+        .filter(Boolean)
+        .join('、')
+      Modal.confirm({
+        title: '再次启用确认',
+        content: `该产品已有生效 BOM（版本 ${versions}），启用后将同步归档。确认继续？`,
+        onOk: () => proceedEnable(record),
+      })
+      return
+    }
+  }
+  proceedEnable(record)
 }
 
 function onEnableRefConfirm({ action, selectedRefs, upgradeRefs }) {

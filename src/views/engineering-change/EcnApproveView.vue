@@ -97,10 +97,12 @@ import {
   resolveEcnChangeReason,
 } from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
+import { useTabs } from '@/composables/useTabs'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 
 const route = useRoute()
 const router = useRouter()
+const { closeTab } = useTabs()
 const moduleConfig = resolveChangeRequestModule(route)
 const opinion = ref('')
 
@@ -135,17 +137,24 @@ function approvalResultColor(result) {
 }
 
 function goBack() {
+  leaveApprovePage()
+}
+
+/** 审核通过/驳回后关闭审核页，返回列表 */
+function leaveApprovePage() {
+  const approvePath = route.path
   router.push(moduleConfig.listPath)
+  closeTab(approvePath)
 }
 
 function handleApprove() {
   const res = moduleConfig.store.approve(record.value.id, opinion.value, true)
   if (res.ok) {
-    message.success('审批已通过')
+    message.success(
+      record.value?.status === ECN_STATUS.APPROVED ? '审批已通过' : '本级已通过，已返回列表',
+    )
     opinion.value = ''
-    if (record.value.status === ECN_STATUS.APPROVED) {
-      router.push(moduleConfig.listPath)
-    }
+    leaveApprovePage()
   } else {
     message.warning(res.message)
   }
@@ -159,7 +168,9 @@ function handleReject() {
   const res = moduleConfig.store.approve(record.value.id, opinion.value, false)
   if (res.ok) {
     message.success('已驳回')
-    router.push(moduleConfig.listPath)
+    leaveApprovePage()
+  } else {
+    message.warning(res.message)
   }
 }
 </script>

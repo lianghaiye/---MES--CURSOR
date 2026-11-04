@@ -38,6 +38,9 @@
             <a-button v-if="isShipBom" @click="handleToggleShipStatus">
               {{ isShipAttachmentEnabled(record) ? '停用' : '启用' }}
             </a-button>
+            <a-button v-else-if="isArchivedBom" type="primary" @click="handleReEnable">
+              启用
+            </a-button>
             <a-button v-else :disabled="record.status === '已归档'" @click="handleArchive">
               归档
             </a-button>
@@ -195,7 +198,11 @@ import { Modal, message } from 'ant-design-vue'
 import { PrinterOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
 import { getVersionsInGroup } from '@/mock/productBom'
 import { buildBomOperationLogs } from '@/mock/bomOperationLogs'
-import { defaultBomColumnSettings, isShipBomType } from '@/mock/bomMaterialColumns'
+import {
+  defaultBomColumnSettings,
+  isShipBomType,
+  normalizeBomType,
+} from '@/mock/bomMaterialColumns'
 import {
   bomWorkspaceDetailPath,
   bomWorkspaceEditPath,
@@ -206,10 +213,11 @@ import {
 } from '@/utils/shipAttachmentNav'
 import { defaultBomOverviewColumnSettings } from '@/mock/bomOverviewColumns'
 import { mergeColumnSettings } from '@/utils/tableColumnSettings'
-import { isBomEditable } from '@/mock/productBomOptions'
+import { isBomEditable, isBomArchived, isBomActive } from '@/mock/productBomOptions'
 import {
   getProductBomById,
   archiveProductBom,
+  enableProductBom,
   productBomState,
   enableShipAttachment,
   disableShipAttachment,
@@ -364,6 +372,7 @@ const overviewInfo = computed(() => {
 })
 
 const canEdit = computed(() => isBomEditable(record.value))
+const isArchivedBom = computed(() => isBomArchived(record.value))
 
 function formatDisplayDate(val) {
   if (!val) return '—'
@@ -514,6 +523,59 @@ function onShipConflictConfirm(resolution) {
   }
   loadDetail()
   message.success('已启用')
+}
+
+function findActiveBomsForCurrentItem() {
+  const bom = record.value
+  if (!bom) return []
+  const bomType = normalizeBomType(bom.bomType)
+  return productBomState.boms.filter(
+    (b) =>
+      b.itemType === bom.itemType &&
+      b.itemId === bom.itemId &&
+      b.id !== bom.id &&
+      isBomActive(b) &&
+      normalizeBomType(b.bomType) === bomType,
+  )
+}
+
+function doReEnable() {
+  if (!record.value) return
+  const res = enableProductBom(record.value.id)
+  if (res?.error) {
+    message.warning(res.error)
+    return
+  }
+  loadDetail()
+  const archivedHint = res.archivedActives?.length
+    ? `，已同步归档同产品生效 BOM（版本 ${res.archivedActives
+        .map((a) => a.version || a.bomNo)
+        .filter(Boolean)
+        .join('、')}）`
+    : ''
+  message.success(`已重新启用${archivedHint}`)
+}
+
+function handleReEnable() {
+  if (!record.value || !isArchivedBom.value) return
+  const actives = findActiveBomsForCurrentItem()
+  if (actives.length) {
+    const versions = actives
+      .map((a) => a.version || a.bomNo)
+      .filter(Boolean)
+      .join('、')
+    Modal.confirm({
+      title: '再次启用确认',
+      content: `该产品已有生效 BOM（版本 ${versions}），启用后将同步归档。确认继续？`,
+      onOk: () => doReEnable(),
+    })
+    return
+  }
+  Modal.confirm({
+    title: '再次启用确认',
+    content: `确定重新启用 BOM「${record.value.bomName}」吗？`,
+    onOk: () => doReEnable(),
+  })
 }
 
 function handleArchive() {

@@ -168,7 +168,9 @@
         :footer="null"
         destroy-on-close
       >
-        <p class="bom-ref-hint">该产品作为子件被以下 BOM 引用，点击 BOM 编码可打开详情。</p>
+        <p class="bom-ref-hint">
+          仅展示将该物品作为子件直接引用的 BOM（不含间接引用、已归档），点击 BOM 编码可打开详情。
+        </p>
         <a-table
           :columns="bomRefColumns"
           :data-source="overview.bomRefs"

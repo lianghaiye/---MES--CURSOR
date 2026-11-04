@@ -9,8 +9,8 @@
             <span class="page-sub">{{ record.type }} · {{ record.productName }}</span>
           </div>
           <a-space>
-            <a-button v-if="showPlanImpactEntry" type="primary" size="small" @click="goPlanImpact">
-              继续重排
+            <a-button v-if="showExecuteEntry" type="primary" size="small" @click="goPlanImpact">
+              {{ executeEntryLabel }}
             </a-button>
             <a-button size="small" @click="printModalOpen = true">
               <PrinterOutlined />
@@ -26,6 +26,10 @@
 
         <DetailSectionCard title="变更技术内容">
           <EcnChangeItemsReadonlyTable :items="changeItems" />
+        </DetailSectionCard>
+
+        <DetailSectionCard v-if="dispositionSnapshot" title="处置操作与执行结果">
+          <EcnDispositionResultSection :snapshot="dispositionSnapshot" :show-title="false" />
         </DetailSectionCard>
 
         <template v-if="showPostApprovalSections">
@@ -80,6 +84,7 @@ import EcnBasicInfoSection from './components/EcnBasicInfoSection.vue'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 import EcnBomVersionTimeline from './components/EcnBomVersionTimeline.vue'
 import EcnPrintModal from './components/EcnPrintModal.vue'
+import EcnDispositionResultSection from './components/EcnDispositionResultSection.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -89,6 +94,7 @@ const printModalOpen = ref(false)
 
 const record = computed(() => moduleConfig.store.findById(route.params.id))
 const changeItems = computed(() => record.value?.changeItems || [])
+const dispositionSnapshot = computed(() => record.value?.rescheduleDisposition || null)
 const historyRecords = computed(() => record.value?.approvalRecords || [])
 const bomVersionHistory = computed(() =>
   record.value?.bomVersionHistory?.length
@@ -101,9 +107,22 @@ const showPostApprovalSections = computed(() => {
   return status && status !== ECN_STATUS.DRAFT && status !== ECN_STATUS.APPROVING
 })
 
-const showPlanImpactEntry = computed(() => {
+const showExecuteEntry = computed(() => {
   const status = record.value?.status
-  return status === ECN_STATUS.EXECUTED || status === ECN_STATUS.COMPLETED
+  return (
+    status === ECN_STATUS.APPROVED ||
+    status === ECN_STATUS.EXECUTED ||
+    status === ECN_STATUS.COMPLETED
+  )
+})
+
+const executeEntryLabel = computed(() => {
+  const row = record.value
+  if (!row) return '执行'
+  if (row.status === ECN_STATUS.APPROVED) {
+    return row.executionDraft || moduleConfig.store.hasExecutionDraft?.(row) ? '继续执行' : '执行'
+  }
+  return '查看执行结果'
 })
 
 watch(
@@ -158,7 +177,8 @@ function handleCompare(item) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 4px;
+  padding: 12px 4px 0;
+  margin-bottom: 8px;
   gap: 12px;
   flex-wrap: wrap;
 }

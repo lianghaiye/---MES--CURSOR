@@ -8,11 +8,13 @@ import { analyzeEcnPlanImpact } from '@/utils/ecnPlanImpact'
 
 const api = createChangeRequestStore({
   storageKey: 'i_doms_ecn',
-  dataVersion: 11,
+  dataVersion: 20,
   buildMockRecords: buildMockEcnRecords,
   docNoField: 'ecnNo',
   docNoPrefix: 'ECN',
   idPrefix: 'ecn',
+  // 演示数据不落盘：刷新页面即恢复 MOCK 初始态
+  ephemeral: true,
 })
 
 export const ecnState = api.state
@@ -50,8 +52,31 @@ export function completeEcnExecution(id, operator = '张工') {
     summary: impact.summary,
   }
   row.rescheduleStatus = ECN_RESCHEDULE_STATUS.PENDING
+  row.executionDraft = null
 
   return { ...res, bomUpgrade: bomRes, planImpact: impact }
+}
+
+/** 执行页草稿：只落处置选择，不改状态、不升版 BOM */
+export function saveEcnExecutionDraft(id, draft) {
+  const row = findEcnById(id)
+  if (!row) return { ok: false, message: '变更单不存在' }
+  if (row.status !== ECN_STATUS.APPROVED) {
+    return { ok: false, message: '仅待执行的变更单可保存执行草稿' }
+  }
+  row.executionDraft = {
+    workItemKeys: Array.isArray(draft?.workItemKeys) ? [...draft.workItemKeys] : [],
+    oldActionByKey: { ...(draft?.oldActionByKey || {}) },
+    newActionByKey: { ...(draft?.newActionByKey || {}) },
+    supplyFormByKey: { ...(draft?.supplyFormByKey || {}) },
+    wholePlanMode: !!draft?.wholePlanMode,
+    savedAt: new Date().toISOString(),
+  }
+  return { ok: true, record: row }
+}
+
+export function hasEcnExecutionDraft(record) {
+  return !!(record?.executionDraft && record.status === ECN_STATUS.APPROVED)
 }
 
 export function canWithdrawEcn(order) {
@@ -92,6 +117,8 @@ export function archiveEcn(id) {
 export const ecnStoreApi = {
   ...api,
   completeExecution: completeEcnExecution,
+  saveExecutionDraft: saveEcnExecutionDraft,
+  hasExecutionDraft: hasEcnExecutionDraft,
   withdraw: withdrawEcn,
   canWithdraw: canWithdrawEcn,
   cancel: withdrawEcn,

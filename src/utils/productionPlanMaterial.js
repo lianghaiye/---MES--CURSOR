@@ -86,15 +86,26 @@ export function applyPlanQtyByDeductMode(workItem, deductInventory = true) {
   walk(workItem.materials)
 }
 
-/** 订单是否已下达单据（计划数量锁定） */
+const PLAN_QTY_EDITABLE_WI_STATUS = new Set(['待下达', '待BOM', '设计中'])
+
+/** 工作项计划数量是否可改：待下达/待BOM/设计中允许修改 */
+export function isWorkItemPlanQtyLocked(workItem, order) {
+  if (!workItem) return false
+  const st = workItem.status || ''
+  if (PLAN_QTY_EDITABLE_WI_STATUS.has(st)) return false
+  if (order?.planQtyLocked) return true
+  const all = []
+  flattenMaterials(workItem.materials, all)
+  return all.some((m) => m.status === '进行中' || m.status === '已完成')
+}
+
+/** 订单级锁定（扣减库存等）：整单待下达类状态不锁；否则看是否已有下达单据 */
 export function isOrderPlanQtyLocked(order) {
   if (!order) return false
+  const orderSt = order.orderStatus || ''
+  if (PLAN_QTY_EDITABLE_WI_STATUS.has(orderSt)) return false
   if (order.planQtyLocked) return true
-  return (order.workItems || []).some((wi) => {
-    const all = []
-    flattenMaterials(wi.materials, all)
-    return all.some((m) => m.status === '进行中' || m.status === '已完成')
-  })
+  return (order.workItems || []).some((wi) => isWorkItemPlanQtyLocked(wi, order))
 }
 
 export function lockOrderPlanQty(order) {

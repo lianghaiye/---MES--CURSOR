@@ -53,13 +53,16 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
   const orders = []
 
   if (selfMade[0]) {
-    const { m } = selfMade[0]
+    const { wi, m } = selfMade[0]
+    // 树演示挂成品工单，避免与同 SO 下组件 ECN 演示工单「一料多单」
+    const materialCode = wi.productCode || m.code
+    const productName = wi.productName || m.name
     orders.push({
       id: 'wo-pp-tree-demo-1',
       code: 'WO202605280-001',
-      name: `${m.name}生产工单`,
-      productName: m.name,
-      materialCode: m.code,
+      name: `${productName}生产工单`,
+      productName,
+      materialCode,
       orderCategory: '生产工单',
       status: '待下发',
       progressLabel: '待下发',
@@ -82,14 +85,28 @@ export function createProductionPlanOrderTreeDemoWorkOrders() {
     })
   }
 
-  if (outsourced[0]) {
-    const { m } = outsourced[0]
+  // 避开 ECN-DEMO-COVER 组件编码，避免同 SO 下一料既有外协订单又有外协工单
+  const ecnCoverCodes = new Set([
+    '010050001',
+    '010050002',
+    '010050003',
+    '010050004',
+    '010050004-A',
+    '010050004-B',
+    '010050005',
+    '010050006',
+  ])
+  const outRow = outsourced.find(({ m }) => m.code && !ecnCoverCodes.has(m.code)) || outsourced[0]
+  if (outRow) {
+    const { wi, m } = outRow
+    const materialCode = ecnCoverCodes.has(m.code) ? wi.productCode || 'CP2610001' : m.code
+    const productName = ecnCoverCodes.has(m.code) ? wi.productName || m.name : m.name
     orders.push({
       id: 'wo-pp-tree-demo-2',
       code: 'WO202606010-003',
-      name: `${m.name}外协工单`,
-      productName: m.name,
-      materialCode: m.code,
+      name: `${productName}外协工单`,
+      productName,
+      materialCode,
       orderCategory: '外协工单',
       status: '执行中',
       progressLabel: '进行中',

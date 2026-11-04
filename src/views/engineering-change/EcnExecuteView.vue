@@ -39,15 +39,30 @@
             :readonly="rescheduleDone"
             :refresh-key="refreshKey"
             v-model:work-item-keys="workItemKeys"
-            v-model:line-action-keys="lineActionKeys"
+            v-model:old-action-by-key="oldActionByKey"
+            v-model:new-action-by-key="newActionByKey"
+            v-model:supply-form-by-key="supplyFormByKey"
+            v-model:whole-plan-mode="wholePlanMode"
           />
         </div>
 
-        <div v-if="!rescheduleDone" class="page-footer">
+        <div v-if="dispositionSnapshot" class="section-card">
+          <EcnDispositionResultSection :snapshot="dispositionSnapshot" />
+        </div>
+
+        <div class="page-footer">
           <a-space>
-            <a-button @click="goBack">取消</a-button>
-            <a-button type="primary" :loading="submitting" @click="handleExecute">
-              {{ isExecuted ? '确认重排' : '确认执行并重排' }}
+            <a-button @click="goBack">{{ rescheduleDone ? '返回列表' : '取消' }}</a-button>
+            <a-button v-if="!rescheduleDone" :loading="saving" @click="handleSaveDraft">
+              保存
+            </a-button>
+            <a-button
+              v-if="!rescheduleDone"
+              type="primary"
+              :loading="submitting"
+              @click="handleExecute"
+            >
+              确认执行并重排
             </a-button>
           </a-space>
         </div>
@@ -71,18 +86,24 @@ import { resolveChangeRequestModule } from '@/constants/changeRequestModule'
 import { rescheduleEcnImpact } from '@/utils/ecnPlanImpact'
 import EcnChangeItemsReadonlyTable from './components/EcnChangeItemsReadonlyTable.vue'
 import EcnExecuteRescheduleSection from './components/EcnExecuteRescheduleSection.vue'
+import EcnDispositionResultSection from './components/EcnDispositionResultSection.vue'
 
 const route = useRoute()
 const router = useRouter()
 const moduleConfig = resolveChangeRequestModule(route)
 const submitting = ref(false)
+const saving = ref(false)
 const refreshKey = ref(0)
 const workItemKeys = ref([])
-const lineActionKeys = ref([])
+const oldActionByKey = ref({})
+const newActionByKey = ref({})
+const supplyFormByKey = ref({})
+const wholePlanMode = ref(false)
 
 const record = computed(() => moduleConfig.store.findById(route.params.id))
 const changeItems = computed(() => record.value?.changeItems || [])
 const execConfig = computed(() => findExecConfigOption(record.value?.wipHandling))
+const dispositionSnapshot = computed(() => record.value?.rescheduleDisposition || null)
 
 const isExecuted = computed(
   () =>
@@ -95,11 +116,30 @@ function goBack() {
   router.push(moduleConfig.listPath)
 }
 
-function applyReschedule() {
-  return rescheduleEcnImpact(record.value, {
+function currentDraftPayload() {
+  return {
     workItemKeys: workItemKeys.value,
-    lineActionKeys: lineActionKeys.value,
-  })
+    oldActionByKey: oldActionByKey.value,
+    newActionByKey: newActionByKey.value,
+    supplyFormByKey: supplyFormByKey.value,
+    wholePlanMode: wholePlanMode.value,
+  }
+}
+
+function applyReschedule() {
+  return rescheduleEcnImpact(record.value, currentDraftPayload())
+}
+
+function handleSaveDraft() {
+  if (!record.value?.id) return
+  saving.value = true
+  const res = moduleConfig.store.saveExecutionDraft?.(record.value.id, currentDraftPayload())
+  saving.value = false
+  if (!res?.ok) {
+    message.warning(res?.message || '保存失败')
+    return
+  }
+  message.success('已保存，可稍后继续执行')
 }
 
 function handleExecute() {
@@ -124,13 +164,21 @@ function handleExecute() {
   refreshKey.value += 1
   const parts = []
   if (!wasExecuted) parts.push('变更已执行')
-  if (reshaped.refreshed) parts.push(`已重排 ${reshaped.refreshed} 个工作项`)
-  if (reshaped.cancelledWo) parts.push(`已作废 ${reshaped.cancelledWo} 张待下发工单`)
-  if (reshaped.cancelledPlan) parts.push(`已取消 ${reshaped.cancelledPlan} 条未下发物料`)
-  if (reshaped.scheduled) parts.push(`已排产 ${reshaped.scheduled} 条新料`)
-  if (!parts.length) parts.push('没有勾选可重排项')
+  if (reshaped.refreshed) parts.push(`已整单换 BOM ${reshaped.refreshed} 项`)
+  if (reshaped.updatedQty) parts.push(`已更新 ${reshaped.updatedQty} 处数量`)
+  if (reshaped.cancelledWo) parts.push(`已作废 ${reshaped.cancelledWo} 张工单`)
+  if (reshaped.cancelledOut) parts.push(`已作废 ${reshaped.cancelledOut} 张外协订单`)
+  if (reshaped.purchaseReqNo) {
+    parts.push(
+      `已合并生成采购申请 ${reshaped.purchaseReqNo}（${reshaped.purchaseLineCount || 0} 条明细）`,
+    )
+  }
+  if (reshaped.scheduled) {
+    const other = reshaped.purchaseReqNo ? Math.max(0, reshaped.scheduled - 1) : reshaped.scheduled
+    if (other > 0) parts.push(`已生成 ${other} 条新料工单/外协订单`)
+  }
+  if (!parts.length) parts.push(wholePlanMode.value ? '未勾选整单换 BOM' : '未选择处置动作')
   message.success(parts.join('，'))
-  goBack()
 }
 </script>
 
@@ -143,7 +191,8 @@ function handleExecute() {
 }
 
 .page-header {
-  padding: 12px 4px;
+  padding: 12px 4px 0;
+  margin-bottom: 8px;
 }
 
 .header-left {
@@ -207,12 +256,17 @@ function handleExecute() {
 .page-footer {
   position: sticky;
   bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: flex-end;
   padding: 12px 16px;
   background: #fff;
-  border-top: 1px solid #f0f0f0;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
-  margin: 0 -12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* 与上方 section-card 同宽，不再左右撑满 */
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 </style>

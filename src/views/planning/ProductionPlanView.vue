@@ -265,7 +265,7 @@
                       :formatter="inputNumberFormatter"
                       :parser="inputNumberParser"
                       style="width: 100%"
-                      :disabled="isPlanQtyLocked"
+                      :disabled="isWorkItemPlanQtyLocked(record, selectedOrder)"
                       @change="onWorkItemPlanQtyChange(record)"
                     />
                   </template>
@@ -353,11 +353,31 @@
                   <a-button type="primary" @click="openOutsourceWorkOrderModal"
                     >生成外协工单</a-button
                   >
-                  <a-button @click="handleCreatePhase2Plan">生成二期计划（待定料）</a-button>
                 </a-space>
               </div>
 
-              <div v-if="activeWorkItem && materialTree.length" class="ebom-panel-title">
+              <div v-if="activeWorkItem?.lastRescheduleEcnNo" class="ecn-reschedule-banner">
+                <span>
+                  本物料清单已按
+                  <a class="link-code" @click.prevent="openEcnExecuteResult(activeWorkItem)">
+                    {{ activeWorkItem.lastRescheduleEcnNo }}
+                  </a>
+                  更新
+                  <template v-if="activeWorkItem.lastRescheduleAt">
+                    · {{ activeWorkItem.lastRescheduleAt }}
+                  </template>
+                </span>
+                <a-space :size="12">
+                  <a class="link-code" @click.prevent="hideEcnOldMaterials = !hideEcnOldMaterials">
+                    {{ hideEcnOldMaterials ? '显示旧料' : '隐藏旧料' }}
+                  </a>
+                  <a class="link-code" @click.prevent="openEcnExecuteResult(activeWorkItem)"
+                    >查看执行结果</a
+                  >
+                </a-space>
+              </div>
+
+              <div v-if="activeWorkItem && displayMaterialTree.length" class="ebom-panel-title">
                 <span>BOM名称：{{ activeWorkItemBomTitle }}</span>
                 <TableColumnSettingButton
                   v-if="detailFullscreen"
@@ -372,7 +392,7 @@
               <div v-else-if="activeWorkItem" class="material-tree-wrap">
                 <a-table
                   :columns="displayMaterialColumns"
-                  :data-source="materialTree"
+                  :data-source="displayMaterialTree"
                   :pagination="false"
                   row-key="id"
                   size="small"
@@ -380,6 +400,7 @@
                   :scroll="{ x: materialTableScrollX }"
                   v-model:expanded-row-keys="materialExpandedRowKeys"
                   :default-expand-all-rows="true"
+                  :row-class-name="materialRowClassName"
                 >
                   <template #headerCell="{ column }">
                     <template v-if="column.key === 'availableStock'">
@@ -408,6 +429,22 @@
                     <template v-if="column.key === 'status'">
                       <a-tag :color="materialStatusColor(record.status)">{{ record.status }}</a-tag>
                     </template>
+                    <template v-else-if="column.key === 'name' || column.dataIndex === 'name'">
+                      <span
+                        class="mat-name-cell"
+                        :class="{ 'is-ecn-muted': isEcnMutedMaterial(record) }"
+                      >
+                        <span class="mat-name-text">{{ record.name }}</span>
+                        <a-tooltip
+                          v-if="ecnMaterialTag(record)"
+                          :title="ecnMaterialTag(record).tip"
+                        >
+                          <a-tag :color="ecnMaterialTag(record).color" class="ecn-mat-tag">
+                            {{ ecnMaterialTag(record).text }}
+                          </a-tag>
+                        </a-tooltip>
+                      </span>
+                    </template>
                     <template v-else-if="column.key === 'supplyType'">
                       <a-select
                         v-if="record.isTopLevel"
@@ -415,6 +452,7 @@
                         size="small"
                         :options="topLevelSupplyTypeOptions"
                         style="width: 100%"
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="onTopLevelSupplyTypeChange(record)"
                       />
                       <a-select
@@ -423,21 +461,9 @@
                         size="small"
                         :options="supplyTypeOptions"
                         style="width: 100%"
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="onMaterialSupplyTypeChange(record)"
                       />
-                    </template>
-                    <template v-else-if="column.key === 'releaseStatus'">
-                      <a-select
-                        v-if="!record.isTopLevel"
-                        :value="record.releaseStatus || 'releasable'"
-                        size="small"
-                        style="width: 100%"
-                        :options="materialReleaseStatusOptions"
-                        :disabled="!!record.phase2Deferred"
-                        @change="(v) => onMaterialReleaseStatusChange(record, v)"
-                      />
-                      <a-tag v-else-if="record.phase2Deferred" color="default">已拆二期</a-tag>
-                      <span v-else class="muted">—</span>
                     </template>
                     <template v-else-if="column.key === 'planQty'">
                       <a-input-number
@@ -449,7 +475,7 @@
                         :parser="inputNumberParser"
                         size="small"
                         style="width: 100%"
-                        :disabled="isPlanQtyLocked"
+                        :disabled="isActiveWorkItemPlanQtyLocked || isEcnLockedMaterial(record)"
                         @change="(val) => onTopLevelPlanQtyChange(val)"
                       />
                       <a-input-number
@@ -461,7 +487,7 @@
                         :parser="inputNumberParser"
                         size="small"
                         style="width: 100%"
-                        :disabled="isPlanQtyLocked"
+                        :disabled="isActiveWorkItemPlanQtyLocked || isEcnLockedMaterial(record)"
                         @change="onMaterialPlanQtyChange(record)"
                       />
                     </template>
@@ -469,6 +495,7 @@
                       <a-switch
                         :checked="record.joinPlan === '是'"
                         size="small"
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="(checked) => (record.joinPlan = checked ? '是' : '否')"
                       />
                     </template>
@@ -477,6 +504,7 @@
                         v-if="isPurchasedOrOutsourced(record.supplyType)"
                         :checked="!!record.designateSupplier"
                         size="small"
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="(checked) => onMaterialDesignateSupplierChange(record, checked)"
                       />
                       <span v-else class="muted">—</span>
@@ -485,7 +513,9 @@
                       <PlanSupplierSelect
                         v-model:value="record.supplier"
                         size="small"
-                        :disabled="!isPurchasedOrOutsourced(record.supplyType)"
+                        :disabled="
+                          isEcnLockedMaterial(record) || !isPurchasedOrOutsourced(record.supplyType)
+                        "
                         :status="
                           record.designateSupplier &&
                           isPurchasedOrOutsourced(record.supplyType) &&
@@ -504,6 +534,7 @@
                         placeholder="请选择"
                         :options="processRouteOpts"
                         style="width: 100%"
+                        :disabled="isEcnLockedMaterial(record)"
                         :filter-option="filterSelectOption"
                       />
                     </template>
@@ -516,6 +547,7 @@
                         placeholder="暂未配置"
                         :options="processFileOptions"
                         style="width: 100%"
+                        :disabled="isEcnLockedMaterial(record)"
                         :filter-option="filterSelectOption"
                       />
                     </template>
@@ -525,6 +557,7 @@
                         size="small"
                         placeholder="天"
                         allow-clear
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="onMaterialStandardCycleChange(record, selectedOrder)"
                       />
                     </template>
@@ -534,6 +567,7 @@
                         size="small"
                         allow-clear
                         style="width: 100%"
+                        :disabled="isEcnLockedMaterial(record)"
                         @change="(d) => onMaterialLatestDateChange(record, d)"
                       />
                     </template>
@@ -543,10 +577,17 @@
                         size="small"
                         placeholder="补充说明"
                         allow-clear
+                        :disabled="isEcnLockedMaterial(record)"
                       />
                     </template>
                     <template v-else-if="column.key === 'unitUsage'">
-                      {{ formatUnitUsageWithUnit(record) }}
+                      <a-tooltip
+                        v-if="record.updatedByEcnNo"
+                        :title="`由 ${record.updatedByEcnNo} 更新`"
+                      >
+                        <span>{{ formatUnitUsageWithUnit(record) }}</span>
+                      </a-tooltip>
+                      <template v-else>{{ formatUnitUsageWithUnit(record) }}</template>
                     </template>
                     <template v-else-if="column.key === 'availableStock'">
                       <span>{{ formatAvailableStockText(record) }}</span>
@@ -742,8 +783,7 @@ import {
 } from '@/store/productionPlanStore'
 import { voidIncompleteDesignTasksForPlan } from '@/store/designTaskStore'
 import { getOwnActiveBomForItem } from '@/store/productBomStore'
-import { materialReleaseStatusOptions } from '@/constants/ecnPlanReschedule'
-import { createPhase2PlanFromPending, setMaterialReleaseStatus } from '@/utils/ecnPlanImpact'
+import { ecnState } from '@/store/ecnStore'
 import { useTabs } from '@/composables/useTabs'
 import GenerateWorkOrderModal from './components/GenerateWorkOrderModal.vue'
 import GenerateAssemblyWorkOrderModal from './components/GenerateAssemblyWorkOrderModal.vue'
@@ -788,6 +828,7 @@ import {
   cascadeMaterialPlanQtyFromParent,
   collectAllMaterialRowKeys,
   isOrderPlanQtyLocked,
+  isWorkItemPlanQtyLocked,
   lockOrderPlanQty,
   resolveWorkItemMaterials,
   isPurchasedOrOutsourced,
@@ -921,7 +962,6 @@ const baseMaterialColumns = [
   { title: '单位用量', key: 'unitUsage', dataIndex: 'unitUsage', width: 110 },
   { title: '下料尺寸', dataIndex: 'blankSizeText', width: 160, ellipsis: true },
   { title: '供应型态', key: 'supplyType', dataIndex: 'supplyType', width: 100 },
-  { title: '投产状态', key: 'releaseStatus', dataIndex: 'releaseStatus', width: 96 },
   { title: '库存数量', dataIndex: 'stockQty', width: 90 },
   {
     title: '可用库存',
@@ -954,7 +994,7 @@ const {
   displayColumns: displayMaterialColumns,
   tableScrollX: materialTableScrollX,
   defaultColumnSettings: defaultMaterialColumnSettings,
-} = useTableColumnSettings('production-plan-material-list-v3', baseMaterialColumns, {
+} = useTableColumnSettings('production-plan-material-list-v4', baseMaterialColumns, {
   minScrollX: 2600,
 })
 
@@ -1004,7 +1044,13 @@ const activeWorkItem = computed(() => {
   return order.workItems.find((w) => w.id === expandedWorkItemId.value) || null
 })
 
+const isActiveWorkItemPlanQtyLocked = computed(() =>
+  isWorkItemPlanQtyLocked(activeWorkItem.value, selectedOrder.value),
+)
+
 const materialExpandedRowKeys = ref([])
+/** 隐藏 ECN 换料/替换/取消的旧料行 */
+const hideEcnOldMaterials = ref(false)
 
 const materialTree = computed(() => {
   // 依赖采购/工单/领料变更，刷新在途与工单占用
@@ -1019,8 +1065,23 @@ const materialTree = computed(() => {
   return buildDisplayMaterialTree(activeWorkItem.value, selectedOrder.value)
 })
 
+function filterOutEcnOldMaterials(nodes) {
+  return (nodes || [])
+    .filter((n) => !isEcnMutedMaterial(n))
+    .map((n) => {
+      if (!n.children?.length) return n
+      return { ...n, children: filterOutEcnOldMaterials(n.children) }
+    })
+}
+
+const displayMaterialTree = computed(() => {
+  const tree = materialTree.value
+  if (!hideEcnOldMaterials.value) return tree
+  return filterOutEcnOldMaterials(tree)
+})
+
 watch(
-  materialTree,
+  displayMaterialTree,
   (tree) => {
     nextTick(() => {
       materialExpandedRowKeys.value = collectAllMaterialRowKeys(tree)
@@ -1028,6 +1089,10 @@ watch(
   },
   { immediate: true, deep: true },
 )
+
+function materialRowClassName(record) {
+  return isEcnLockedMaterial(record) ? 'ecn-locked-material-row' : ''
+}
 
 const productionPlanEbomRows = computed(() =>
   buildProductionPlanEbomRows(selectedOrder.value?.workItems || []),
@@ -1258,12 +1323,12 @@ function refreshWorkItemMaterials(wi, order) {
 }
 
 function onWorkItemPlanQtyChange(record) {
-  if (isPlanQtyLocked.value) return
+  if (isWorkItemPlanQtyLocked(record, selectedOrder.value)) return
   cascadeMaterialPlanQtyFromParent(record.planQty, record.materials)
 }
 
 function onTopLevelPlanQtyChange(val) {
-  if (isPlanQtyLocked.value) return
+  if (isActiveWorkItemPlanQtyLocked.value) return
   const wi = activeWorkItem.value
   if (!wi) return
   wi.planQty = val
@@ -1271,7 +1336,7 @@ function onTopLevelPlanQtyChange(val) {
 }
 
 function onMaterialPlanQtyChange(record) {
-  if (isPlanQtyLocked.value) return
+  if (isActiveWorkItemPlanQtyLocked.value) return
   if (record.children?.length) {
     cascadeMaterialPlanQtyFromParent(record.planQty, record.children)
   }
@@ -1400,26 +1465,59 @@ function materialStatusColor(status) {
   return map[status] || 'default'
 }
 
-function onMaterialReleaseStatusChange(record, value) {
-  setMaterialReleaseStatus(record, value)
+function isEcnAddedMaterial(record) {
+  if (!record || record.isTopLevel) return false
+  if (record.addedByEcnNo || record.ecnTrace === 'added') return true
+  return /ECN\s+\S+\s*新增/.test(String(record.remark || ''))
 }
 
-function handleCreatePhase2Plan() {
-  if (!selectedOrder.value) {
-    message.warning('请先选择订单')
+function isEcnMutedMaterial(record) {
+  const t = record?.ecnTrace
+  return t === 'cancelled' || t === 'replaced' || t === 'swapped_out'
+}
+
+/** ECN 旧料：整行只读（换料旧料 / 已替换 / 取消） */
+function isEcnLockedMaterial(record) {
+  return isEcnMutedMaterial(record)
+}
+
+/** 物料行 ECN 痕迹标签 */
+function ecnMaterialTag(record) {
+  if (!record || record.isTopLevel) return null
+  const no = record.addedByEcnNo || record.updatedByEcnNo || record.ecnByEcnNo || ''
+  if (isEcnAddedMaterial(record)) {
+    return { text: 'ECN新增', color: 'success', tip: no ? `由 ${no} 新增` : 'ECN 新增物料' }
+  }
+  if (record.ecnTrace === 'cancelled') {
+    return { text: 'ECN取消', color: 'default', tip: no ? `由 ${no} 取消` : 'ECN 取消物料' }
+  }
+  if (record.ecnTrace === 'replaced') {
+    return { text: 'ECN已替换', color: 'warning', tip: no ? `由 ${no} 替换` : 'ECN 替换旧料' }
+  }
+  if (record.ecnTrace === 'swapped_out') {
+    return { text: 'ECN换料·旧料', color: 'orange', tip: no ? `由 ${no} 换料` : 'ECN 换料旧料' }
+  }
+  if (record.ecnTrace === 'qty' || record.updatedByEcnNo) {
+    return {
+      text: '用量已更新',
+      color: 'processing',
+      tip: no ? `由 ${no} 更新用量` : 'ECN 更新用量',
+    }
+  }
+  return null
+}
+
+function openEcnExecuteResult(wi) {
+  const ecnNo = wi?.lastRescheduleEcnNo
+  if (!ecnNo) return
+  const row = (ecnState.items || []).find((e) => e.ecnNo === ecnNo)
+  if (!row) {
+    message.warning(`未找到变更单 ${ecnNo}`)
     return
   }
-  if (!activeWorkItem.value) {
-    message.warning('请先展开工作项查看物料清单')
-    return
-  }
-  const res = createPhase2PlanFromPending(selectedOrder.value.id, activeWorkItem.value.id)
-  if (!res.ok) {
-    message.warning(res.message)
-    return
-  }
-  selectedId.value = res.plan.id
-  message.success(`已生成二期计划 ${res.plan.orderNo}，共 ${res.materialCount} 项物料`)
+  const path = `/engineering-change/ecn/${row.id}/execute`
+  openTab(path, `${ecnNo} 执行结果`)
+  router.push(path)
 }
 
 /** 可用库存列：工单占用/可用库存 */
@@ -1750,7 +1848,7 @@ function handleReset() {
 }
 
 .order-list-panel {
-  width: 280px;
+  width: 300px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -1801,9 +1899,18 @@ function handleReset() {
   }
 }
 
-.list-pagination {
+.list-pagination.ant-pagination {
   margin-top: auto;
-  text-align: center;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+  row-gap: 0;
+
+  :deep(.ant-pagination-options) {
+    margin-inline-start: 4px;
+  }
 }
 
 .detail-panel {
@@ -1948,6 +2055,62 @@ function handleReset() {
 
 .ebom-empty {
   margin: 12px 0;
+}
+
+.ecn-reschedule-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  border: 1px solid #91caff;
+  border-radius: 6px;
+  background: #e6f4ff;
+  font-size: 13px;
+  color: #0958d9;
+}
+
+.mat-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+
+  &.is-ecn-muted .mat-name-text {
+    color: rgba(0, 0, 0, 0.45);
+    text-decoration: line-through;
+  }
+}
+
+.mat-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ecn-mat-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0 !important;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+:deep(.ecn-locked-material-row) {
+  color: rgba(0, 0, 0, 0.45);
+  background: #fafafa !important;
+
+  td {
+    background: #fafafa !important;
+  }
+
+  .ant-input,
+  .ant-input-number,
+  .ant-select-selector,
+  .ant-picker {
+    background: #f5f5f5 !important;
+    color: rgba(0, 0, 0, 0.45);
+  }
 }
 
 .ebom-panel-title {

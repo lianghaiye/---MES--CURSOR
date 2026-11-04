@@ -8,6 +8,7 @@ import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { productBomState, getProductBomById } from '@/store/productBomStore'
 import { getBomLineItems } from '@/utils/bomVersionReference'
+import { findChildBomRefAncestorLine } from '@/utils/bomChildRefDetach'
 import { isBomArchived, normalizeBomStatusValue } from '@/mock/productBomOptions'
 import { isShipBomType } from '@/mock/bomMaterialColumns'
 import {
@@ -64,7 +65,47 @@ function orderDate(order, keys) {
   return ''
 }
 
-/** 引用该产品作为子件的 BOM（不含自身 BOM、已归档、随货配件） */
+function lineMatchesItem(line, id, code) {
+  const lineId = String(line.referencedItemId || line.itemId || '')
+  const lineCode = String(
+    line.materialCode || line.itemCode || line.productCode || line.inventoryCode || '',
+  ).trim()
+  return (id && lineId === id) || (code && lineCode === code)
+}
+
+/**
+ * 是否为母件 BOM 的直接引用行：
+ * - 计入：本 BOM 结构里直接挂上的子件（含引用子件 BOM 的那一行本身）
+ * - 不计：挂在「子件 BOM 引用」节点下的展开下级（间接出现）
+ */
+function isDirectItemReferenceLine(parent, line) {
+  if (!line) return false
+  const flatNodes = parent.treeNodes || []
+  const lineItems = getBomLineItems(parent)
+  if (line.id && findChildBomRefAncestorLine(flatNodes, lineItems, line.id)) {
+    return false
+  }
+  // 兜底：按树父节点上溯，识别 bom-ref / childBomId 祖先
+  let parentId = line.parentTreeId
+  const seen = new Set()
+  while (parentId && !seen.has(parentId)) {
+    seen.add(parentId)
+    const parentNode = flatNodes.find((n) => n.id === parentId)
+    if (parentNode?.nodeType === 'bom-ref') return false
+    const parentLine =
+      lineItems.find((l) => l.treeNodeId === parentId) ||
+      (parentNode?.lineId ? lineItems.find((l) => l.id === parentNode.lineId) : null)
+    if (parentLine && (parentLine.childBomId || parentLine.childBom)) return false
+    parentId = parentNode?.parentId || null
+  }
+  return true
+}
+
+/**
+ * 引用该物品作为子件的 BOM
+ * - 仅直接引用（不含经多层 BOM 引用展开后的间接出现）
+ * - 不含自身 BOM、已归档、随货配件
+ */
 export function findBomsReferencingItem(record) {
   const id = String(record?.id || '')
   const code = String(record?.code || '').trim()
@@ -75,13 +116,9 @@ export function findBomsReferencingItem(record) {
     if (!parent?.id || isBomArchived(parent) || isShipBomType(parent.bomType)) return
     if (id && String(parent.itemId) === id) return
     const lines = getBomLineItems(parent)
-    const matched = lines.filter((line) => {
-      const lineId = String(line.referencedItemId || line.itemId || '')
-      const lineCode = String(
-        line.materialCode || line.itemCode || line.productCode || line.inventoryCode || '',
-      ).trim()
-      return (id && lineId === id) || (code && lineCode === code)
-    })
+    const matched = lines.filter(
+      (line) => lineMatchesItem(line, id, code) && isDirectItemReferenceLine(parent, line),
+    )
     if (!matched.length) return
     const unitQty = matched.reduce((s, l) => s + (Number(l.unitQty) || 0), 0)
     rows.push({

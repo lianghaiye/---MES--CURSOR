@@ -363,6 +363,14 @@
       <a-select v-model:value="urgencyDraft" style="width: 100%" :options="urgencyOpts" />
     </a-modal>
 
+    <WorkOrderTerminateModal
+      v-model:open="terminateModalOpen"
+      :work-order="terminateTarget"
+      :need-choose="terminateNeedChoose"
+      :choose-message="terminateChooseMessage"
+      @confirm="onTerminateConfirm"
+    />
+
     <WorkOrderPrintModal v-model:open="batchPrintOpen" :work-orders="batchPrintOrders" />
 
     <ExportExcelModal
@@ -439,6 +447,8 @@ import { getUrgencyOptions, urgencyTagColor, urgencyLabel } from '@/constants/ur
 import { getWarehouseSelectOptions, warehouseState } from '@/store/warehouseStore'
 import { bomOptions } from '@/mock/workOrderMaster'
 import CreateWorkOrderModal from './components/CreateWorkOrderModal.vue'
+import WorkOrderTerminateModal from './components/WorkOrderTerminateModal.vue'
+import { appendWorkOrderOperationLog } from '@/utils/workOrderOperationLog'
 import CreateScheduleBatchModal from './components/CreateScheduleBatchModal.vue'
 import EditScheduleQtyModal from './components/EditScheduleQtyModal.vue'
 import WorkOrderConvertModals from './components/WorkOrderConvertModals.vue'
@@ -505,6 +515,10 @@ function runEnsureProcessOutsourceOrders(workOrder, batchQty, scheduleBatchId = 
   })
 }
 const urgencyModalOpen = ref(false)
+const terminateModalOpen = ref(false)
+const terminateTarget = ref(null)
+const terminateNeedChoose = ref(false)
+const terminateChooseMessage = ref('')
 const scheduleBatchModalOpen = ref(false)
 const scheduleBatchTarget = ref(null)
 const editScheduleQtyModalOpen = ref(false)
@@ -918,6 +932,39 @@ function onBatchMenu({ key }) {
   else if (key === 'export') openExportModal()
 }
 
+function onTerminateConfirm({ mode, reason }) {
+  const wo = terminateTarget.value
+  if (!wo) return
+  const done = buildTerminateWorkOrderResult(wo, {
+    mode: mode || 'reset',
+    confirmed: true,
+    reason,
+  })
+  if (!done.ok) {
+    message.error(done.message || '终止失败')
+    return
+  }
+  const row = updateWorkOrder(wo.id, done.patch)
+  if (!row) {
+    message.error('终止失败：找不到工单')
+    return
+  }
+  const reasonText = String(reason || '').trim()
+  appendWorkOrderOperationLog(row, {
+    action: '终止',
+    operator: '当前用户',
+    remark: reasonText ? `人工终止：${reasonText}` : '人工终止',
+  })
+  const tip =
+    mode === 'keep'
+      ? `工单状态已变为「${row.status}」（保留报工）`
+      : mode === 'reset' && terminateNeedChoose.value
+        ? `工单状态已变为「${row.status}」（报工已重置）`
+        : `工单状态已变为「${row.status}」`
+  message.success(tip)
+  terminateTarget.value = null
+}
+
 function onCardAction(key, wo) {
   if (key === 'edit') {
     openEditModal(wo)
@@ -1021,76 +1068,14 @@ function onCardAction(key, wo) {
   }
   if (key === 'terminate') {
     const result = buildTerminateWorkOrderResult(wo)
-    if (result.needChoose) {
-      Modal.confirm({
-        title: '确认终止',
-        width: 480,
-        content: `${result.message}
-处理建议：
-· 仍终止：报工数量重置为 0，小程序任务不再显示
-· 不处理：承认报工数量，不影响工时工资结算；未完成任务隐藏`,
-        okText: '仍终止（重置报工）',
-        cancelText: '不处理（保留报工）',
-        okType: 'danger',
-        closable: true,
-        maskClosable: true,
-        onOk: () => {
-          const done = buildTerminateWorkOrderResult(wo, { mode: 'reset', confirmed: true })
-          if (!done.ok) {
-            message.error(done.message || '终止失败')
-            return Promise.reject()
-          }
-          const row = updateWorkOrder(wo.id, done.patch)
-          if (!row) {
-            message.error('终止失败：找不到工单')
-            return Promise.reject()
-          }
-          message.success(`工单状态已变为「${row.status}」（报工已重置）`)
-        },
-        onCancel: (e) => {
-          // 点击 X / 遮罩：不写终止；仅「不处理」按钮执行保留报工
-          if (e && e.triggerCancel) return
-          const done = buildTerminateWorkOrderResult(wo, { mode: 'keep', confirmed: true })
-          if (!done.ok) {
-            message.error(done.message || '终止失败')
-            return
-          }
-          const row = updateWorkOrder(wo.id, done.patch)
-          if (!row) {
-            message.error('终止失败：找不到工单')
-            return
-          }
-          message.success(`工单状态已变为「${row.status}」（保留报工）`)
-        },
-      })
-      return
-    }
-    if (result.needConfirm) {
-      Modal.confirm({
-        title: '确认终止',
-        content: `确定终止工单「${wo.code}」吗？终止后不可恢复生产。`,
-        okType: 'danger',
-        okText: '确认终止',
-        cancelText: '取消',
-        onOk: () => {
-          const done = buildTerminateWorkOrderResult(wo, { mode: 'reset', confirmed: true })
-          if (!done.ok) {
-            message.error(done.message || '终止失败')
-            return Promise.reject()
-          }
-          const row = updateWorkOrder(wo.id, done.patch)
-          if (!row) {
-            message.error('终止失败：找不到工单')
-            return Promise.reject()
-          }
-          message.success(`工单状态已变为「${row.status}」`)
-        },
-      })
-      return
-    }
-    if (!result.ok) {
+    if (!result.ok && !result.needChoose && !result.needConfirm) {
       message.warning(result.message || '无法终止')
+      return
     }
+    terminateTarget.value = wo
+    terminateNeedChoose.value = !!result.needChoose
+    terminateChooseMessage.value = result.message || ''
+    terminateModalOpen.value = true
     return
   }
   if (map[key]) {

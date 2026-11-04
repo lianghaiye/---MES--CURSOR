@@ -18,6 +18,7 @@
               'is-material': node.nodeType === 'material',
               'is-document': node.nodeType === 'document',
               'is-top-level': node.isTopLevel,
+              'is-ecn-muted': isEcnMutedMaterial(node),
             }"
           >
             <template v-if="node.nodeType === 'workItem'">
@@ -42,6 +43,11 @@
               >
                 {{ node.supplyType }}
               </a-tag>
+              <a-tooltip v-if="ecnMaterialTag(node)" :title="ecnMaterialTag(node).tip">
+                <a-tag :color="ecnMaterialTag(node).color" class="status-tag">
+                  {{ ecnMaterialTag(node).text }}
+                </a-tag>
+              </a-tooltip>
             </template>
 
             <template v-else-if="node.nodeType === 'document'">
@@ -100,6 +106,38 @@ function workItemStatusColor(status) {
   return 'default'
 }
 
+/** 取消 / 替换 / 换料旧料：划线灰显 */
+function isEcnMutedMaterial(node) {
+  if (node?.nodeType !== 'material') return false
+  const t = node.ecnTrace
+  return t === 'cancelled' || t === 'replaced' || t === 'swapped_out'
+}
+
+function ecnMaterialTag(node) {
+  if (!node || node.nodeType !== 'material' || node.isTopLevel) return null
+  const no = node.ecnByEcnNo || node.addedByEcnNo || node.updatedByEcnNo || ''
+  if (node.addedByEcnNo || node.ecnTrace === 'added') {
+    return { text: 'ECN新增', color: 'success', tip: no ? `由 ${no} 新增` : 'ECN 新增物料' }
+  }
+  if (node.ecnTrace === 'cancelled') {
+    return { text: 'ECN取消', color: 'default', tip: no ? `由 ${no} 取消` : 'ECN 取消物料' }
+  }
+  if (node.ecnTrace === 'replaced') {
+    return { text: 'ECN已替换', color: 'warning', tip: no ? `由 ${no} 替换` : 'ECN 替换旧料' }
+  }
+  if (node.ecnTrace === 'swapped_out') {
+    return { text: 'ECN换料·旧料', color: 'orange', tip: no ? `由 ${no} 换料` : 'ECN 换料旧料' }
+  }
+  if (node.ecnTrace === 'qty' || node.updatedByEcnNo) {
+    return {
+      text: '用量已更新',
+      color: 'processing',
+      tip: no ? `由 ${no} 更新用量` : 'ECN 更新用量',
+    }
+  }
+  return null
+}
+
 function documentStatusColor(docType, status) {
   if (docType === '采购申请') {
     if (status === '处理中') return 'processing'
@@ -108,6 +146,7 @@ function documentStatusColor(docType, status) {
   }
   if (status === '执行中' || status === '进行中') return 'processing'
   if (status === '完成' || status === '已完成') return 'success'
+  if (status === '已作废' || status === '终止' || status === '已终止') return 'default'
   if (status === '待下发') return 'default'
   return 'blue'
 }
@@ -178,6 +217,14 @@ function openDocument(node) {
 
   &.is-document {
     font-size: 12px;
+  }
+
+  &.is-ecn-muted {
+    .node-name,
+    .node-code {
+      color: rgba(0, 0, 0, 0.45);
+      text-decoration: line-through;
+    }
   }
 
   .node-code {

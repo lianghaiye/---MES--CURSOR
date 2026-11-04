@@ -149,6 +149,9 @@
         <a-tab-pane v-if="!hideBomRelatedTabs" key="bom-versions" tab="BOM版本">
           <WorkOrderBomVersionTab :work-order="workOrder" :variant="variant" />
         </a-tab-pane>
+        <a-tab-pane key="operation-log" tab="操作日志">
+          <WorkOrderOperationLogTab :work-order="workOrder" />
+        </a-tab-pane>
       </template>
     </a-tabs>
   </div>
@@ -182,6 +185,7 @@ import WorkOrderReworkInfoTab from './WorkOrderReworkInfoTab.vue'
 import WorkOrderEbomTreeTab from './WorkOrderEbomTreeTab.vue'
 import WorkOrderCurrentBomTab from './WorkOrderCurrentBomTab.vue'
 import WorkOrderBomVersionTab from './WorkOrderBomVersionTab.vue'
+import WorkOrderOperationLogTab from './WorkOrderOperationLogTab.vue'
 import WorkOrderProductionSections from './WorkOrderProductionSections.vue'
 import WorkOrderPrintModal from './WorkOrderPrintModal.vue'
 import {

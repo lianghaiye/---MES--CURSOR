@@ -84,6 +84,7 @@ export function workOrderStatusColor(status) {
     完成: 'success',
     暂停: 'default',
     终止: 'error',
+    已作废: 'default',
     部分下发: 'processing', // 兼容旧数据展示瞬间
   }
   return map[status] || 'default'
@@ -409,8 +410,12 @@ export function buildResumeWorkOrderResult(workOrder) {
 /**
  * 终止工单
  * @param {'reset'|'keep'|null} mode reset=仍终止重置报工；keep=不处理承认报工
+ * @param {string} [reason] 终止原因（选填）
  */
-export function buildTerminateWorkOrderResult(workOrder, { mode = null, confirmed = false } = {}) {
+export function buildTerminateWorkOrderResult(
+  workOrder,
+  { mode = null, confirmed = false, reason = '' } = {},
+) {
   if (!workOrder) return { ok: false, message: '工单不存在' }
   if (!canTerminateWorkOrder(workOrder.status)) {
     return { ok: false, message: `当前状态「${workOrder.status}」不可终止` }
@@ -467,15 +472,15 @@ export function buildTerminateWorkOrderResult(workOrder, { mode = null, confirme
     /* 任务侧写入失败不阻断工单状态变更 */
   }
 
-  return {
-    ok: true,
-    patch: {
-      status: '终止',
-      terminatedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
-      terminateMode: effectiveMode,
-      statusBeforePause: '',
-    },
+  const terminateReason = String(reason || '').trim()
+  const patch = {
+    status: '终止',
+    terminatedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    terminateMode: effectiveMode,
+    statusBeforePause: '',
   }
+  if (terminateReason) patch.terminateReason = terminateReason
+  return { ok: true, patch }
 }
 
 /**

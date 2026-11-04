@@ -12,6 +12,7 @@ export function formatPlanOrderDocumentTitle(docType, docNo, productName, status
 
 function createDocumentNode({ docType, docId, docNo, productName, status, raw }) {
   const resolvedStatus = status || '—'
+  const docRaw = raw?.req ? raw.req : raw
   return {
     key: `doc-${docType}-${docId}`,
     nodeType: 'document',
@@ -21,6 +22,8 @@ function createDocumentNode({ docType, docId, docNo, productName, status, raw })
     productName,
     status: resolvedStatus,
     title: formatPlanOrderDocumentTitle(docType, docNo, productName, resolvedStatus),
+    supersededByEcnNo: docRaw?.supersededByEcnNo || '',
+    relatedEcnNo: docRaw?.relatedEcnNo || '',
     raw,
     isLeaf: true,
   }
@@ -167,6 +170,10 @@ function buildMaterialNode(material, context) {
     status: material.status,
     isTopLevel: context.isTopLevel,
     title: material.name,
+    ecnTrace: material.ecnTrace || '',
+    addedByEcnNo: material.addedByEcnNo || '',
+    updatedByEcnNo: material.updatedByEcnNo || '',
+    ecnByEcnNo: material.ecnByEcnNo || material.addedByEcnNo || material.updatedByEcnNo || '',
     children: children.length ? children : undefined,
   }
 }

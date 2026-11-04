@@ -568,10 +568,30 @@ export function createBomNewVersion(sourceId) {
 export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [] } = {}) {
   const row = productBomState.boms.find((b) => b.id === id)
   if (!row) return { error: '记录不存在' }
-  if (!isBomPending(row)) return { error: '仅待发布状态可审核发布' }
+  if (isBomActive(row)) return { error: '当前 BOM 已生效' }
+  if (!isBomPending(row) && !isBomArchived(row)) {
+    return { error: '仅待发布或已归档状态可启用' }
+  }
 
+  const fromArchived = isBomArchived(row)
   const ts = nowStr()
   const bomType = normalizeBomType(row.bomType)
+  const archivedActives = productBomState.boms
+    .filter(
+      (b) =>
+        b.itemType === row.itemType &&
+        b.itemId === row.itemId &&
+        b.id !== row.id &&
+        isBomActive(b) &&
+        normalizeBomType(b.bomType) === bomType,
+    )
+    .map((b) => ({
+      id: b.id,
+      version: b.version,
+      bomNo: b.bomNo,
+      bomName: b.bomName,
+    }))
+
   archiveActiveForItem(row.itemType, row.itemId, row.id, bomType)
   productBomState.boms.forEach((b) => {
     if (
@@ -584,7 +604,7 @@ export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [
   })
   row.status = BOM_STATUS.ACTIVE
   row.isDefault = true
-  row.effectiveAt = row.effectiveAt || ts
+  row.effectiveAt = fromArchived ? ts : row.effectiveAt || ts
   row.expiredAt = ''
   row.updatedAt = ts
   if (row.changeSourceType === BOM_CHANGE_SOURCE_TYPE.MANUAL_EDIT && !row.upgradedAt) {
@@ -596,7 +616,7 @@ export function enableProductBom(id, { upgradeParentRefs = false, parentRefs = [
     upgradeParentBomReferences(row, parentRefs)
   }
 
-  return row
+  return { ...row, fromArchived, archivedActives }
 }
 
 /**
@@ -700,7 +720,7 @@ export function batchEnableProductBom(ids) {
   const errors = []
   ids.forEach((id) => {
     const row = productBomState.boms.find((b) => b.id === id)
-    if (!row || !isBomPending(row)) return
+    if (!row || (!isBomPending(row) && !isBomArchived(row))) return
     const res = enableProductBom(id)
     if (res?.error) errors.push(`${row.bomNo}: ${res.error}`)
     else ok += 1

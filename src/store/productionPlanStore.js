@@ -18,10 +18,27 @@ import { ensureKitMultiAllocDemoPlans } from '@/mock/kitMultiAllocDemoSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
 import { MATERIAL_RELEASE_STATUS } from '@/constants/ecnPlanReschedule'
 import { flattenMaterials } from '@/utils/material'
-
 const STORAGE_KEY = 'i_doms_production_plans'
-/** v11：物料投产状态 releasable/pending_spec + 分批计划字段 */
-const DATA_VERSION = 11
+/** 与 ecnSeed.ECN_WHOLE_PLAN_DEMO_SO 保持一致（避免循环依赖不从 seed 引用） */
+const ECN_WHOLE_PLAN_DEMO_SO = {
+  WP01: '1-20261104-WP01',
+  WP02: '1-20261104-WP02',
+}
+/** v15：ECN 演示计划置顶 + 新料暂不处理稍后排 */
+const DATA_VERSION = 16
+
+/** 演示计划置顶，方便开发首屏查看 */
+const ECN_DEMO_PIN_ORDER_NOS = ['1-20260512-005', '1-20261104-ECN-SKIP']
+
+function pinEcnDemoPlansToFront(plans = []) {
+  const list = Array.isArray(plans) ? [...plans] : []
+  const pinned = []
+  ECN_DEMO_PIN_ORDER_NOS.forEach((no) => {
+    const idx = list.findIndex((p) => p.salesOrderNo === no || p.orderNo === no)
+    if (idx >= 0) pinned.push(...list.splice(idx, 1))
+  })
+  return [...pinned, ...list]
+}
 
 function normalizePlanStatuses(orders) {
   const normalized = (orders || []).map((o) => {
@@ -62,29 +79,104 @@ function normalizePlanStatuses(orders) {
     return plan
   })
 
-  // 演示：首个销售计划的首条非顶级料标为「待定」，便于二期分批联调（仅未打标时）
-  const firstSales = normalized.find((p) => p.planSource !== PLAN_SOURCE.STOCK_REPLENISH)
-  if (firstSales && !firstSales._pendingDemoApplied) {
-    const wi = firstSales.workItems?.[0]
-    const flat = []
-    flattenMaterials(wi?.materials, flat)
-    const demoMat = flat.find(
-      (m) =>
-        !m.isTopLevel &&
-        (m.supplyType === '自制件' || m.supplyType === '外购件' || m.supplyType === '外购'),
-    )
-    if (demoMat) {
-      demoMat.releaseStatus = MATERIAL_RELEASE_STATUS.PENDING_SPEC
-      demoMat.joinPlan = '否'
-    }
-    firstSales._pendingDemoApplied = true
-  }
-
-  return ensureKitMultiAllocDemoPlans(
-    ensureShipAccessoryProduceDemoPlans(
-      ensurePackageConvertDemoOnPlans(ensureEcnCoverPlanMaterials(normalized)),
+  return pinEcnDemoPlansToFront(
+    ensureKitMultiAllocDemoPlans(
+      ensureShipAccessoryProduceDemoPlans(
+        ensurePackageConvertDemoOnPlans(
+          ensureEcnWholePlanDemoPlans(
+            ensureEcnSkipScheduleDemoPlan(ensureEcnCoverPlanMaterials(normalized)),
+          ),
+        ),
+      ),
     ),
   )
+}
+
+/**
+ * ECN-DEMO-WHOLE-*：计划未下达，执行页走「整单换 BOM」
+ * 刷新后 ensure 会把工作项状态拉回「待下达」
+ */
+function ensureEcnWholePlanDemoPlans(plans) {
+  const list = plans || []
+  const specs = [
+    {
+      so: ECN_WHOLE_PLAN_DEMO_SO.WP01,
+      keyword: 'ISW80-65-200',
+      customer: '华北水务',
+      planId: 'plan-ecn-whole-wp01',
+    },
+    {
+      so: ECN_WHOLE_PLAN_DEMO_SO.WP02,
+      keyword: 'CDL4-40',
+      customer: '胜利油田',
+      planId: 'plan-ecn-whole-wp02',
+    },
+  ]
+
+  specs.forEach((spec) => {
+    const product =
+      mockProducts.find((p) => String(p.name || '').includes(spec.keyword)) || mockProducts[0]
+    let plan = list.find(
+      (p) => p.salesOrderNo === spec.so || p.orderNo === spec.so || p.id === spec.planId,
+    )
+    if (!plan) {
+      const bom = getOwnActiveBomForItem('product', product.id)
+      const qty = 2
+      const snapshot = bom ? buildEbomSnapshotFromBom(bom, qty) : { materials: [] }
+      plan = {
+        id: spec.planId,
+        orderNo: spec.so,
+        salesOrderNo: spec.so,
+        planSource: 'sales-order',
+        customerName: spec.customer,
+        orderStatus: '待下达',
+        urgency: '正常',
+        deliveryDate: dayjs().add(20, 'day').format('YYYY-MM-DD'),
+        tags: ['待下达'],
+        planBatch: 1,
+        deductInventory: true,
+        workItems: [
+          {
+            id: `${spec.planId}-wi`,
+            productId: product.id,
+            productCode: product.code,
+            productName: product.name,
+            status: '待下达',
+            planQty: qty,
+            orderQty: qty,
+            salesQty: qty,
+            bomId: bom?.id || '',
+            bomName: bom?.bomName || bom?.name || '',
+            bomVersion: bom?.version || '',
+            materials: JSON.parse(JSON.stringify(snapshot.materials || [])),
+            ebomSnapshot: snapshot,
+            planBatch: 1,
+            expanded: true,
+          },
+        ],
+      }
+      list.unshift(plan)
+      return
+    }
+    plan.orderStatus = '待下达'
+    plan.tags = Array.from(
+      new Set([...(plan.tags || []).filter((t) => t !== '部分下达'), '待下达']),
+    )
+    const wi =
+      plan.workItems?.find(
+        (w) =>
+          String(w.productId) === String(product.id) ||
+          w.productCode === product.code ||
+          String(w.productName || '').includes(spec.keyword),
+      ) || plan.workItems?.[0]
+    if (wi) {
+      wi.status = '待下达'
+      wi.productId = product.id
+      wi.productCode = product.code
+      wi.productName = product.name
+    }
+  })
+  return list
 }
 
 /** 让 ECN-DEMO-COVER 的修改/替换/取消能对上这张订单的计划物料 */
@@ -102,9 +194,13 @@ function ensureEcnCoverPlanMaterials(plans) {
   const codes = new Set(flat.map((m) => m.code))
   const qty = Number(wi.planQty ?? wi.orderQty ?? wi.salesQty) || 1
   const extras = [
+    { code: '010050001', name: '泵体（泵壳）', supplyType: '自制件', spec: 'ISG50-160' },
     { code: '010050003', name: '叶轮', supplyType: '自制件', spec: 'ISG50-160' },
-    { code: '010050004', name: '机械密封组件', supplyType: '外购件', spec: 'φ25×180mm' },
-    { code: '010050002', name: '泵盖', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050004', name: '机械密封组件', supplyType: '自制件', spec: 'φ25×180mm' },
+    { code: '010050004-A', name: '动环', supplyType: '自制件', spec: '' },
+    { code: '010050004-B', name: '静环', supplyType: '外购件', spec: '' },
+    { code: '010050002', name: '泵盖', supplyType: '外协件', spec: 'ISG50-160' },
+    { code: '010050005', name: '泵轴', supplyType: '自制件', spec: 'φ25×180mm' },
     { code: '010050006', name: '地脚螺栓组', supplyType: '外购件', spec: 'M16' },
   ]
   extras.forEach((row) => {
@@ -123,7 +219,338 @@ function ensureEcnCoverPlanMaterials(plans) {
       }),
     )
   })
+  // ECN-DEMO-COVER 走「物料处置」模式：计划已开工，不展示整单换 BOM
+  if (wi.status === '待下达' || wi.status === '设计中' || wi.status === '待BOM') {
+    wi.status = '进行中'
+  }
+  if (plan.orderStatus === '待下达') {
+    plan.orderStatus = '部分下达'
+    plan.tags = Array.from(new Set([...(plan.tags || []), '部分下达']))
+  }
+  applyEcnExecutedFullTraceDemo(wi, qty)
   return plans
+}
+
+const ECN_EXECUTED_DEMO_NO = 'ECN-DEMO-EXECUTED'
+
+/** 演示：已执行 ECN 覆盖改用量/换料/替换含子树/取消/新增 */
+function applyEcnExecutedFullTraceDemo(wi, parentQty) {
+  if (!wi || wi._ecnTraceDemoV >= 4) return
+  const ecnNo = ECN_EXECUTED_DEMO_NO
+  const qty = Number(parentQty) || 1
+  wi.lastRescheduleEcnNo = ecnNo
+  wi.lastRescheduleAt = '2026-11-04 15:20'
+  wi._ecnTraceDemoV = 4
+
+  const ensureMat = (row) => {
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    let hit = flat.find((m) => m.code === row.code)
+    if (!hit) {
+      hit = createPlanMaterial({
+        name: row.name,
+        code: row.code,
+        spec: row.spec || '',
+        supplyType: row.supplyType || '自制件',
+        unitUsage: row.unitUsage ?? 1,
+        demandQty: (row.unitUsage ?? 1) * qty,
+        planQty: (row.unitUsage ?? 1) * qty,
+        joinPlan: row.joinPlan || '是',
+        status: row.status || '待下达',
+      })
+      wi.materials.push(hit)
+    }
+    return hit
+  }
+
+  const mark = (code, patch) => {
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    const hit = flat.find((m) => m.code === code)
+    if (!hit) return
+    Object.assign(hit, patch)
+    if (patch.unitUsage != null) {
+      hit.demandQty = Number(patch.unitUsage) * qty
+      hit.planQty = Number(patch.unitUsage) * qty
+    }
+  }
+
+  // 改用量
+  mark('010050003', { unitUsage: 2, updatedByEcnNo: ecnNo, ecnTrace: 'qty', ecnByEcnNo: ecnNo })
+  mark('010050001', { unitUsage: 2, updatedByEcnNo: ecnNo, ecnTrace: 'qty', ecnByEcnNo: ecnNo })
+
+  // 换料：旧泵轴 → 新泵轴
+  mark('010050005', {
+    joinPlan: '否',
+    status: '不转产',
+    ecnTrace: 'swapped_out',
+    ecnByEcnNo: ecnNo,
+    updatedByEcnNo: ecnNo,
+    remark: `${ecnNo} 换料·旧料`,
+  })
+  const newShaft = ensureMat({
+    code: '010050015',
+    name: '泵轴',
+    spec: 'φ28×200mm',
+    supplyType: '自制件',
+    unitUsage: 1,
+  })
+  Object.assign(newShaft, {
+    addedByEcnNo: ecnNo,
+    ecnTrace: 'added',
+    ecnByEcnNo: ecnNo,
+    remark: `ECN ${ecnNo} 新增`,
+    joinPlan: '是',
+    status: '进行中',
+  })
+
+  // 替换含子树：旧密封及下级取消，新密封及下级新增
+  ;['010050004', '010050004-A', '010050004-B'].forEach((code) => {
+    mark(code, {
+      joinPlan: '否',
+      status: '不转产',
+      ecnTrace: 'replaced',
+      ecnByEcnNo: ecnNo,
+      remark: `${ecnNo} 已替换`,
+    })
+  })
+  ;[
+    { code: '010050024', name: '耐腐机械密封总成', spec: '58U-30', supplyType: '自制件' },
+    { code: '010050024-A', name: 'SIC动环', spec: '', supplyType: '自制件' },
+    { code: '010050024-B', name: 'SIC静环', spec: '', supplyType: '外购件' },
+    { code: '010050024-C', name: '波形弹簧', spec: '', supplyType: '外购件' },
+  ].forEach((row) => {
+    const m = ensureMat(row)
+    Object.assign(m, {
+      addedByEcnNo: ecnNo,
+      ecnTrace: 'added',
+      ecnByEcnNo: ecnNo,
+      remark: `ECN ${ecnNo} 新增`,
+      joinPlan: '是',
+      status: '进行中',
+    })
+  })
+
+  // 取消
+  mark('010050002', {
+    joinPlan: '否',
+    status: '不转产',
+    ecnTrace: 'cancelled',
+    ecnByEcnNo: ecnNo,
+    remark: `${ecnNo} 取消`,
+  })
+  mark('010050006', {
+    joinPlan: '否',
+    status: '不转产',
+    ecnTrace: 'cancelled',
+    ecnByEcnNo: ecnNo,
+    remark: `${ecnNo} 取消`,
+  })
+
+  // 纯新增
+  const sensor = ensureMat({
+    code: '010050099',
+    name: '温度传感器',
+    spec: 'PT100',
+    supplyType: '自制件',
+    unitUsage: 1,
+  })
+  Object.assign(sensor, {
+    addedByEcnNo: ecnNo,
+    ecnTrace: 'added',
+    ecnByEcnNo: ecnNo,
+    remark: `ECN ${ecnNo} 新增`,
+    joinPlan: '是',
+    status: '进行中',
+  })
+
+  // 改用量后仍有在制/待下发单据，物料状态跟单据
+  mark('010050003', { status: '进行中' })
+  mark('010050001', { status: '进行中' })
+}
+
+const ECN_SKIP_SCHEDULE_DEMO_NO = 'ECN-DEMO-SKIP-SCHEDULE'
+const ECN_SKIP_SCHEDULE_SO = '1-20261104-ECN-SKIP'
+
+/**
+ * 演示：ECN 已执行，新料处置为「暂不处理（稍后生产计划排）」——计划有 ECN 新增料，但未生成工单
+ */
+function ensureEcnSkipScheduleDemoPlan(plans = []) {
+  let list = Array.isArray(plans) ? [...plans] : []
+  const product =
+    mockProducts.find(
+      (p) => String(p.name || '').includes('立式管道泵') || p.code === 'CP2610001',
+    ) || mockProducts[0]
+  const so = ECN_SKIP_SCHEDULE_SO
+  let plan = list.find(
+    (p) => p.salesOrderNo === so || p.orderNo === so || p.id === 'plan-ecn-skip-schedule',
+  )
+  const qty = 1
+  if (!plan) {
+    plan = {
+      id: 'plan-ecn-skip-schedule',
+      orderNo: so,
+      salesOrderNo: so,
+      planSource: PLAN_SOURCE.SALES_ORDER,
+      customerName: 'ECN稍后排产演示客户',
+      salesperson: '张工',
+      productQty: qty,
+      orderStatus: '部分下达',
+      urgency: '紧急',
+      orderDate: dayjs().format('YYYY-MM-DD'),
+      deliveryDate: dayjs().add(18, 'day').format('YYYY-MM-DD'),
+      tags: ['部分下达'],
+      planBatch: 1,
+      deductInventory: true,
+      remark: '演示：ECN 已执行，新料暂不处理，稍后在生产计划排产',
+      workItems: [
+        {
+          id: 'plan-ecn-skip-schedule-wi',
+          productId: product.id,
+          productCode: product.code,
+          productName: product.name,
+          status: '进行中',
+          planQty: qty,
+          orderQty: qty,
+          salesQty: qty,
+          materials: [],
+          planBatch: 1,
+          expanded: true,
+        },
+      ],
+    }
+    list.unshift(plan)
+  }
+
+  const wi = plan.workItems?.[0]
+  if (!wi) return list
+  if (!Array.isArray(wi.materials)) wi.materials = []
+
+  const seedMats = [
+    { code: '010050001', name: '泵体（泵壳）', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050003', name: '叶轮', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050005', name: '泵轴', supplyType: '自制件', spec: 'φ25×180mm' },
+    { code: '010050004', name: '机械密封组件', supplyType: '自制件', spec: 'φ25×180mm' },
+  ]
+  const flat0 = []
+  flattenMaterials(wi.materials, flat0)
+  const codes = new Set(flat0.map((m) => m.code))
+  seedMats.forEach((row) => {
+    if (codes.has(row.code)) return
+    wi.materials.push(
+      createPlanMaterial({
+        name: row.name,
+        code: row.code,
+        spec: row.spec,
+        supplyType: row.supplyType,
+        unitUsage: 1,
+        demandQty: qty,
+        planQty: qty,
+        joinPlan: '是',
+        status: '待下达',
+      }),
+    )
+  })
+
+  if (wi._ecnSkipDemoV >= 1) return list
+  wi._ecnSkipDemoV = 1
+  wi.lastRescheduleEcnNo = ECN_SKIP_SCHEDULE_DEMO_NO
+  wi.lastRescheduleAt = '2026-11-04 16:00'
+  wi.status = '进行中'
+  plan.orderStatus = '部分下达'
+  plan.tags = Array.from(new Set([...(plan.tags || []), '部分下达']))
+
+  const mark = (code, patch) => {
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    const hit = flat.find((m) => m.code === code)
+    if (hit) Object.assign(hit, patch)
+  }
+  const ensure = (row) => {
+    const flat = []
+    flattenMaterials(wi.materials, flat)
+    let hit = flat.find((m) => m.code === row.code)
+    if (!hit) {
+      hit = createPlanMaterial({
+        name: row.name,
+        code: row.code,
+        spec: row.spec || '',
+        supplyType: row.supplyType || '自制件',
+        unitUsage: row.unitUsage ?? 1,
+        demandQty: qty,
+        planQty: qty,
+        joinPlan: '是',
+        status: '待下达',
+      })
+      wi.materials.push(hit)
+    }
+    return hit
+  }
+
+  // 旧料取消/替换（划线），新料 ECN新增 且仍为待下达——未生成工单，稍后排
+  mark('010050005', {
+    joinPlan: '否',
+    status: '不转产',
+    ecnTrace: 'swapped_out',
+    ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+    remark: `${ECN_SKIP_SCHEDULE_DEMO_NO} 换料·旧料`,
+  })
+  Object.assign(
+    ensure({ code: '010050015', name: '泵轴', spec: 'φ28×200mm', supplyType: '自制件' }),
+    {
+      addedByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      ecnTrace: 'added',
+      ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      remark: `ECN ${ECN_SKIP_SCHEDULE_DEMO_NO} 新增·暂不处理稍后排`,
+      joinPlan: '是',
+      status: '待下达',
+    },
+  )
+
+  mark('010050004', {
+    joinPlan: '否',
+    status: '不转产',
+    ecnTrace: 'replaced',
+    ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+    remark: `${ECN_SKIP_SCHEDULE_DEMO_NO} 已替换`,
+  })
+  Object.assign(
+    ensure({ code: '010050024', name: '耐腐机械密封总成', spec: '58U-30', supplyType: '自制件' }),
+    {
+      addedByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      ecnTrace: 'added',
+      ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      remark: `ECN ${ECN_SKIP_SCHEDULE_DEMO_NO} 新增·暂不处理稍后排`,
+      joinPlan: '是',
+      status: '待下达',
+    },
+  )
+
+  Object.assign(
+    ensure({ code: '010050099', name: '温度传感器', spec: 'PT100', supplyType: '自制件' }),
+    {
+      addedByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      ecnTrace: 'added',
+      ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+      remark: `ECN ${ECN_SKIP_SCHEDULE_DEMO_NO} 新增·暂不处理稍后排`,
+      joinPlan: '是',
+      status: '待下达',
+    },
+  )
+
+  mark('010050003', {
+    unitUsage: 2,
+    demandQty: 2 * qty,
+    planQty: 2 * qty,
+    updatedByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+    ecnTrace: 'qty',
+    ecnByEcnNo: ECN_SKIP_SCHEDULE_DEMO_NO,
+    status: '待下达',
+  })
+  // 旧料已有下达（部分下达），对比新料仍待下达、无新工单
+  mark('010050001', { status: '进行中', joinPlan: '是' })
+
+  return list
 }
 
 function loadFromStorage() {

@@ -41,10 +41,6 @@
             <div class="n">{{ impact.summary.workOrderPending }}</div>
             <div class="l">待下发工单可作废</div>
           </div>
-          <div class="summary-card warn">
-            <div class="n">{{ impact.summary.pendingSpecCount }}</div>
-            <div class="l">待定物料</div>
-          </div>
         </div>
 
         <div class="section-card">
@@ -91,8 +87,7 @@
                 </span>
               </template>
               <template v-else-if="column.key === 'planBatch'">
-                <a-tag v-if="row.planBatch === 2" color="purple">二期</a-tag>
-                <span v-else>一期</span>
+                <span>{{ row.planBatch || 1 }}</span>
               </template>
             </template>
           </a-table>
@@ -122,39 +117,6 @@
             </template>
           </a-table>
         </div>
-
-        <div class="section-card">
-          <div class="section-head">
-            <div class="section-title">二期：规格待定物料 · 分批计划</div>
-            <a-button
-              type="primary"
-              size="small"
-              ghost
-              :disabled="!impact.pendingSpecRows.length"
-              @click="handleCreatePhase2"
-            >
-              将待定物料生成二期计划
-            </a-button>
-          </div>
-          <p class="hint">
-            在 BOM /
-            生产计划物料清单将行标为「待定」后，一期下达会跳过这些料；确认规格后可从此处或生产计划页拆出二期计划单独投产。
-          </p>
-          <a-table
-            :columns="pendingColumns"
-            :data-source="impact.pendingSpecRows"
-            :pagination="false"
-            row-key="key"
-            size="small"
-            bordered
-            :locale="{ emptyText: '暂无待定物料，可在生产计划物料清单设置「投产状态」' }"
-          />
-          <div v-if="phase2Result" class="phase2-result">
-            已生成二期计划
-            <a @click="goPlan(phase2Result.planId)">{{ phase2Result.orderNo }}</a>
-            ，共 {{ phase2Result.materialCount }} 项物料
-          </div>
-        </div>
       </template>
     </a-spin>
   </div>
@@ -171,16 +133,10 @@ import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { ecnStatusColor } from '@/constants/ecn'
 import { resolveChangeRequestModule, getDocNo } from '@/constants/changeRequestModule'
-import {
-  analyzeEcnPlanImpact,
-  rescheduleEcnImpact,
-  createPhase2PlanFromPending,
-} from '@/utils/ecnPlanImpact'
-import { useTabs } from '@/composables/useTabs'
+import { analyzeEcnPlanImpact, rescheduleEcnImpact } from '@/utils/ecnPlanImpact'
 
 const route = useRoute()
 const router = useRouter()
-const { openTab } = useTabs()
 const moduleConfig = resolveChangeRequestModule(route)
 
 const record = computed(() => moduleConfig.store.findById(route.params.id))
@@ -193,7 +149,6 @@ const impact = computed(() => {
 const selectedWiKeys = ref([])
 const selectedWoKeys = ref([])
 const rescheduling = ref(false)
-const phase2Result = ref(null)
 
 watch(
   () => record.value?.id,
@@ -202,7 +157,6 @@ watch(
       .filter((r) => r.canReschedule)
       .map((r) => r.key)
     selectedWoKeys.value = impact.value.workOrderRows.filter((r) => r.canCancel).map((r) => r.key)
-    phase2Result.value = null
   },
   { immediate: true },
 )
@@ -231,7 +185,6 @@ const wiColumns = [
   { title: '计划状态', dataIndex: 'planStatus', width: 90 },
   { title: '批次', key: 'planBatch', width: 72 },
   { title: '当前BOM版本', key: 'bomVersion', width: 160 },
-  { title: '待定料', dataIndex: 'pendingSpecCount', width: 72 },
   { title: '处置', key: 'action', width: 90 },
 ]
 
@@ -241,15 +194,6 @@ const woColumns = [
   { title: '状态', dataIndex: 'status', width: 90 },
   { title: '来源订单', dataIndex: 'sourceOrderNo', width: 140 },
   { title: '处置', key: 'action', width: 110 },
-]
-
-const pendingColumns = [
-  { title: '计划单号', dataIndex: 'planOrderNo', width: 140 },
-  { title: '产品', dataIndex: 'productName', width: 140 },
-  { title: '物料编码', dataIndex: 'materialCode', width: 120 },
-  { title: '物料名称', dataIndex: 'materialName', width: 140 },
-  { title: '供应型态', dataIndex: 'supplyType', width: 90 },
-  { title: '计划数', dataIndex: 'planQty', width: 80 },
 ]
 
 function refreshImpact() {
@@ -285,39 +229,12 @@ function handleReschedule() {
   }
 }
 
-function handleCreatePhase2() {
-  const rows = impact.value.pendingSpecRows
-  if (!rows.length) {
-    message.info('没有待定物料')
-    return
-  }
-  const first = rows[0]
-  const res = createPhase2PlanFromPending(first.planId, first.workItemId)
-  if (!res.ok) {
-    message.warning(res.message)
-    return
-  }
-  phase2Result.value = {
-    planId: res.plan.id,
-    orderNo: res.plan.orderNo,
-    materialCount: res.materialCount,
-  }
-  refreshImpact()
-  message.success(`已生成二期计划 ${res.plan.orderNo}`)
-}
-
 function goBack() {
   router.push(moduleConfig.listPath)
 }
 
 function goDetail() {
   router.push(moduleConfig.detailPath(route.params.id))
-}
-
-function goPlan(planId) {
-  const path = `/planning/production-plan?planId=${planId}`
-  openTab(path, '生产计划')
-  router.push(path)
 }
 </script>
 
@@ -429,10 +346,5 @@ function goPlan(planId) {
 .muted {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
-}
-
-.phase2-result {
-  margin-top: 12px;
-  font-size: 13px;
 }
 </style>
