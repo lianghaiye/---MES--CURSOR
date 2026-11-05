@@ -33,6 +33,11 @@
             </a-radio-group>
           </a-form-item>
         </a-col>
+        <a-col :span="24">
+          <a-form-item label="打印范围">
+            <a-checkbox v-model:checked="form.onlyFirstLevel">仅打印一级物料</a-checkbox>
+          </a-form-item>
+        </a-col>
       </a-row>
     </a-form>
 
@@ -112,6 +117,7 @@ import { buildBomPrintPayload, openBomPrintPreview } from '@/utils/bomPrintPrevi
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 
 const COLUMN_STORAGE_PREFIX = 'i_doms_table_col_'
+const ONLY_FIRST_LEVEL_STORAGE_KEY = 'i_doms_bom_print_only_first_level'
 
 const props = defineProps({
   open: Boolean,
@@ -146,6 +152,7 @@ const form = reactive({
   paper: 'A4',
   orientation: 'portrait',
   quantity: 1,
+  onlyFirstLevel: false,
 })
 
 const paperOptions = [
@@ -164,8 +171,30 @@ watch(
     form.paper = 'A4'
     form.orientation = 'portrait'
     form.quantity = Number(props.quantity) || 1
+    form.onlyFirstLevel = loadOnlyFirstLevelPreference()
     effectiveColumnSettings.value = loadLatestColumnSettings()
   },
+)
+
+function loadOnlyFirstLevelPreference() {
+  try {
+    return localStorage.getItem(ONLY_FIRST_LEVEL_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistOnlyFirstLevelPreference(checked) {
+  try {
+    localStorage.setItem(ONLY_FIRST_LEVEL_STORAGE_KEY, checked ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
+watch(
+  () => form.onlyFirstLevel,
+  (checked) => persistOnlyFirstLevelPreference(checked),
 )
 
 function loadLatestColumnSettings() {
@@ -213,6 +242,7 @@ function buildPayload() {
     orientation: form.orientation,
     materialQtyByCode: props.materialQtyByCode,
     printScene: isProductionPlanPrint.value ? 'production-plan' : null,
+    onlyFirstLevel: form.onlyFirstLevel,
   })
 }
 

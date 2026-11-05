@@ -5,7 +5,8 @@
     </div>
     <template v-else>
       <div class="preview-toolbar no-print">
-        <a-space>
+        <a-space wrap>
+          <a-checkbox v-model:checked="onlyFirstLevel">仅打印一级物料</a-checkbox>
           <a-button type="primary" @click="handlePrint">
             <PrinterOutlined />
             打印
@@ -75,7 +76,7 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in payload.rows" :key="row.key">
+                  <tr v-for="row in displayRows" :key="row.key">
                     <td
                       v-for="col in payload.columns"
                       :key="col.key"
@@ -88,7 +89,9 @@
                       <span
                         v-if="col.key === 'itemName'"
                         class="name-text"
-                        :style="{ paddingLeft: `${row.depth * 12}px` }"
+                        :style="{
+                          paddingLeft: `${(onlyFirstLevel ? 0 : row.depth) * 12}px`,
+                        }"
                       >
                         {{ row.itemName ?? '—' }}
                       </span>
@@ -131,7 +134,7 @@ export default { name: 'BomPrintPreviewView' }
 </script>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { PrinterOutlined, SettingOutlined } from '@ant-design/icons-vue'
 import {
@@ -148,16 +151,25 @@ import {
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 
 const COLUMN_STORAGE_PREFIX = 'i_doms_table_col_'
+const ONLY_FIRST_LEVEL_STORAGE_KEY = 'i_doms_bom_print_only_first_level'
 
 const route = useRoute()
 const payload = ref(null)
 const sheetRef = ref(null)
 const printColumnDrawerOpen = ref(false)
 const printColumnSettings = ref([])
+const onlyFirstLevel = ref(false)
 
 const isProductionPlanPrint = computed(
   () => payload.value?.printConfig?.scene === 'production-plan',
 )
+
+/** 仅一级：depth === 0（序号 1、2、3…）；不勾选则输出完整层级 */
+const displayRows = computed(() => {
+  const rows = payload.value?.rows || []
+  if (!onlyFirstLevel.value) return rows
+  return rows.filter((row) => Number(row.depth) === 0)
+})
 
 const printDefaultColumnSettings = computed(() =>
   JSON.parse(JSON.stringify(productionPlanPrintColumnSettings)),
@@ -198,11 +210,39 @@ const printedAtText = computed(() => {
 
 onMounted(() => {
   payload.value = loadBomPrintPayload(route.query.key)
+  initOnlyFirstLevelPreference()
   initPrintColumnSettings()
   if (route.query.autoPrint === '1') {
     window.setTimeout(() => handlePrint(), 300)
   }
 })
+
+watch(onlyFirstLevel, (checked) => {
+  try {
+    localStorage.setItem(ONLY_FIRST_LEVEL_STORAGE_KEY, checked ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+  if (payload.value) {
+    payload.value.onlyFirstLevel = checked
+    if (payload.value.printConfig) {
+      payload.value.printConfig.onlyFirstLevel = checked
+    }
+    updateBomPrintPayload(route.query.key, payload.value)
+  }
+})
+
+function initOnlyFirstLevelPreference() {
+  if (typeof payload.value?.onlyFirstLevel === 'boolean') {
+    onlyFirstLevel.value = payload.value.onlyFirstLevel
+    return
+  }
+  try {
+    onlyFirstLevel.value = localStorage.getItem(ONLY_FIRST_LEVEL_STORAGE_KEY) === '1'
+  } catch {
+    onlyFirstLevel.value = false
+  }
+}
 
 function initPrintColumnSettings() {
   if (!isProductionPlanPrint.value) return
@@ -233,6 +273,7 @@ function applyPrintColumnSettings(settings) {
     orientation: cfg.orientation,
     materialQtyByCode: cfg.materialQtyByCode,
     printScene: cfg.scene,
+    onlyFirstLevel: onlyFirstLevel.value,
   })
   payload.value = nextPayload
   updateBomPrintPayload(route.query.key, nextPayload)

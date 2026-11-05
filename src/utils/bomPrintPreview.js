@@ -89,6 +89,7 @@ export function buildBomPrintPayload({
   orientation = 'portrait',
   materialQtyByCode = null,
   printScene = null,
+  onlyFirstLevel = false,
 }) {
   const scale = Number(quantity) || 1
   const resolvedColumnSettings = columnSettings?.length
@@ -106,6 +107,7 @@ export function buildBomPrintPayload({
     quantity: scale,
     paper,
     orientation,
+    onlyFirstLevel: Boolean(onlyFirstLevel),
     columns: resolvePrintColumns(resolvedColumnSettings, baseColumns).map((col) => ({
       key: col.key,
       title: col.title,
@@ -130,6 +132,7 @@ export function buildBomPrintPayload({
       quantity: scale,
       paper,
       orientation,
+      onlyFirstLevel: Boolean(onlyFirstLevel),
     }
   }
   return payload
