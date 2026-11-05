@@ -615,6 +615,7 @@ export function filterPurchaseOrders(list, filters) {
     if (filters.reqNo && !item.reqNo?.includes(filters.reqNo)) return false
     if (filters.salesOrderNo && !item.salesOrderNo?.includes(filters.salesOrderNo)) return false
     if (filters.status && item.status !== filters.status) return false
+    if (filters.inboundStatus && item.inboundStatus !== filters.inboundStatus) return false
     if (filters.accountStatus && item.accountStatus !== filters.accountStatus) return false
     if (filters.orderSource && item.orderSource !== filters.orderSource) return false
     if (filters.overdueStatus) {

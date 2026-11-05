@@ -23,11 +23,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import {
-  MATERIAL_REQ_AUDIT,
-  relatedProductText,
-  relatedWorkOrderText,
-} from '@/store/mobileMaterialReqStore'
+import { MATERIAL_REQ_AUDIT } from '@/store/mobileMaterialReqStore'
 
 const props = defineProps({
   record: { type: Object, required: true },
@@ -57,16 +53,6 @@ const fields = computed(() => {
   return [
     { key: 'reqNo', label: '申请单号' },
     { key: 'modeLabel', label: '领料方式' },
-    {
-      key: 'workOrder',
-      label: '关联工单',
-      format: () => relatedWorkOrderText(r) || '—',
-    },
-    {
-      key: 'product',
-      label: '产品/摘要',
-      format: () => relatedProductText(r) || '—',
-    },
     {
       key: 'salesOrderNo',
       label: '销售订单',

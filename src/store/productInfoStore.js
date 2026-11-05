@@ -147,7 +147,11 @@ export function getSelectableProducts() {
   return productInfoState.products.filter((p) => isProductActive(p))
 }
 
-/** 归档仅为状态变更，不校验 BOM/工单/订单引用 */
+/**
+ * 归档产品（状态变更）。
+ * BOM 直接引用的联动处理由 UI（ProductArchiveReferenceModal）在调用前完成；
+ * 不校验工单/订单引用，已有引用不受影响。
+ */
 export function archiveProduct(id) {
   return updateProduct(id, { status: PRODUCT_STATUS.ARCHIVED })
 }

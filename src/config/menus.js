@@ -119,6 +119,11 @@ export const sideMenus = {
       label: '齐套与供应进度',
       path: '/production/kit-supply',
     },
+    {
+      key: 'demand-calculation',
+      label: '需求计算',
+      path: '/production/demand-calculation',
+    },
   ],
   'report-management': [
     { key: 'report-work', label: '报工确认', path: '/report-management/report-work' },
@@ -511,6 +516,7 @@ export const routeTitles = {
   '/production/arrival-tracking': '到货跟踪',
   '/production/kit-supply': '齐套与供应进度',
   '/production/kit-supply/shortage/:rowId': '齐套缺件明细',
+  '/production/demand-calculation': '需求计算',
   '/inventory/deduct-records': '库存扣减记录',
   '/inventory/deduct-records/:id/edit': '编辑扣减记录',
   '/inventory/deduct-records/:id': '扣减记录详情',

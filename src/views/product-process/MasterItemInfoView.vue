@@ -434,6 +434,16 @@
     <ImportExportHistoryModal v-model:open="historyOpen" />
 
     <ProductLabelPrintModal v-model:open="labelPrintOpen" :items="labelPrintItems" />
+
+    <ProductArchiveReferenceModal
+      v-model:open="archiveRefOpen"
+      :item-name="archiveTarget?.name || ''"
+      :item-code="archiveTarget?.code || ''"
+      :exclude-item-id="archiveTarget?.id || ''"
+      :refs="archiveParentRefs"
+      @confirm="onArchiveRefConfirm"
+      @cancel="onArchiveRefCancel"
+    />
   </div>
 </template>
 
@@ -475,6 +485,11 @@ import {
 import { buildCategoryItemCountMap, sortCategoryTreeForDisplay } from '@/utils/categoryTreeSort'
 import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
 import { productInfoState, archiveProduct, unarchiveProduct } from '@/store/productInfoStore'
+import {
+  findDirectBomRefsForItem,
+  applyProductArchiveBomRefActions,
+} from '@/utils/itemBomReference'
+import ProductArchiveReferenceModal from './components/ProductArchiveReferenceModal.vue'
 import {
   isProductActive,
   isProductArchived,
@@ -1164,20 +1179,101 @@ function handleClone(record) {
   if (cloned) message.success('已克隆')
 }
 
+const archiveRefOpen = ref(false)
+const archiveTarget = ref(null)
+const archiveParentRefs = ref([])
+/** 批量归档时待处理队列（有 BOM 引用需弹窗） */
+const archiveQueue = ref([])
+const archiveBatchDone = ref(0)
+
+function clearArchiveRefState() {
+  archiveTarget.value = null
+  archiveParentRefs.value = []
+}
+
+function doArchiveProduct(record, { removeRefs = [], replaceRefs = [], silent = false } = {}) {
+  if (!record) return { removed: 0, replaced: 0, autoPublished: 0 }
+  const { removed, replaced, autoPublished } = applyProductArchiveBomRefActions({
+    removeRefs,
+    replaceRefs,
+  })
+  archiveProduct(record.id)
+  selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
+  if (!silent) {
+    const parts = ['已归档']
+    if (removed) parts.push(`已从 ${removeRefs.length} 个 BOM 移除引用（${removed} 行）`)
+    if (replaced) parts.push(`已在 ${replaceRefs.length} 个 BOM 替换为替代件（${replaced} 行）`)
+    if (autoPublished) parts.push(`其中 ${autoPublished} 个生效母件 BOM 已自动升版并发布`)
+    message.success(parts.join('，'))
+  }
+  return { removed, replaced, autoPublished }
+}
+
+function openArchiveRefModal(record, refs) {
+  archiveTarget.value = record
+  archiveParentRefs.value = refs
+  archiveRefOpen.value = true
+}
+
+function processNextArchiveInQueue() {
+  const next = archiveQueue.value.shift()
+  if (!next) {
+    if (archiveBatchDone.value > 0) {
+      message.success(`已归档 ${archiveBatchDone.value} 条`)
+      archiveBatchDone.value = 0
+    }
+    return
+  }
+  const refs = findDirectBomRefsForItem(next)
+  if (!refs.length) {
+    doArchiveProduct(next, { silent: true })
+    archiveBatchDone.value += 1
+    processNextArchiveInQueue()
+    return
+  }
+  openArchiveRefModal(next, refs)
+}
+
 function confirmArchive(record) {
   if (!isProductSideRecord(record)) {
     message.warning('仅产品信息支持归档')
     return
   }
+  void productBomState.boms
+  const refs = findDirectBomRefsForItem(record)
+  if (refs.length) {
+    archiveQueue.value = []
+    openArchiveRefModal(record, refs)
+    return
+  }
   Modal.confirm({
     title: '确认归档',
-    content: `确定归档「${record.name}」吗？归档后选品时不再展示，已被 BOM/工单/订单引用不受影响。`,
+    content: `确定归档「${record.name}」吗？归档后选品时不再展示；当前无未归档 BOM 直接引用该产品。`,
     onOk: () => {
-      archiveProduct(record.id)
-      selectedRowKeys.value = selectedRowKeys.value.filter((k) => k !== record.id)
-      message.success('已归档')
+      doArchiveProduct(record)
     },
   })
+}
+
+function onArchiveRefConfirm({ removeRefs = [], replaceRefs = [] }) {
+  if (!archiveTarget.value) return
+  const inBatch = archiveQueue.value.length > 0 || archiveBatchDone.value > 0
+  doArchiveProduct(archiveTarget.value, { removeRefs, replaceRefs, silent: inBatch })
+  if (inBatch) archiveBatchDone.value += 1
+  clearArchiveRefState()
+  processNextArchiveInQueue()
+}
+
+function onArchiveRefCancel() {
+  clearArchiveRefState()
+  if (archiveQueue.value.length) {
+    message.info('已取消当前条归档，其余待确认项已停止')
+    archiveQueue.value = []
+    if (archiveBatchDone.value > 0) {
+      message.success(`已归档 ${archiveBatchDone.value} 条`)
+      archiveBatchDone.value = 0
+    }
+  }
 }
 
 function handleUnarchive(record) {
@@ -1195,13 +1291,33 @@ function handleBatchArchive() {
     message.warning('请先勾选要归档的产品')
     return
   }
+  void productBomState.boms
+  const withRefs = []
+  const withoutRefs = []
+  rows.forEach((row) => {
+    const refs = findDirectBomRefsForItem(row)
+    if (refs.length) withRefs.push(row)
+    else withoutRefs.push(row)
+  })
   Modal.confirm({
     title: '批量归档',
-    content: `确定归档选中的 ${rows.length} 条产品吗？归档后选品时不再展示，已被引用不受影响。`,
+    content:
+      withRefs.length > 0
+        ? `将归档 ${rows.length} 条产品，其中 ${withRefs.length} 条被 BOM 直接引用，需逐条确认如何处理引用。`
+        : `确定归档选中的 ${rows.length} 条产品吗？归档后选品时不再展示。`,
     onOk: () => {
-      rows.forEach((r) => archiveProduct(r.id))
+      withoutRefs.forEach((r) => doArchiveProduct(r, { silent: true }))
       selectedRowKeys.value = []
-      message.success(`已归档 ${rows.length} 条`)
+      if (!withRefs.length) {
+        message.success(`已归档 ${withoutRefs.length} 条`)
+        return
+      }
+      archiveBatchDone.value = withoutRefs.length
+      if (withoutRefs.length) {
+        message.success(`已先归档 ${withoutRefs.length} 条无 BOM 引用的产品`)
+      }
+      archiveQueue.value = [...withRefs]
+      processNextArchiveInQueue()
     },
   })
 }

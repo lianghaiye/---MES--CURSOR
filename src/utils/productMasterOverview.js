@@ -6,17 +6,12 @@ import { purchaseOrderState } from '@/store/purchaseOrderStore'
 import { salesOrderState } from '@/store/salesOrderStore'
 import { workOrderState } from '@/store/workOrderStore'
 import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
-import { productBomState, getProductBomById } from '@/store/productBomStore'
-import { getBomLineItems } from '@/utils/bomVersionReference'
-import { findChildBomRefAncestorLine } from '@/utils/bomChildRefDetach'
-import { isBomArchived, normalizeBomStatusValue } from '@/mock/productBomOptions'
-import { isShipBomType } from '@/mock/bomMaterialColumns'
+import { findDirectBomRefsForItem } from '@/utils/itemBomReference'
 import {
   buildPurchaseInTransitMap,
   getInTransitForMaterialCode,
 } from '@/utils/planPurchaseInTransit'
 import { buildWipInProcessMap, getWipForMaterialCode } from '@/utils/planWipInProcess'
-import { bomWorkspaceDetailPath } from '@/utils/shipAttachmentNav'
 
 function roundQty(n) {
   const v = Number(n) || 0
@@ -65,77 +60,22 @@ function orderDate(order, keys) {
   return ''
 }
 
-function lineMatchesItem(line, id, code) {
-  const lineId = String(line.referencedItemId || line.itemId || '')
-  const lineCode = String(
-    line.materialCode || line.itemCode || line.productCode || line.inventoryCode || '',
-  ).trim()
-  return (id && lineId === id) || (code && lineCode === code)
-}
-
 /**
- * 是否为母件 BOM 的直接引用行：
- * - 计入：本 BOM 结构里直接挂上的子件（含引用子件 BOM 的那一行本身）
- * - 不计：挂在「子件 BOM 引用」节点下的展开下级（间接出现）
- */
-function isDirectItemReferenceLine(parent, line) {
-  if (!line) return false
-  const flatNodes = parent.treeNodes || []
-  const lineItems = getBomLineItems(parent)
-  if (line.id && findChildBomRefAncestorLine(flatNodes, lineItems, line.id)) {
-    return false
-  }
-  // 兜底：按树父节点上溯，识别 bom-ref / childBomId 祖先
-  let parentId = line.parentTreeId
-  const seen = new Set()
-  while (parentId && !seen.has(parentId)) {
-    seen.add(parentId)
-    const parentNode = flatNodes.find((n) => n.id === parentId)
-    if (parentNode?.nodeType === 'bom-ref') return false
-    const parentLine =
-      lineItems.find((l) => l.treeNodeId === parentId) ||
-      (parentNode?.lineId ? lineItems.find((l) => l.id === parentNode.lineId) : null)
-    if (parentLine && (parentLine.childBomId || parentLine.childBom)) return false
-    parentId = parentNode?.parentId || null
-  }
-  return true
-}
-
-/**
- * 引用该物品作为子件的 BOM
- * - 仅直接引用（不含经多层 BOM 引用展开后的间接出现）
- * - 不含自身 BOM、已归档、随货配件
+ * 引用该物品作为子件的 BOM（仅直接引用；不含自身 / 已归档 / 随货配件）
  */
 export function findBomsReferencingItem(record) {
-  const id = String(record?.id || '')
-  const code = String(record?.code || '').trim()
-  if (!id && !code) return []
-  const rows = []
-
-  ;(productBomState.boms || []).forEach((parent) => {
-    if (!parent?.id || isBomArchived(parent) || isShipBomType(parent.bomType)) return
-    if (id && String(parent.itemId) === id) return
-    const lines = getBomLineItems(parent)
-    const matched = lines.filter(
-      (line) => lineMatchesItem(line, id, code) && isDirectItemReferenceLine(parent, line),
-    )
-    if (!matched.length) return
-    const unitQty = matched.reduce((s, l) => s + (Number(l.unitQty) || 0), 0)
-    rows.push({
-      id: parent.id,
-      bomId: parent.id,
-      bomNo: parent.bomNo || '—',
-      bomName: parent.bomName || '—',
-      bomStatus: normalizeBomStatusValue(parent.status),
-      itemName: parent.itemName || '—',
-      itemCode: parent.itemCode || '—',
-      version: parent.version || '—',
-      unitQty: unitQty ? formatOverviewQty(unitQty) : '—',
-      detailPath: bomWorkspaceDetailPath(getProductBomById(parent.id) || parent),
-    })
-  })
-
-  return rows
+  return findDirectBomRefsForItem(record).map((ref) => ({
+    id: ref.parentBomId,
+    bomId: ref.parentBomId,
+    bomNo: ref.bomNo || '—',
+    bomName: ref.parentBomName || '—',
+    bomStatus: ref.parentBomStatus,
+    itemName: ref.parentItemName || '—',
+    itemCode: ref.parentItemCode || '—',
+    version: ref.parentVersion || '—',
+    unitQty: '—',
+    detailPath: ref.detailPath,
+  }))
 }
 
 function sumInboundQty(code) {

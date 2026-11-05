@@ -1,9 +1,28 @@
 import dayjs from 'dayjs'
-import { productBomState } from '@/store/productBomStore'
+import { productBomState, getOwnActiveBomForItem } from '@/store/productBomStore'
 import { normalizeVersionDisplay } from '@/utils/bomVersion'
 import { isCatalogSeedBom, hydrateCatalogBom } from '@/mock/productBomSeed'
 import { mockProducts } from '@/mock/productInfo'
 import { isBomArchived, isBomPending } from '@/mock/productBomOptions'
+import { expandActiveBomOneLevelUnderLine } from '@/utils/bomImport'
+
+function resolveSubstituteItemType(substitute) {
+  if (substitute?.itemType === 'product' || substitute?.itemType === 'material') {
+    return substitute.itemType
+  }
+  return substitute?.itemType === '产品' ? 'product' : 'material'
+}
+
+function resolveSubstitutePickerItemType(substitute) {
+  const t = resolveSubstituteItemType(substitute)
+  return t === 'product' ? '产品' : '物料'
+}
+
+function normalizeUnitQty(value, fallback = 1) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 0) return fallback
+  return n
+}
 
 export function getBomLineItems(bom) {
   if (!bom) return []
@@ -194,6 +213,115 @@ export function removeParentBomReferences(refs = []) {
   })
 
   return removed
+}
+
+/**
+ * 将母件中的子件行替换为替代物料/产品
+ * - 使用 ref.unitQty（可填）；默认沿用原用量
+ * - 清除旧展开下级；若替代件有生效 BOM，按用量系数展开一层下级（下级用量 × 本级用量）
+ * @param {Array<{ parentBomId: string, lineIds?: string[], substitute: object, unitQty?: number }>} refs
+ * @returns {number} 替换的引用行数
+ */
+export function replaceParentBomItemReferences(refs = []) {
+  if (!refs.length) return 0
+  const ts = dayjs().format('YYYY-MM-DD HH:mm')
+  let updated = 0
+
+  refs.forEach((ref) => {
+    const substitute = ref.substitute
+    if (!substitute?.id && !substitute?.code) return
+    const parent = ensureParentWritable(productBomState.boms.find((b) => b.id === ref.parentBomId))
+    if (!parent?.lineItems?.length) return
+
+    const itemType = resolveSubstituteItemType(substitute)
+    const activeBom = getOwnActiveBomForItem(itemType, substitute.id)
+    const lineIdSet = new Set(ref.lineIds || [])
+    const unitQty = normalizeUnitQty(ref.unitQty, 1)
+    const pickerMaterial = {
+      id: substitute.id,
+      itemId: substitute.id,
+      itemType: resolveSubstitutePickerItemType(substitute),
+      code: substitute.code,
+      name: substitute.name,
+      specModel: substitute.specModel,
+      categoryName: substitute.categoryName,
+      materialType: substitute.materialType,
+      supplyForm: substitute.supplyForm,
+      material: substitute.material,
+      drawingNo: substitute.drawingNo,
+      inventoryUnit: substitute.inventoryUnit,
+      unitPrice: substitute.unitPrice,
+    }
+
+    // 先清旧下级，再改本级并按需展开
+    const descendantNodeIds = new Set()
+    parent.lineItems.forEach((line) => {
+      if (!lineIdSet.has(line.id) || !line.treeNodeId) return
+      ;(parent.treeNodes || []).forEach((n) => {
+        if (n.parentId === line.treeNodeId) {
+          collectSubtreeNodeIds(parent.treeNodes, n.id).forEach((id) => descendantNodeIds.add(id))
+        }
+      })
+    })
+    if (descendantNodeIds.size) {
+      removeSubtreeFromParent(parent, descendantNodeIds)
+    }
+
+    const targetLineIds = parent.lineItems.filter((l) => lineIdSet.has(l.id)).map((l) => l.id)
+    targetLineIds.forEach((lineId) => {
+      const line = parent.lineItems.find((l) => l.id === lineId)
+      if (!line) return
+
+      line.materialCode = substitute.code || ''
+      line.itemCode = substitute.code || ''
+      line.itemName = substitute.name || ''
+      line.specModel = substitute.specModel || ''
+      line.categoryName = substitute.categoryName || line.categoryName || ''
+      line.materialType = substitute.materialType || line.materialType || ''
+      line.supplyForm = substitute.supplyForm || line.supplyForm || ''
+      line.material = substitute.material || ''
+      line.drawingNo = substitute.drawingNo || ''
+      if (substitute.inventoryUnit) line.unit = substitute.inventoryUnit
+      if (substitute.unitPrice != null && substitute.unitPrice !== '') {
+        line.unitPrice = substitute.unitPrice
+      }
+      line.unitQty = unitQty
+      line.referencedItemId = substitute.id
+      line.referencedItemType = itemType
+      line.itemId = substitute.id
+      line.childBomId = undefined
+      line.childBom = ''
+      line.childBomVersion = ''
+
+      const node = (parent.treeNodes || []).find((n) => n.id === line.treeNodeId)
+      if (node) {
+        node.title = `${substitute.code || ''} ${substitute.name || ''}`.trim()
+        node.materialCode = substitute.code || ''
+        node.quantity = unitQty
+        node.nodeType = 'material'
+      }
+
+      if (activeBom) {
+        const expanded = expandActiveBomOneLevelUnderLine(
+          parent.treeNodes || [],
+          parent.lineItems || [],
+          line.id,
+          pickerMaterial,
+          unitQty,
+        )
+        parent.treeNodes = expanded.flatNodes
+        parent.lineItems = expanded.lineItems
+        const nodeAfter = (parent.treeNodes || []).find((n) => n.id === line.treeNodeId)
+        if (nodeAfter) nodeAfter.nodeType = 'bom-ref'
+      }
+
+      updated += 1
+    })
+
+    parent.updatedAt = ts
+  })
+
+  return updated
 }
 
 /**

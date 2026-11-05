@@ -648,6 +648,12 @@ const routes = [
         meta: { title: '齐套缺件明细', listPath: '/production/kit-supply' },
       },
       {
+        path: 'production/demand-calculation',
+        name: 'production-demand-calculation',
+        component: () => import('@/views/production/DemandCalculationView.vue'),
+        meta: { title: '需求计算' },
+      },
+      {
         path: 'report-management/report-work',
         name: 'report-management-report-work',
         component: () => import('@/views/production/ReportWorkManagementView.vue'),

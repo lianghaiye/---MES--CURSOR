@@ -48,6 +48,17 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :sm="12" :md="6">
+            <a-form-item label="入库状态">
+              <a-select
+                v-model:value="filters.inboundStatus"
+                allow-clear
+                placeholder="请选择"
+                size="small"
+                :options="inboundStatusOpts"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :sm="12" :md="6">
             <a-form-item label="订单来源">
               <a-select
                 v-model:value="filters.orderSource"
@@ -419,6 +430,7 @@ import {
   supplierOptions,
   overdueStatusOptions,
   accountStatusOptions,
+  inboundStatusOptions,
 } from '@/mock/purchaseOrderOptions'
 import { poLineAccountStatusColor } from '@/utils/purchaseLineInbound'
 import GenerateReceiptModal from './components/GenerateReceiptModal.vue'
@@ -452,6 +464,7 @@ const filters = reactive({
   supplier: undefined,
   reqNo: '',
   status: undefined,
+  inboundStatus: undefined,
   orderSource: undefined,
   overdueStatus: undefined,
   accountStatus: undefined,
@@ -486,6 +499,7 @@ watch(
 
 const supplierOpts = supplierOptions
 const statusOpts = poStatusOptions.map((v) => ({ label: v, value: v }))
+const inboundStatusOpts = inboundStatusOptions.map((v) => ({ label: v, value: v }))
 const sourceOpts = poSourceOptions.map((v) => ({ label: v, value: v }))
 const overdueOpts = overdueStatusOptions.map((v) => ({ label: v, value: v }))
 const accountStatusOpts = accountStatusOptions.map((v) => ({ label: v, value: v }))
@@ -662,6 +676,7 @@ function handleReset() {
   filters.supplier = undefined
   filters.reqNo = ''
   filters.status = undefined
+  filters.inboundStatus = undefined
   filters.orderSource = undefined
   filters.overdueStatus = undefined
   filters.accountStatus = undefined
