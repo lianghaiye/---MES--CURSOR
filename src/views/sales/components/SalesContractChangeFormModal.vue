@@ -312,7 +312,7 @@
             :class="{ 'is-collapsed': partyLegalCollapsed }"
           >
             <div class="section-title-row">
-              <span class="section-title">相对方法人与开票信息</span>
+              <span class="section-title">对方法人与开票信息</span>
               <a-button type="link" size="small" class="collapse-btn" @click="togglePartyLegal">
                 {{ partyLegalCollapsed ? '展开' : '收起' }}
               </a-button>

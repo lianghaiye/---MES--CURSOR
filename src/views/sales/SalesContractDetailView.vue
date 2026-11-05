@@ -108,7 +108,7 @@
               </div>
             </DetailSectionCard>
 
-            <DetailSectionCard title="相对方法人与开票信息">
+            <DetailSectionCard title="对方法人与开票信息">
               <SalesContractPartyLegalSection :contract="record" />
             </DetailSectionCard>
 

@@ -58,7 +58,7 @@
               <SalesContractBasicInfoSection :contract="displayContract" :quota="quota" />
             </DetailSectionCard>
 
-            <DetailSectionCard title="变更后 · 相对方法人与开票信息">
+            <DetailSectionCard title="变更后 · 对方法人与开票信息">
               <SalesContractPartyLegalSection :contract="displayContract" />
             </DetailSectionCard>
 
