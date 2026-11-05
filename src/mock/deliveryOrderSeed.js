@@ -177,6 +177,7 @@ function app(partial, salesOrder) {
       logisticsNo: partial.logisticsNo || '',
       freightAmount: Number(partial.freightAmount) || 0,
       returnReceipts: Array.isArray(partial.returnReceipts) ? partial.returnReceipts : [],
+      operationLogs: Array.isArray(partial.operationLogs) ? partial.operationLogs : [],
       contactPerson: partial.contactPerson || salesOrder?.contactPerson || '',
       contactPhone: partial.contactPhone || salesOrder?.contactPhone || '',
       deliveryAddress: partial.deliveryAddress || '',
@@ -376,11 +377,21 @@ export function buildDeliveryOrderSeed() {
         createdAt: '2026-08-01 09:20',
         deliveryDate: '2026-08-02',
         shipmentMethod: '送货',
+        freightAmount: 160,
         driverName: '周师傅',
         driverPhone: '13600003333',
         plateNo: '沪C88888',
         deliveryAddress: '苏州市工业园区星湖街 328 号',
         remark: '演示：关联出库单已出库，发货状态=已发货',
+        operationLogs: [
+          {
+            id: 'dol-seed-shipped-1',
+            action: '创建发货单',
+            operator: 'admin1',
+            operatedAt: '2026-08-01 09:20:00',
+            remark: '申请发货',
+          },
+        ],
         lineItems: [
           {
             id: 'dl-ship-1',
@@ -775,6 +786,15 @@ export function buildDeliveryOrderSeed() {
             name: '回货单-密封检修包.pdf',
             size: '1.2MB',
             uploadedAt: '2026-09-10 14:20',
+          },
+        ],
+        operationLogs: [
+          {
+            id: 'dol-seed-scatter-1',
+            action: '上传回货单',
+            operator: 'admin1',
+            operatedAt: '2026-09-10 14:20:00',
+            remark: '回货单-密封检修包.pdf',
           },
         ],
         lineItems: [],

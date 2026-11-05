@@ -25,8 +25,8 @@ import { sumSelectedShipQty } from '@/utils/shipEbom'
 import { persistJson } from '@/utils/safeStorage'
 
 const STORAGE_KEY = 'i_doms_delivery_orders'
-/** v7：回款登记联动演示发货单（随销售订单申请同步） */
-const DATA_VERSION = 7
+/** v8：发货操作日志 + 回货单物流信息可回写 */
+const DATA_VERSION = 8
 
 function migrateOrders(orders) {
   return (orders || []).map((o) => {
@@ -39,6 +39,7 @@ function migrateOrders(orders) {
     if (!row.operatedAt) row.operatedAt = row.updatedAt || row.createdAt || ''
     if (row.freightAmount == null || row.freightAmount === '') row.freightAmount = 0
     if (!Array.isArray(row.returnReceipts)) row.returnReceipts = []
+    if (!Array.isArray(row.operationLogs)) row.operationLogs = []
     if (row.returnReceipts.length && row.deliveryStatus === '已发货') {
       row.deliveryStatus = '已收货'
     }
@@ -220,6 +221,7 @@ export function createDeliveryOrder(payload) {
     logisticsNo: payload.logisticsNo || '',
     freightAmount: Number(payload.freightAmount) || 0,
     returnReceipts: Array.isArray(payload.returnReceipts) ? payload.returnReceipts : [],
+    operationLogs: Array.isArray(payload.operationLogs) ? payload.operationLogs : [],
     contactPerson: payload.contactPerson || so?.contactPerson || '',
     contactPhone: payload.contactPhone || so?.contactPhone || '',
     deliveryAddress: payload.deliveryAddress || so?.deliveryAddress || '',
@@ -315,14 +317,33 @@ export function updateDeliveryOrder(id, patch) {
         })
       }
     }
-  } else if (row.salesOrderId && patch.deliveryStatus) {
-    updateDeliveryApplication(row.salesOrderId, row.id, {
-      status:
-        patch.deliveryStatus === '已发货' || patch.deliveryStatus === '已收货'
-          ? patch.deliveryStatus
-          : undefined,
-      actualShipQty: patch.actualOutboundQty,
-    })
+  } else if (row.salesOrderId) {
+    const logisticsTouched =
+      patch.shipmentMethod != null ||
+      patch.freightAmount != null ||
+      patch.driverName != null ||
+      patch.driverPhone != null ||
+      patch.plateNo != null ||
+      patch.logisticsNo != null
+    if (patch.deliveryStatus || logisticsTouched) {
+      updateDeliveryApplication(row.salesOrderId, row.id, {
+        status:
+          patch.deliveryStatus === '已发货' || patch.deliveryStatus === '已收货'
+            ? patch.deliveryStatus
+            : undefined,
+        actualShipQty: patch.actualOutboundQty,
+        ...(logisticsTouched
+          ? {
+              shipmentMethod: row.shipmentMethod,
+              freightAmount: row.freightAmount,
+              driverName: row.driverName,
+              driverPhone: row.driverPhone,
+              plateNo: row.plateNo,
+              logisticsNo: row.logisticsNo,
+            }
+          : {}),
+      })
+    }
   }
 
   const editable = prev.deliveryStatus === '待发货' || prev.deliveryStatus === '待出库'

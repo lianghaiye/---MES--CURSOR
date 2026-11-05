@@ -139,6 +139,7 @@ export function mapApplicationToDeliveryOrder(application, salesOrder) {
     logisticsNo: application.logisticsNo || '',
     freightAmount: Number(application.freightAmount) || 0,
     returnReceipts: Array.isArray(application.returnReceipts) ? application.returnReceipts : [],
+    operationLogs: Array.isArray(application.operationLogs) ? [...application.operationLogs] : [],
     receivedAt: application.receivedAt || '',
     contactPerson: application.contactPerson || salesOrder?.contactPerson || '',
     contactPhone: application.contactPhone || salesOrder?.contactPhone || '',

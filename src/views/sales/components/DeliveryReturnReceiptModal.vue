@@ -2,12 +2,14 @@
   <a-modal
     :open="open"
     title="上传回货单"
-    width="560px"
-    :footer="null"
+    width="640px"
+    ok-text="保存物流信息"
+    cancel-text="关闭"
     destroy-on-close
+    @ok="onOk"
     @cancel="emit('update:open', false)"
   >
-    <DeliveryReturnReceiptSection v-if="order" :order="order" />
+    <DeliveryReturnReceiptSection v-if="order" ref="sectionRef" :order="order" @saved="onSaved" />
   </a-modal>
 </template>
 
@@ -16,6 +18,7 @@ export default { name: 'DeliveryReturnReceiptModal' }
 </script>
 
 <script setup>
+import { ref } from 'vue'
 import DeliveryReturnReceiptSection from './DeliveryReturnReceiptSection.vue'
 
 defineProps({
@@ -23,5 +26,15 @@ defineProps({
   order: { type: Object, default: null },
 })
 
-const emit = defineEmits(['update:open'])
+const emit = defineEmits(['update:open', 'saved'])
+
+const sectionRef = ref(null)
+
+function onOk() {
+  sectionRef.value?.saveLogistics?.()
+}
+
+function onSaved(order) {
+  emit('saved', order)
+}
 </script>
