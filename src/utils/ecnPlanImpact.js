@@ -296,6 +296,19 @@ function findWorkOrdersByCode(ecn, code) {
   })
 }
 
+/** 其它 ECN 已生成的新料工单，不挡本单「新料处置」排产（同 SO 多演示单会共用物料编码） */
+function isWorkOrderFromOtherEcn(wo, ecn) {
+  const related = String(wo?.relatedEcnNo || '').trim()
+  const current = String(ecn?.ecnNo || '').trim()
+  if (!related || !current) return false
+  return related !== current
+}
+
+/** 判断新料是否已有「本单相关」工单（可挡住再次排产） */
+function findBlockingNewMaterialWorkOrders(ecn, afterCode) {
+  return findWorkOrdersByCode(ecn, afterCode).filter((wo) => !isWorkOrderFromOtherEcn(wo, ecn))
+}
+
 function outsourceOrderMatchesCode(order, code) {
   const materialCode = String(code || '').trim()
   if (!materialCode) return false
@@ -474,12 +487,9 @@ function buildOneChangeLineRow(ecn, pairs, spec) {
   const canForceVoid = changeType !== ECN_CHANGE_ITEM_TYPE.ADD && hasIssuedDocs && !qtyOnly
   const canVoidPendingQty = qtyOnly && hasPendingDocs
   const canForceVoidQty = qtyOnly && hasIssuedDocs
-  const canSchedule =
-    bringsNew &&
-    Boolean(afterCode) &&
-    !findWorkOrdersByCode(ecn, afterCode).some(
-      (wo) => wo.status !== '终止' && wo.status !== '已作废',
-    )
+  const blockingNewWos = findBlockingNewMaterialWorkOrders(ecn, afterCode)
+  const canSchedule = bringsNew && Boolean(afterCode) && blockingNewWos.length === 0
+  const newAlreadyScheduled = bringsNew && Boolean(afterCode) && blockingNewWos.length > 0
   const canScheduleAfterVoid =
     qtyOnly &&
     Boolean(afterCode) &&
@@ -542,6 +552,8 @@ function buildOneChangeLineRow(ecn, pairs, spec) {
     canForceVoid: canForceVoid || canForceVoidQty,
     canSchedule,
     canScheduleAfterVoid,
+    newAlreadyScheduled,
+    existingNewWoCodes: blockingNewWos.map((wo) => wo.code).filter(Boolean),
     parentHint,
     // 仅「无关联工单/外协单的外购」才提示采购侧人工
     purchased: purchasedOld && !hasPendingDocs && !hasIssuedDocs,

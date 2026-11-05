@@ -458,6 +458,10 @@ function showNewSchedule(row) {
 function newActionPlaceholder(row) {
   if (row.changeType === '取消') return '—'
   if (row.modifyKind === 'qty_only') return '同料改量，无需新单'
+  if (row.newAlreadyScheduled) {
+    const codes = (row.existingNewWoCodes || []).filter(Boolean).join('、')
+    return codes ? `新料已有工单 ${codes}，无需再排` : '新料已有工单，无需再排'
+  }
   return '—'
 }
 

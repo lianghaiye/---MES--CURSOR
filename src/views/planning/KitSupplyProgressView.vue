@@ -3,17 +3,37 @@
     <header v-if="!drillStack.length" class="page-header">
       <div class="header-main">
         <h1 class="title">{{ isScreen ? '齐套与供应看板' : '齐套与供应进度' }}</h1>
+        <div v-if="isScreen" class="carousel-setting" title="按设定秒数自动切换上方 Tab">
+          <a-switch v-model:checked="carouselEnabled" size="small" />
+          <span class="carousel-label">轮播</span>
+          <a-input-number
+            v-model:value="carouselSeconds"
+            :min="5"
+            :max="300"
+            :step="5"
+            :disabled="!carouselEnabled"
+            size="small"
+            class="carousel-seconds"
+          />
+          <span class="carousel-label">秒/页</span>
+          <span v-if="carouselEnabled" class="carousel-page">
+            {{ activeTabLabel }} {{ activeTabIndex + 1 }}/{{ KIT_SUPPLY_TABS.length }}
+          </span>
+        </div>
         <span class="updated">更新于 {{ dashboard.updatedAt }}</span>
       </div>
       <div class="header-actions">
         <a-button type="primary" ghost @click="refresh">刷新</a-button>
+        <a-button @click="searchVisible = !searchVisible">
+          {{ searchVisible ? '隐藏搜索' : '打开搜索' }}
+        </a-button>
         <a-button v-if="isScreen" @click="toggleFullscreen">
           {{ isFullscreen ? '退出全屏' : '全屏展示' }}
         </a-button>
       </div>
     </header>
 
-    <!-- 列表层：Tab 在上，搜索在 Tab 下 -->
+    <!-- 列表层：Tab 在上，搜索在 Tab 下（默认隐藏，由按钮打开） -->
     <template v-if="!drillStack.length">
       <div class="view-tabs-bar">
         <a-tabs v-model:activeKey="activeTab" class="view-tabs" :tab-bar-style="{ margin: 0 }">
@@ -21,7 +41,7 @@
         </a-tabs>
       </div>
 
-      <div class="filter-card">
+      <div v-show="searchVisible" class="filter-card">
         <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
           <a-row :gutter="[12, 8]" style="width: 100%">
             <template v-if="activeTab === 'kitting'">
@@ -689,8 +709,75 @@ const kitView = ref(KIT_VIEW_MODE.PRODUCTION_WORK_ORDER)
 const filters = ref(createEmptyFilters())
 const dashboard = ref(buildKitSupplyDashboard({ kitView: kitView.value }))
 const isFullscreen = ref(false)
+/** 看板默认收起搜索；计划侧工作台默认展开 */
+const searchVisible = ref(!isScreen.value)
+const carouselEnabled = ref(true)
+const carouselSeconds = ref(15)
+let carouselTimer = null
+const CAROUSEL_STORAGE_KEY = 'i_doms_kit_supply_carousel'
 /** @type {import('vue').Ref<Array<{ type: string, row?: object, vendor?: string }>>} */
 const drillStack = ref([])
+
+const activeTabIndex = computed(() =>
+  Math.max(
+    0,
+    KIT_SUPPLY_TABS.findIndex((t) => t.key === activeTab.value),
+  ),
+)
+const activeTabLabel = computed(
+  () => KIT_SUPPLY_TABS.find((t) => t.key === activeTab.value)?.label || '',
+)
+
+function loadCarouselSettings() {
+  try {
+    const raw = localStorage.getItem(CAROUSEL_STORAGE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (typeof parsed.enabled === 'boolean') carouselEnabled.value = parsed.enabled
+    const sec = Number(parsed.seconds)
+    if (Number.isFinite(sec) && sec >= 5) carouselSeconds.value = Math.min(300, Math.round(sec))
+  } catch {
+    /* ignore */
+  }
+}
+
+function persistCarouselSettings() {
+  try {
+    localStorage.setItem(
+      CAROUSEL_STORAGE_KEY,
+      JSON.stringify({
+        enabled: carouselEnabled.value,
+        seconds: carouselSeconds.value,
+      }),
+    )
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearCarousel() {
+  if (carouselTimer) {
+    clearInterval(carouselTimer)
+    carouselTimer = null
+  }
+}
+
+function advanceCarouselTab() {
+  if (drillStack.value.length) return
+  const idx = activeTabIndex.value
+  const next = (idx + 1) % KIT_SUPPLY_TABS.length
+  activeTab.value = KIT_SUPPLY_TABS[next].key
+}
+
+function restartCarousel() {
+  clearCarousel()
+  if (!isScreen.value || !carouselEnabled.value) return
+  const sec = Math.max(5, Number(carouselSeconds.value) || 15)
+  carouselSeconds.value = sec
+  carouselTimer = setInterval(() => {
+    advanceCarouselTab()
+  }, sec * 1000)
+}
 
 function createEmptyFilters() {
   return {
@@ -877,7 +964,8 @@ const kittingColumns = computed(() => {
     { title: '创建时间', key: 'createdAt', width: 120 },
     { title: '状态', key: 'status', width: 96 },
   ]
-  if (isWorkOrderKitView(kitView.value)) {
+  // 看板投屏不展示操作列；计划侧工作台保留「去领料」
+  if (!isScreen.value && isWorkOrderKitView(kitView.value)) {
     cols.push({ title: '操作', key: 'actions', width: 96, fixed: 'right' })
   }
   return cols
@@ -1004,6 +1092,14 @@ watch(activeTab, () => {
   filters.value = createEmptyFilters()
   refresh()
 })
+watch([carouselEnabled, carouselSeconds, isScreen], () => {
+  persistCarouselSettings()
+  restartCarousel()
+})
+watch(
+  () => drillStack.value.length,
+  () => restartCarousel(),
+)
 
 function formatShortDate(v) {
   if (!v) return '—'
@@ -1193,10 +1289,13 @@ function onFsChange() {
 }
 
 onMounted(() => {
+  loadCarouselSettings()
   refresh()
+  restartCarousel()
   document.addEventListener('fullscreenchange', onFsChange)
 })
 onBeforeUnmount(() => {
+  clearCarousel()
   document.removeEventListener('fullscreenchange', onFsChange)
 })
 </script>
@@ -1235,9 +1334,59 @@ onBeforeUnmount(() => {
   }
 
   .panel,
-  .kpi-card {
+  .kpi-card,
+  .view-tabs-bar,
+  .filter-card,
+  .crumb-bar {
     background: #141c2e;
     border-color: #243049;
+  }
+
+  .carousel-setting {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: #243049;
+  }
+
+  .carousel-label {
+    color: #9db0cc;
+  }
+
+  .carousel-page {
+    color: #69b1ff;
+  }
+
+  .carousel-setting :deep(.ant-input-number) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: #2a3a55;
+    color: #e8eef8;
+  }
+
+  .carousel-setting :deep(.ant-input-number-input) {
+    color: #e8eef8;
+  }
+
+  .view-tabs-bar :deep(.ant-tabs-nav::before) {
+    border-bottom-color: #243049 !important;
+  }
+
+  .view-tabs-bar :deep(.ant-tabs-tab-btn) {
+    color: #9db0cc !important;
+  }
+
+  .view-tabs-bar :deep(.ant-tabs-tab-active .ant-tabs-tab-btn) {
+    color: #69b1ff !important;
+  }
+
+  .filter-card :deep(.ant-form-item-label > label),
+  .filter-card :deep(.ant-input),
+  .filter-card :deep(.ant-input-affix-wrapper) {
+    color: #e8eef8;
+  }
+
+  .filter-card :deep(.ant-input),
+  .filter-card :deep(.ant-input-affix-wrapper) {
+    background: #1a2438;
+    border-color: #2a3a55;
   }
 
   .breadcrumb .crumb {
@@ -1288,7 +1437,8 @@ onBeforeUnmount(() => {
 
 .header-main {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 12px;
 }
 
@@ -1309,6 +1459,33 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+}
+
+.carousel-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e6eb;
+}
+
+.carousel-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  white-space: nowrap;
+}
+
+.carousel-seconds {
+  width: 72px;
+}
+
+.carousel-page {
+  font-size: 12px;
+  color: #1677ff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .view-tabs-bar {

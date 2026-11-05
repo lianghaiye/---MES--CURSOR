@@ -366,9 +366,66 @@ function buildWorkOrderCost(filters) {
   return rows
 }
 
+/** 计入销售成本的外协单：排除草稿/作废/驳回/终结 */
+function isOutsourcingCostCountable(order) {
+  const st = String(order?.status || '')
+  return !['待提交', '已作废', '已拒绝', '已终结'].includes(st)
+}
+
+function outsourcingOrderAmount(order) {
+  const lines = order?.lineItems || []
+  return money(
+    order?.totalAmountInTax ??
+      order?.amountInTax ??
+      lines.reduce((s, l) => s + money(l.totalPriceInTax), 0),
+  )
+}
+
+/**
+ * 按销售订单归集外协费用（含税）。
+ * 索引：销售单号/销售单 id →（外协单 id → 金额），取值时按外协单去重合并。
+ */
+function buildOutsourcingCostBySalesOrder() {
+  /** @type {Map<string, Map<string, number>>} */
+  const index = new Map()
+  const add = (key, osId, amount) => {
+    const k = String(key || '').trim()
+    if (!k || !osId || amount <= 0) return
+    let bucket = index.get(k)
+    if (!bucket) {
+      bucket = new Map()
+      index.set(k, bucket)
+    }
+    bucket.set(osId, amount)
+  }
+  for (const order of outsourcingOrderState.orders || []) {
+    if (!isOutsourcingCostCountable(order)) continue
+    const amount = outsourcingOrderAmount(order)
+    if (amount <= 0) continue
+    const osId = String(order.id || order.orderNo || '').trim()
+    if (!osId) continue
+    add(order.salesOrderNo, osId, amount)
+    add(order.salesOrderId, osId, amount)
+  }
+  return {
+    getCost(salesOrder) {
+      const merged = new Map()
+      for (const key of [salesOrder?.orderNo, salesOrder?.id, salesOrder?.salesOrderId]) {
+        const bucket = index.get(String(key || '').trim())
+        if (!bucket) continue
+        for (const [osId, amt] of bucket) merged.set(osId, amt)
+      }
+      let sum = 0
+      for (const amt of merged.values()) sum = money(sum + amt)
+      return sum
+    },
+  }
+}
+
 function buildSalesOrderCost(filters) {
   const materialMap = buildMaterialCostByWorkOrder()
   const laborMap = buildLaborCostByWorkOrder()
+  const outsourcingMap = buildOutsourcingCostBySalesOrder()
   const workOrders = [...(workOrderState.orders || []), ...(assemblyWorkOrderState.orders || [])]
   const rows = []
 
@@ -412,8 +469,10 @@ function buildSalesOrderCost(filters) {
       if (lab.workers) for (const w of lab.workers) workers.add(w)
     }
 
+    const outsourcingCost = outsourcingMap.getCost(order)
+
     const amountInTax = orderAmountInTax(order)
-    const totalCost = money(materialCost + laborCost)
+    const totalCost = money(materialCost + laborCost + outsourcingCost)
     rows.push({
       orderNo: order.orderNo,
       customerName: order.customerName || '—',
@@ -431,6 +490,7 @@ function buildSalesOrderCost(filters) {
       workerCount: workers.size,
       laborHours,
       laborCost,
+      outsourcingCost,
       totalCost,
       grossProfit: money(amountInTax - totalCost),
     })
@@ -656,6 +716,7 @@ const COLUMN_MAP = {
     { title: '工人数', key: 'workerCount', align: 'right' },
     { title: '核算工时', key: 'laborHours', align: 'right' },
     { title: '人工成本', key: 'laborCost', align: 'right' },
+    { title: '外协费用', key: 'outsourcingCost', align: 'right' },
     { title: '成本合计', key: 'totalCost', align: 'right' },
     { title: '毛利', key: 'grossProfit', align: 'right' },
   ],
@@ -774,6 +835,22 @@ export function summarizeReportRows(reportKey, rows = []) {
       'shippedAmountInTax',
     ],
     'work-order-progress': ['planQty', 'doneQty'],
+    'sales-order-cost': [
+      'salesQty',
+      'amountInTax',
+      'workOrderCount',
+      'woPlanQty',
+      'woDoneQty',
+      'materialSkuCount',
+      'materialQty',
+      'materialCost',
+      'workerCount',
+      'laborHours',
+      'laborCost',
+      'outsourcingCost',
+      'totalCost',
+      'grossProfit',
+    ],
     'work-order-cost': [
       'planQty',
       'doneQty',

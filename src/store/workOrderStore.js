@@ -447,49 +447,72 @@ function finalizeOrders(orders) {
     migrateWorkOrderStatusFields(normalizeWorkOrderScheduleFields(o)),
   )
 }
+/** 待执行 COVER 与已执行 EXECUTED 分属不同销售订单，避免新料工单挡住待执行「新料处置」 */
+const ECN_COVER_DEMO_SO = '1-20260512-005'
+const ECN_EXECUTED_DEMO_SO = '1-20261105-ECN-DONE'
+const ECN_EXECUTED_DEMO_NO = 'ECN-DEMO-EXECUTED'
+
+function upsertEcnDemoWorkOrder(orders, spec) {
+  const row = {
+    orderCategory: '生产工单',
+    scheduleQty: 0,
+    actualQty: 0,
+    workCenter: '机加车间',
+    source: 'production-plan',
+    createdAt: '2026-06-20',
+    processes: [],
+    scheduleBatches: [],
+    ...spec,
+  }
+  if (spec.supersededByEcnNo && !row.operationLogs?.length) {
+    const force = String(spec.id || '').includes('seal')
+    row.operationLogs = [
+      {
+        id: `wol-demo-${spec.id}`,
+        action: force ? 'ECN强制终止' : 'ECN终止',
+        operator: '系统',
+        operatedAt: '2026-11-04 15:20:00',
+        remark: force
+          ? `ECN强制终止（${spec.supersededByEcnNo}）`
+          : `ECN变更终止（${spec.supersededByEcnNo}）`,
+      },
+    ]
+  }
+  if (spec.relatedEcnNo && !row.operationLogs?.length) {
+    row.operationLogs = [
+      {
+        id: `wol-demo-${spec.id}`,
+        action: 'ECN生成',
+        operator: '系统',
+        operatedAt: '2026-11-04 15:20:00',
+        remark: `由 ${spec.relatedEcnNo} 生成待下发工单`,
+      },
+    ]
+  }
+  const existing = orders.find((o) => o.id === spec.id)
+  if (existing) {
+    Object.assign(existing, row)
+    if (row.operationLogs?.length && !existing.operationLogs?.length) {
+      existing.operationLogs = row.operationLogs
+    }
+  } else {
+    orders.unshift(row)
+  }
+}
+
 function ensureEcnCoverDemoWorkOrders(orders) {
-  const ecnNo = 'ECN-DEMO-EXECUTED'
-  const specs = [
+  // —— 待执行 ECN-DEMO-COVER：旧料仍有可处置单据，尚无新料工单 ——
+  const coverSpecs = [
     {
       id: 'wo-ecn-cover-impeller',
       code: 'WO-ECN-COVER-01',
       productName: '叶轮',
       materialCode: '010050003',
       status: '执行中',
-      planQty: 2,
-      scheduleQty: 2,
-      remark: `ECN ${ecnNo}：叶轮改用量后保留在制单据并更新数量`,
-    },
-    {
-      id: 'wo-ecn-cover-seal',
-      code: 'WO-ECN-COVER-02',
-      productName: '机械密封组件',
-      materialCode: '010050004',
-      status: '终止',
-      planQty: 3,
-      scheduleQty: 0,
-      supersededByEcnNo: ecnNo,
-      remark: `ECN ${ecnNo}：替换·旧单已终止`,
-    },
-    {
-      id: 'wo-ecn-cover-bolt',
-      code: 'WO-ECN-COVER-03',
-      productName: '地脚螺栓组',
-      materialCode: '010050006',
-      status: '终止',
-      planQty: 3,
-      supersededByEcnNo: ecnNo,
-      remark: `ECN ${ecnNo}：取消·旧单已终止`,
-    },
-    {
-      id: 'wo-ecn-cover-shaft',
-      code: 'WO-ECN-COVER-05',
-      productName: '泵轴',
-      materialCode: '010050005',
-      status: '终止',
-      planQty: 3,
-      supersededByEcnNo: ecnNo,
-      remark: `ECN ${ecnNo}：换料·旧料工单已终止`,
+      planQty: 1,
+      scheduleQty: 1,
+      sourceOrderNo: ECN_COVER_DEMO_SO,
+      remark: 'ECN-DEMO-COVER：叶轮改用量·执行中（默认可强制作废或暂不处理）',
     },
     {
       id: 'wo-ecn-cover-casing',
@@ -497,18 +520,112 @@ function ensureEcnCoverDemoWorkOrders(orders) {
       productName: '泵体（泵壳）',
       materialCode: '010050001',
       status: '待下发',
-      planQty: 2,
-      remark: `ECN ${ecnNo}：泵体改用量后更新待下发数量`,
+      planQty: 1,
+      sourceOrderNo: ECN_COVER_DEMO_SO,
+      remark: 'ECN-DEMO-COVER：泵体改用量·待下发（默认可更新数量）',
+    },
+    {
+      id: 'wo-ecn-cover-shaft',
+      code: 'WO-ECN-COVER-05',
+      productName: '泵轴',
+      materialCode: '010050005',
+      status: '待下发',
+      planQty: 1,
+      sourceOrderNo: ECN_COVER_DEMO_SO,
+      remark: 'ECN-DEMO-COVER：换料·旧泵轴待下发可作废',
+    },
+    {
+      id: 'wo-ecn-cover-seal',
+      code: 'WO-ECN-COVER-02',
+      productName: '机械密封组件',
+      materialCode: '010050004',
+      status: '执行中',
+      planQty: 1,
+      scheduleQty: 1,
+      sourceOrderNo: ECN_COVER_DEMO_SO,
+      remark: 'ECN-DEMO-COVER：替换父件·执行中可强制作废',
     },
     {
       id: 'wo-ecn-cover-seal-ring',
       code: 'WO-ECN-COVER-07',
       productName: '动环',
       materialCode: '010050004-A',
+      status: '待下发',
+      planQty: 1,
+      sourceOrderNo: ECN_COVER_DEMO_SO,
+      remark: 'ECN-DEMO-COVER：替换子树·下级动环待下发可作废',
+    },
+  ]
+
+  // —— 已执行 ECN-DEMO-EXECUTED：独立 SO，旧单已终止 + 新料已生成 ——
+  const executedSpecs = [
+    {
+      id: 'wo-ecn-exec-impeller',
+      code: 'WO-ECN-EXEC-01',
+      productName: '叶轮',
+      materialCode: '010050003',
+      status: '执行中',
+      planQty: 2,
+      scheduleQty: 2,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：叶轮改用量后保留在制单据并更新数量`,
+      relatedEcnNo: ECN_EXECUTED_DEMO_NO,
+    },
+    {
+      id: 'wo-ecn-exec-casing',
+      code: 'WO-ECN-EXEC-06',
+      productName: '泵体（泵壳）',
+      materialCode: '010050001',
+      status: '待下发',
+      planQty: 2,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：泵体改用量后更新待下发数量`,
+      relatedEcnNo: ECN_EXECUTED_DEMO_NO,
+    },
+    {
+      id: 'wo-ecn-exec-seal',
+      code: 'WO-ECN-EXEC-02',
+      productName: '机械密封组件',
+      materialCode: '010050004',
       status: '终止',
       planQty: 3,
-      supersededByEcnNo: ecnNo,
-      remark: `ECN ${ecnNo}：替换子树·旧下级已终止`,
+      scheduleQty: 0,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      supersededByEcnNo: ECN_EXECUTED_DEMO_NO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：替换·旧单已终止`,
+    },
+    {
+      id: 'wo-ecn-exec-bolt',
+      code: 'WO-ECN-EXEC-03',
+      productName: '地脚螺栓组',
+      materialCode: '010050006',
+      status: '终止',
+      planQty: 3,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      supersededByEcnNo: ECN_EXECUTED_DEMO_NO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：取消·旧单已终止`,
+    },
+    {
+      id: 'wo-ecn-exec-shaft',
+      code: 'WO-ECN-EXEC-05',
+      productName: '泵轴',
+      materialCode: '010050005',
+      status: '终止',
+      planQty: 3,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      supersededByEcnNo: ECN_EXECUTED_DEMO_NO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：换料·旧料工单已终止`,
+    },
+    {
+      id: 'wo-ecn-exec-seal-ring',
+      code: 'WO-ECN-EXEC-07',
+      productName: '动环',
+      materialCode: '010050004-A',
+      status: '终止',
+      planQty: 3,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      supersededByEcnNo: ECN_EXECUTED_DEMO_NO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：替换子树·旧下级已终止`,
     },
     {
       id: 'wo-ecn-demo-shaft-new',
@@ -517,8 +634,9 @@ function ensureEcnCoverDemoWorkOrders(orders) {
       materialCode: '010050015',
       status: '待下发',
       planQty: 1,
-      remark: `ECN ${ecnNo}：换料·新料工单`,
-      relatedEcnNo: ecnNo,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：换料·新料工单`,
+      relatedEcnNo: ECN_EXECUTED_DEMO_NO,
     },
     {
       id: 'wo-ecn-demo-seal-new',
@@ -527,8 +645,9 @@ function ensureEcnCoverDemoWorkOrders(orders) {
       materialCode: '010050024',
       status: '待下发',
       planQty: 1,
-      remark: `ECN ${ecnNo}：替换·新料工单`,
-      relatedEcnNo: ecnNo,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：替换·新料工单`,
+      relatedEcnNo: ECN_EXECUTED_DEMO_NO,
     },
     {
       id: 'wo-ecn-demo-sensor',
@@ -537,66 +656,28 @@ function ensureEcnCoverDemoWorkOrders(orders) {
       materialCode: '010050099',
       status: '待下发',
       planQty: 1,
-      remark: `ECN ${ecnNo}：新增物料工单`,
-      relatedEcnNo: ecnNo,
+      sourceOrderNo: ECN_EXECUTED_DEMO_SO,
+      remark: `${ECN_EXECUTED_DEMO_NO}：新增物料工单`,
+      relatedEcnNo: ECN_EXECUTED_DEMO_NO,
     },
   ]
-  specs.forEach((spec) => {
-    const row = {
-      orderCategory: '生产工单',
-      scheduleQty: 0,
-      actualQty: 0,
-      workCenter: '机加车间',
-      source: 'production-plan',
-      sourceOrderNo: '1-20260512-005',
-      createdAt: '2026-06-20',
-      processes: [],
-      scheduleBatches: [],
-      ...spec,
-    }
-    // ECN 演示：强制终止旧单写入操作日志
-    if (spec.supersededByEcnNo && !row.operationLogs?.length) {
-      const force = spec.id === 'wo-ecn-cover-seal' || spec.id === 'wo-ecn-cover-seal-ring'
-      row.operationLogs = [
-        {
-          id: `wol-demo-${spec.id}`,
-          action: force ? 'ECN强制终止' : 'ECN终止',
-          operator: '系统',
-          operatedAt: '2026-11-04 15:20:00',
-          remark: force
-            ? `ECN强制终止（${spec.supersededByEcnNo}）`
-            : `ECN变更终止（${spec.supersededByEcnNo}）`,
-        },
-      ]
-    }
-    if (spec.relatedEcnNo && !row.operationLogs?.length) {
-      row.operationLogs = [
-        {
-          id: `wol-demo-${spec.id}`,
-          action: 'ECN生成',
-          operator: '系统',
-          operatedAt: '2026-11-04 15:20:00',
-          remark: `由 ${spec.relatedEcnNo} 生成待下发工单`,
-        },
-      ]
-    }
-    const existing = orders.find((o) => o.id === spec.id)
-    if (existing) {
-      Object.assign(existing, row)
-      if (row.operationLogs?.length && !existing.operationLogs?.length) {
-        existing.operationLogs = row.operationLogs
-      }
-    } else orders.unshift(row)
-  })
+
+  ;[...coverSpecs, ...executedSpecs].forEach((spec) => upsertEcnDemoWorkOrder(orders, spec))
+
   // 去掉误加/冲突演示单：同料第二张、泵盖外协工单（与外协订单重复）
-  const dropIds = new Set(['wo-ecn-cover-impeller-pending', 'wo-ecn-cover-cover-wx'])
+  const dropIds = new Set([
+    'wo-ecn-cover-impeller-pending',
+    'wo-ecn-cover-cover-wx',
+    'wo-ecn-cover-bolt',
+  ])
   for (let i = orders.length - 1; i >= 0; i -= 1) {
     if (dropIds.has(orders[i].id)) orders.splice(i, 1)
   }
   // 生产计划树演示工单勿占用 ECN 变更组件编码（同 SO 下会表现为一料多单）
   const coverCodes = new Set([
-    ...specs.map((s) => s.materialCode).filter(Boolean),
+    ...coverSpecs.map((s) => s.materialCode).filter(Boolean),
     '010050002', // 泵盖：仅挂外协订单 WX-ECN-COVER-01，勿再挂外协工单
+    '010050006',
   ])
   orders.forEach((o) => {
     if (o.id !== 'wo-pp-tree-demo-1' && o.id !== 'wo-pp-tree-demo-2') return

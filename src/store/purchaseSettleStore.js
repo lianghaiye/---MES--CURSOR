@@ -1526,9 +1526,10 @@ export function registerPurchaseSettleInvoice(settleId, payload = {}) {
   const invoiceDate = String(payload.invoiceDate || '').trim()
   if (!invoiceDate) return { ok: false, message: '请填写开票日期' }
   const invoiceNo = String(payload.invoiceNo || '').trim()
-  if (!invoiceNo) return { ok: false, message: '请填写发票号码' }
-  const dup = settle.invoiceRecords.some((r) => r.invoiceNo === invoiceNo)
-  if (dup) return { ok: false, message: '该发票号码已登记' }
+  if (invoiceNo) {
+    const dup = settle.invoiceRecords.some((r) => r.invoiceNo === invoiceNo)
+    if (dup) return { ok: false, message: '该发票号码已登记' }
+  }
 
   let amount =
     payload.invoiceAmount != null && payload.invoiceAmount !== ''

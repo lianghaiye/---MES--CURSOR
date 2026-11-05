@@ -24,11 +24,16 @@ const ECN_WHOLE_PLAN_DEMO_SO = {
   WP01: '1-20261104-WP01',
   WP02: '1-20261104-WP02',
 }
-/** v15：ECN 演示计划置顶 + 新料暂不处理稍后排 */
-const DATA_VERSION = 16
+/** v17：ECN 待执行 / 已执行演示拆到不同销售订单，避免同 SO 工单互相污染 */
+const DATA_VERSION = 17
+
+/** 待执行细项处置演示 SO（ECN-DEMO-COVER） */
+const ECN_COVER_DEMO_SO = '1-20260512-005'
+/** 已执行全量处置演示 SO（ECN-DEMO-EXECUTED）——勿与 COVER 共用 */
+const ECN_EXECUTED_DEMO_SO = '1-20261105-ECN-DONE'
 
 /** 演示计划置顶，方便开发首屏查看 */
-const ECN_DEMO_PIN_ORDER_NOS = ['1-20260512-005', '1-20261104-ECN-SKIP']
+const ECN_DEMO_PIN_ORDER_NOS = [ECN_COVER_DEMO_SO, ECN_EXECUTED_DEMO_SO, '1-20261104-ECN-SKIP']
 
 function pinEcnDemoPlansToFront(plans = []) {
   const list = Array.isArray(plans) ? [...plans] : []
@@ -84,7 +89,9 @@ function normalizePlanStatuses(orders) {
       ensureShipAccessoryProduceDemoPlans(
         ensurePackageConvertDemoOnPlans(
           ensureEcnWholePlanDemoPlans(
-            ensureEcnSkipScheduleDemoPlan(ensureEcnCoverPlanMaterials(normalized)),
+            ensureEcnSkipScheduleDemoPlan(
+              ensureEcnExecutedDemoPlan(ensureEcnCoverPlanMaterials(normalized)),
+            ),
           ),
         ),
       ),
@@ -179,10 +186,10 @@ function ensureEcnWholePlanDemoPlans(plans) {
   return list
 }
 
-/** 让 ECN-DEMO-COVER 的修改/替换/取消能对上这张订单的计划物料 */
+/** 让 ECN-DEMO-COVER 的修改/替换/取消能对上这张订单的计划物料（待执行态，不含已执行痕迹） */
 function ensureEcnCoverPlanMaterials(plans) {
   const plan = (plans || []).find(
-    (p) => p.salesOrderNo === '1-20260512-005' || p.orderNo === '1-20260512-005',
+    (p) => p.salesOrderNo === ECN_COVER_DEMO_SO || p.orderNo === ECN_COVER_DEMO_SO,
   )
   const wi = plan?.workItems?.find(
     (w) => String(w.productName || '').includes('ISG50-160') || w.productCode === 'CP2610001',
@@ -227,8 +234,92 @@ function ensureEcnCoverPlanMaterials(plans) {
     plan.orderStatus = '部分下达'
     plan.tags = Array.from(new Set([...(plan.tags || []), '部分下达']))
   }
-  applyEcnExecutedFullTraceDemo(wi, qty)
   return plans
+}
+
+/**
+ * ECN-DEMO-EXECUTED：独立销售订单 + 计划，展示已执行后的物料痕迹（与 COVER 分离）
+ */
+function ensureEcnExecutedDemoPlan(plans = []) {
+  let list = Array.isArray(plans) ? [...plans] : []
+  const product =
+    mockProducts.find(
+      (p) => String(p.name || '').includes('立式管道泵') || p.code === 'CP2610001',
+    ) || mockProducts[0]
+  const so = ECN_EXECUTED_DEMO_SO
+  let plan = list.find(
+    (p) => p.salesOrderNo === so || p.orderNo === so || p.id === 'plan-ecn-executed-demo',
+  )
+  const qty = 1
+  if (!plan) {
+    plan = {
+      id: 'plan-ecn-executed-demo',
+      orderNo: so,
+      salesOrderNo: so,
+      planSource: PLAN_SOURCE.SALES_ORDER,
+      customerName: 'ECN已执行演示客户',
+      salesperson: '张工',
+      productQty: qty,
+      orderStatus: '部分下达',
+      urgency: '紧急',
+      orderDate: dayjs().format('YYYY-MM-DD'),
+      deliveryDate: dayjs().add(20, 'day').format('YYYY-MM-DD'),
+      tags: ['部分下达'],
+      planBatch: 1,
+      deductInventory: true,
+      remark: '演示：ECN 已执行全量处置后的计划物料痕迹',
+      workItems: [
+        {
+          id: 'plan-ecn-executed-demo-wi',
+          productId: product.id,
+          productCode: product.code,
+          productName: product.name,
+          status: '进行中',
+          planQty: qty,
+          orderQty: qty,
+          salesQty: qty,
+          materials: [],
+          planBatch: 1,
+          expanded: true,
+        },
+      ],
+    }
+    list.unshift(plan)
+  }
+  const wi = plan.workItems?.[0]
+  if (!wi) return list
+  if (!Array.isArray(wi.materials)) wi.materials = []
+  const baseCodes = [
+    { code: '010050001', name: '泵体（泵壳）', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050003', name: '叶轮', supplyType: '自制件', spec: 'ISG50-160' },
+    { code: '010050004', name: '机械密封组件', supplyType: '自制件', spec: 'φ25×180mm' },
+    { code: '010050004-A', name: '动环', supplyType: '自制件', spec: '' },
+    { code: '010050004-B', name: '静环', supplyType: '外购件', spec: '' },
+    { code: '010050002', name: '泵盖', supplyType: '外协件', spec: 'ISG50-160' },
+    { code: '010050005', name: '泵轴', supplyType: '自制件', spec: 'φ25×180mm' },
+    { code: '010050006', name: '地脚螺栓组', supplyType: '外购件', spec: 'M16' },
+  ]
+  const flat = []
+  flattenMaterials(wi.materials, flat)
+  const existing = new Set(flat.map((m) => m.code))
+  baseCodes.forEach((row) => {
+    if (existing.has(row.code)) return
+    wi.materials.push(
+      createPlanMaterial({
+        name: row.name,
+        code: row.code,
+        spec: row.spec,
+        supplyType: row.supplyType,
+        unitUsage: 1,
+        demandQty: qty,
+        planQty: qty,
+        joinPlan: '是',
+        status: '待下达',
+      }),
+    )
+  })
+  applyEcnExecutedFullTraceDemo(wi, qty)
+  return list
 }
 
 const ECN_EXECUTED_DEMO_NO = 'ECN-DEMO-EXECUTED'

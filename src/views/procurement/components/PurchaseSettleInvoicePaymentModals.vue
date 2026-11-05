@@ -47,12 +47,8 @@
           </a-form-item>
         </a-col>
         <a-col :span="8">
-          <a-form-item label="发票号码" required>
-            <a-input
-              v-model:value="invoiceForm.invoiceNo"
-              allow-clear
-              placeholder="请输入发票号码"
-            />
+          <a-form-item label="发票号码">
+            <a-input v-model:value="invoiceForm.invoiceNo" allow-clear placeholder="选填" />
           </a-form-item>
         </a-col>
         <a-col :span="8">

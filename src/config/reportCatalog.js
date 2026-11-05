@@ -55,9 +55,9 @@ export const REPORT_CATALOG = [
     group: 'sales',
     groupLabel: '销售报表',
     path: '/report/sales-order-cost',
-    question: '一笔订单花了多少料、多少人工？毛利如何？',
+    question: '一笔订单花了多少料、多少人工、多少外协？毛利如何？',
     timeFieldLabel: '审核通过日',
-    desc: '按审核通过日，汇总关联生产/总装工单的物料消耗与人工成本，对照销售含税金额看毛利。',
+    desc: '按审核通过日，汇总关联生产/总装工单的物料与人工成本，以及关联外协单含税费用，对照销售含税金额看毛利。',
   },
   {
     key: 'work-order-progress',
