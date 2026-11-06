@@ -110,6 +110,14 @@
             去领料
           </a-button>
         </div>
+        <a-alert
+          v-if="!filteredLines.length"
+          type="warning"
+          show-icon
+          class="empty-bom-tip"
+          message="当前行无物料明细（多半未关联 BOM）。请返回列表优先打开 KIT-DEMO-* 演示单，或选择有物料清单的生产计划。"
+          style="margin-bottom: 12px"
+        />
         <a-table
           :columns="shortageColumns"
           :data-source="filteredLines"
@@ -117,13 +125,24 @@
           row-key="id"
           size="middle"
           bordered
-          :scroll="{ x: 1280 }"
+          :scroll="{ x: 1380 }"
+          :row-class-name="lineRowClassName"
         >
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">
               <span class="level-no" :style="levelNoStyle(record.levelNo)">{{
                 record.levelNo || index + 1
               }}</span>
+            </template>
+            <template v-else-if="column.key === 'itemCode'">
+              <div :class="['mat-cell', record.isTreeChild && 'mat-cell--child']">
+                {{ record.itemCode || '—' }}
+              </div>
+            </template>
+            <template v-else-if="column.key === 'itemName'">
+              <div :class="['mat-cell', record.isTreeChild && 'mat-cell--child']">
+                {{ record.itemName || '—' }}
+              </div>
             </template>
             <template v-else-if="column.key === 'demandQty'">
               {{ formatQtyUnit(record.demandQty, record.unit) }}
@@ -148,6 +167,9 @@
             <template v-else-if="column.key === 'inTransitQty'">
               {{ formatQtyUnit(record.inTransitQty, record.unit) }}
             </template>
+            <template v-else-if="column.key === 'requisitionQty'">
+              {{ formatQtyUnit(record.requisitionQty || 0, record.unit) }}
+            </template>
             <template v-else-if="column.key === 'status'">
               <a-tag :color="record.statusColor">{{ record.statusLabel }}</a-tag>
             </template>
@@ -160,13 +182,18 @@
         </a-table>
         <div class="logic-box">
           <div>
-            缺料状态（缺口 = 需求 − 本单占用）：已齐套：缺口 ≤ 0；待到货：有缺口，且在途 ≥
-            缺口；部分缺口：有缺口，且 0 &lt; 在途 &lt; 缺口；严重缺料：有缺口，且在途 =
-            0；被高优先占用：他单占用 &gt; 0 且在途 = 0
+            缺料状态（缺口 = 需求 − 本单占用）：已齐套：缺口 ≤ 0；待到货：有缺口，且在途/在制 ≥
+            缺口；部分缺口：有缺口，且 0 &lt; 在途/在制 &lt; 缺口；严重缺料：有缺口，且在途/在制 =
+            0；被高优先占用：他单占用 &gt; 0 且在途/在制 = 0
           </div>
           <div>
+            在途/在制：外购取该物料未转单采购申请 +
+            未入库采购订单（库存单位）；自制/组装/外协取该物料待下发/执行中在制量。按物料编码汇总，非单笔采购单绑定。
+          </div>
+          <div>领料数量：关联工单领料/发料出库已出库量；已领料则自动释放该行手动占用。</div>
+          <div>
             占用口径：可用池 = 实物 − 手动锁定；无人手动时按「紧急度 → 计划日期 →
-            创建时间」自动预占。有手动占用后锁定优先保留再重算。
+            创建时间」自动预占。有手动占用后锁定优先保留再重算。外购/外协与自制件均可做占用明细。
           </div>
         </div>
       </section>
@@ -280,6 +307,7 @@ const shortageColumns = [
   { title: '本单占用', key: 'allocatedQty', width: 88, align: 'right' },
   { title: '他单占用', key: 'othersAllocatedQty', width: 88, align: 'right' },
   { title: '在途/在制', key: 'inTransitQty', width: 88, align: 'right' },
+  { title: '领料数量', key: 'requisitionQty', width: 88, align: 'right' },
   { title: '预计到位', dataIndex: 'etaText', key: 'etaText', width: 80 },
   { title: '状态', key: 'status', width: 110 },
   { title: '占用', key: 'allocAction', width: 88, fixed: 'right' },
@@ -297,6 +325,12 @@ function levelNoStyle(levelNo) {
     .filter(Boolean)
   const depth = Math.max(0, parts.length - 1)
   return { paddingLeft: `${depth * 12}px`, fontVariantNumeric: 'tabular-nums' }
+}
+
+function lineRowClassName(record) {
+  if (record?.isTreeParent) return 'line-row-parent'
+  if (record?.isTreeChild) return 'line-row-child'
+  return ''
 }
 
 function includesText(hay, needle) {
@@ -562,5 +596,26 @@ watch(
 .linkish {
   color: #1677ff;
   cursor: pointer;
+}
+
+.level-no {
+  font-variant-numeric: tabular-nums;
+}
+
+.mat-cell--child {
+  padding-left: 12px;
+  border-left: 2px solid #d3adf7;
+}
+
+:deep(.line-row-parent) > td {
+  background: #f9f0ff !important;
+}
+
+:deep(.line-row-child) > td {
+  background: #fcfaff !important;
+}
+
+:deep(.line-row-child) > td:first-child {
+  box-shadow: inset 3px 0 0 #b37feb;
 }
 </style>

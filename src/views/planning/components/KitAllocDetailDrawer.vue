@@ -29,6 +29,14 @@
         </div>
       </div>
 
+      <a-alert
+        v-if="showActions && !(Number(itemSummary.physicalQty) > 0)"
+        type="info"
+        show-icon
+        class="stock-tip"
+        message="实物库存为 0，「转入本单」不会出现（不是生产计划不支持占用）。请优先打开单号 KIT-DEMO-* 或物料 KIT-SHARE-CAST-01 体验手动占用。"
+      />
+
       <a-tabs v-model:activeKey="activeTab" class="drawer-tabs">
         <a-tab-pane key="alloc" tab="占用明细">
           <div v-if="showActions && allItemLocks.length" class="lock-list-box">
@@ -306,10 +314,10 @@ const flowColumns = [
   { title: '占用(自动/手动)', key: 'qty', width: 148 },
   { title: '缺口', dataIndex: 'gapQty', key: 'gapQty', width: 64, align: 'right' },
   {
-    title: '本单在途',
+    title: '在途/在制',
     dataIndex: 'inTransitQty',
     key: 'inTransitQty',
-    width: 80,
+    width: 88,
     align: 'right',
   },
   { title: '方式', key: 'method', width: 72 },
@@ -469,6 +477,10 @@ function confirmQtyModal() {
 </script>
 
 <style scoped lang="less">
+.stock-tip {
+  margin-bottom: 12px;
+}
+
 .summary-bar {
   display: flex;
   align-items: center;

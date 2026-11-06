@@ -254,7 +254,10 @@
             <a-radio-button :value="KIT_VIEW_MODE.ASSEMBLY_WORK_ORDER">按总装工单</a-radio-button>
             <a-radio-button :value="KIT_VIEW_MODE.PLAN">按生产计划</a-radio-button>
           </a-radio-group>
-          <span class="hint">点行下钻缺件明细。按生产计划时同计划单号/销售单号/客户合并展示。</span>
+          <span class="hint"
+            >点行下钻缺件明细。按生产计划时同计划单号/销售单号/客户合并展示。占用演示请优先
+            KIT-DEMO-*（共用阀体铸件有库存，可转入本单）。</span
+          >
         </div>
         <a-table
           :columns="kittingDisplayColumns"
@@ -271,7 +274,14 @@
               {{ (kittingPager.current - 1) * kittingPager.pageSize + index + 1 }}
             </template>
             <template v-else-if="column.key === 'docNo'">
-              {{ record.docNo || '—' }}
+              <a
+                v-if="isWorkOrderDocLink(record)"
+                class="doc-link"
+                @click.prevent.stop="openKitShortageDetail(record)"
+              >
+                {{ record.docNo }}
+              </a>
+              <span v-else>{{ record.docNo || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'salesOrderNo'">
               {{ record.salesOrderNo || '-' }}
@@ -352,6 +362,16 @@
           <template #bodyCell="{ column, record, index }">
             <template v-if="column.key === 'index'">
               {{ index + 1 }}
+            </template>
+            <template v-else-if="column.key === 'workOrderNo'">
+              <a
+                v-if="record.workOrderId && record.workOrderNo"
+                class="doc-link"
+                @click.prevent.stop="goPath('/production/work-orders')"
+              >
+                {{ record.workOrderNo }}
+              </a>
+              <span v-else>{{ record.workOrderNo || '—' }}</span>
             </template>
             <template v-else-if="column.key === 'processRate'">
               <div class="rate-cell">
@@ -612,6 +632,12 @@
               <template v-else-if="column.key === 'othersAllocatedQty'">
                 {{ formatQtyUnit(record.othersAllocatedQty || 0, record.unit) }}
               </template>
+              <template v-else-if="column.key === 'inTransitQty'">
+                {{ formatQtyUnit(record.inTransitQty, record.unit) }}
+              </template>
+              <template v-else-if="column.key === 'requisitionQty'">
+                {{ formatQtyUnit(record.requisitionQty || 0, record.unit) }}
+              </template>
               <template v-else-if="column.key === 'status'">
                 <a-tag :color="record.statusColor">{{ record.statusLabel }}</a-tag>
               </template>
@@ -619,9 +645,9 @@
           </a-table>
           <div class="logic-box">
             <div>
-              缺料状态（缺口 = 需求 − 本单占用）：已齐套：缺口 ≤ 0；待到货：有缺口，且在途 ≥
-              缺口；部分缺口：有缺口，且 0 &lt; 在途 &lt; 缺口；严重缺料：有缺口，且在途 =
-              0；被高优先占用：他单占用 &gt; 0 且在途 = 0
+              缺料状态（缺口 = 需求 − 本单占用）：已齐套：缺口 ≤ 0；待到货：有缺口，且在途/在制 ≥
+              缺口；部分缺口：有缺口，且 0 &lt; 在途/在制 &lt; 缺口；严重缺料：有缺口，且在途/在制 =
+              0；被高优先占用：他单占用 &gt; 0 且在途/在制 = 0
             </div>
             <div>
               占用口径：可用池 = 实物 − 手动锁定；无人手动时按「紧急度 → 计划日期 →
@@ -1053,6 +1079,13 @@ const shortageColumns = [
   { title: '本单占用', key: 'allocatedQty', width: 88, align: 'right' },
   { title: '他单占用', key: 'othersAllocatedQty', width: 88, align: 'right' },
   { title: '在途/在制', dataIndex: 'inTransitQty', key: 'inTransitQty', width: 88, align: 'right' },
+  {
+    title: '领料数量',
+    dataIndex: 'requisitionQty',
+    key: 'requisitionQty',
+    width: 88,
+    align: 'right',
+  },
   { title: '预计到位', dataIndex: 'etaText', key: 'etaText', width: 80 },
   { title: '状态', key: 'status', width: 110 },
 ]
@@ -1191,6 +1224,13 @@ function canRequisition(record) {
     record.docNo !== '待派工' &&
     record.docNo !== '—'
   )
+}
+
+/** 工单号蓝色可点，提示可下钻缺件 */
+function isWorkOrderDocLink(record) {
+  if (!isWorkOrderKitView(kitView.value)) return false
+  const no = String(record?.docNo || '').trim()
+  return Boolean(no && no !== '待派工' && no !== '—')
 }
 
 function goRequisition(record) {
@@ -1486,6 +1526,16 @@ onBeforeUnmount(() => {
   color: #1677ff;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.doc-link {
+  color: #1677ff;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.doc-link:hover {
+  text-decoration: underline;
 }
 
 .view-tabs-bar {

@@ -1,11 +1,12 @@
 /**
  * 齐套：同一物料被多张单据争用演示
  *
- * 物料 KIT-SHARE-CAST-01 实物 7：
- * - B 特急 需求5 → 占用5 已齐套
- * - C 紧急 需求4 → 占用2、在途1 → 部分缺口
- * - D 正常 需求5 → 占用0、在途6 → 待到货
- * - E 正常 需求7 → 占用0、在途3 → 部分缺口
+ * 物料 KIT-SHARE-CAST-01 实物 12：
+ * - B 特急 需求5 → 优先占用
+ * - C 紧急 需求4 → 部分占用 + 在途
+ * - D 正常 需求5 → 在途待到货
+ * - E 正常 需求7 → 部分缺口
+ * 列表置顶，单号 KIT-DEMO-*，验证占用明细请点这些行或物料 KIT-SHARE-CAST-01。
  */
 import dayjs from 'dayjs'
 import { stockState } from '@/store/stockStore'
@@ -15,7 +16,8 @@ export const KIT_MULTI_ALLOC = {
   itemCode: 'KIT-SHARE-CAST-01',
   itemName: '共用阀体铸件（多单占用演示）',
   warehouse: '原料仓',
-  physicalQty: 7,
+  /** 实物 12：保证多单争用后仍可点「转入本单」体验手动占用 */
+  physicalQty: 12,
   unit: '件',
 }
 

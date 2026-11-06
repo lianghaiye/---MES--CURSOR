@@ -15,6 +15,7 @@ import { applyCrossDemoStockToPlanMaterials } from '@/mock/crossModuleDemoSeed'
 import { ensurePackageConvertDemoOnPlans } from '@/mock/packageConvertPurchaseDemoSeed'
 import { ensureShipAccessoryProduceDemoPlans } from '@/mock/shipAccessoryProduceDemoSeed'
 import { ensureKitMultiAllocDemoPlans } from '@/mock/kitMultiAllocDemoSeed'
+import { ensureKitSupplyDemoEnrichment } from '@/mock/kitSupplyDemoEnrichSeed'
 import { PLAN_SOURCE } from '@/utils/planSource'
 import { MATERIAL_RELEASE_STATUS } from '@/constants/ecnPlanReschedule'
 import { flattenMaterials } from '@/utils/material'
@@ -84,13 +85,15 @@ function normalizePlanStatuses(orders) {
     return plan
   })
 
-  return pinEcnDemoPlansToFront(
-    ensureKitMultiAllocDemoPlans(
-      ensureShipAccessoryProduceDemoPlans(
-        ensurePackageConvertDemoOnPlans(
-          ensureEcnWholePlanDemoPlans(
-            ensureEcnSkipScheduleDemoPlan(
-              ensureEcnExecutedDemoPlan(ensureEcnCoverPlanMaterials(normalized)),
+  return ensureKitSupplyDemoEnrichment(
+    pinEcnDemoPlansToFront(
+      ensureKitMultiAllocDemoPlans(
+        ensureShipAccessoryProduceDemoPlans(
+          ensurePackageConvertDemoOnPlans(
+            ensureEcnWholePlanDemoPlans(
+              ensureEcnSkipScheduleDemoPlan(
+                ensureEcnExecutedDemoPlan(ensureEcnCoverPlanMaterials(normalized)),
+              ),
             ),
           ),
         ),

@@ -9,6 +9,7 @@ import { assemblyWorkOrderState } from '@/store/assemblyWorkOrderStore'
 import { materialRequisitionState } from '@/store/materialRequisitionStore'
 import { materialInfoState } from '@/store/materialInfoStore'
 import { productInfoState } from '@/store/productInfoStore'
+import { outboundState } from '@/store/outboundStore'
 import { calcGapQty } from '@/utils/material'
 import {
   applyKitPriorityAllocationToRows,
@@ -23,6 +24,8 @@ import { hydratePurchaseSuppliers } from '@/utils/purchaseSuppliers'
 import { listMobileTasksForWorkOrder } from '@/utils/workOrderStatus'
 import { normalizeOutsourceMode, OUTSOURCE_MODE } from '@/utils/outsourcingMode'
 import { formatQty } from '@/utils/numberFormat'
+import { releaseKitLocksForTarget, listActiveKitLocks } from '@/store/kitStockAllocationStore'
+import { MATERIAL_DEDUCT_STATUS } from '@/mock/materialRequisitionRecords'
 
 export const KIT_SUPPLY_TABS = [
   { key: 'kitting', label: '齐套进度' },
@@ -157,7 +160,103 @@ function resolveEtaText(m, gap, inTransit) {
   return '—'
 }
 
-function pushPartLine(lines, plan, wi, m, levelNo) {
+/**
+ * 领料出库数量索引：`${woKey}::${itemCode}` → 库存单位数量
+ * 来源：领料/发料出库已出库行 + 工单完工扣减成功行
+ */
+function buildRequisitionIssuedIndex() {
+  /** @type {Map<string, number>} */
+  const map = new Map()
+  const add = (woKeys, itemCode, qty) => {
+    const code = String(itemCode || '').trim()
+    const q = num(qty)
+    if (!code || q <= 0) return
+    ;(woKeys || []).forEach((woKey) => {
+      const k = String(woKey || '').trim()
+      if (!k) return
+      const key = `${k}::${code}`
+      map.set(key, Math.round((num(map.get(key)) + q) * 1000) / 1000)
+    })
+  }
+
+  ;(outboundState.orders || []).forEach((order) => {
+    if (order.status !== '已出库') return
+    if (order.outboundType !== '领料出库' && order.outboundType !== '发料出库') return
+    ;(order.lineItems || []).forEach((line) => {
+      const code = line.itemCode || line.materialCode || line.inventoryCode || ''
+      const qty = num(line.shipQty ?? line.actualQty ?? line.shippedQty ?? line.demandMeters)
+      const keys = [
+        line.workOrderNo,
+        line.workOrderId,
+        line.sourceDocNo,
+        order.sourceOrderNo,
+        order.workOrderNo,
+        order.workOrderId,
+      ]
+      ;(line.sourceWorkOrders || []).forEach((s) => {
+        keys.push(s?.workOrderCode, s?.workOrderId, s?.code, s?.id)
+      })
+      add(keys, code, qty)
+    })
+  })
+  ;(materialRequisitionState.records || []).forEach((rec) => {
+    const st = rec.status
+    if (st !== MATERIAL_DEDUCT_STATUS.SUCCESS && st !== MATERIAL_DEDUCT_STATUS.PARTIAL) return
+    const woKeys = [rec.workOrderNo, rec.workOrderId, rec.sourceWorkOrderNo]
+    ;(rec.lines || []).forEach((line) => {
+      const lineSt = line.status || st
+      if (lineSt !== MATERIAL_DEDUCT_STATUS.SUCCESS && lineSt !== MATERIAL_DEDUCT_STATUS.PARTIAL) {
+        return
+      }
+      const code = line.itemCode || line.materialCode || line.code || line.inventoryCode || ''
+      add(woKeys, code, num(line.actualQty))
+    })
+  })
+  return map
+}
+
+function lookupRequisitionIssuedQty(index, itemCode, woKeys = []) {
+  const code = String(itemCode || '').trim()
+  if (!code || !index) return 0
+  let total = 0
+  const seen = new Set()
+  ;(woKeys || []).forEach((woKey) => {
+    const k = String(woKey || '').trim()
+    if (!k || seen.has(k)) return
+    seen.add(k)
+    total += num(index.get(`${k}::${code}`))
+  })
+  return Math.round(total * 1000) / 1000
+}
+
+/** 收集与计划工作项相关的工单号/id，用于计划维领料数量汇总 */
+function collectRelatedWorkOrderKeys(plan, wi) {
+  const keys = []
+  const so = String(plan?.salesOrderNo || plan?.orderNo || '').trim()
+  const pushWo = (wo) => {
+    if (wo?.code) keys.push(wo.code)
+    if (wo?.orderNo) keys.push(wo.orderNo)
+    if (wo?.workOrderNo) keys.push(wo.workOrderNo)
+    if (wo?.id) keys.push(wo.id)
+  }
+  const matchWo = (wo) => {
+    const src = String(wo?.sourceOrderNo || wo?.salesOrderNo || '').trim()
+    if (!so || !src) return false
+    if (src !== so && !src.includes(so) && !so.includes(src)) return false
+    if (!wi) return true
+    const hit = findWorkItemForWorkOrder(plan, wo)
+    return hit && hit.id === wi.id
+  }
+  ;(workOrderState.orders || []).forEach((wo) => {
+    if (matchWo(wo)) pushWo(wo)
+  })
+  ;(assemblyWorkOrderState.orders || []).forEach((wo) => {
+    if (matchWo(wo)) pushWo(wo)
+  })
+  return keys
+}
+
+function pushPartLine(lines, plan, wi, m, levelNo, meta = {}) {
   const demand = num(m.demandQty ?? m.planQty)
   if (demand <= 0) return
   const physical = num(m.stockQty ?? m.onHandQty)
@@ -170,6 +269,19 @@ function pushPartLine(lines, plan, wi, m, levelNo) {
   const st = shortageStatus(gap, inTransit)
   const spec = m.spec || m.specModel || ''
   const material = m.material || ''
+  const itemCode = m.code || m.itemCode || m.materialCode || ''
+  const issuedIndex = meta.issuedIndex
+  const woKeys = meta.woKeys || []
+  const requisitionQty =
+    meta.requisitionQty != null
+      ? num(meta.requisitionQty)
+      : lookupRequisitionIssuedQty(issuedIndex, itemCode, woKeys)
+  const hasChildren = Boolean(m.children?.length)
+  const depthParts = String(levelNo || '')
+    .split('.')
+    .filter(Boolean)
+  const isTreeChild = depthParts.length >= 2
+  const isTreeParent = hasChildren && !isTreeChild
   lines.push({
     id: `${plan.id}-${wi.id}-${m.id || m.code}`,
     planId: plan.id,
@@ -180,7 +292,7 @@ function pushPartLine(lines, plan, wi, m, levelNo) {
     workItemId: wi.id,
     productName: wi.productName || plan.productName || '',
     productCode: wi.productCode || '',
-    itemCode: m.code || m.itemCode || m.materialCode || '',
+    itemCode,
     itemName: m.name || m.itemName || m.materialName || '',
     specModel: spec,
     material,
@@ -194,6 +306,7 @@ function pushPartLine(lines, plan, wi, m, levelNo) {
     gapQty: gap,
     inTransitQty: inTransit,
     inTransitText: m.inTransitText || '',
+    requisitionQty,
     etaText: resolveEtaText(m, gap, inTransit),
     tone: shortageTone(gap, inTransit),
     statusKey: st.key,
@@ -202,35 +315,101 @@ function pushPartLine(lines, plan, wi, m, levelNo) {
     unit: m.unit || m.inventoryUnit || '',
     sourceDocNo: m.sourceDocNo || m.poNo || m.prNo || '',
     levelNo: levelNo || '',
+    isTreeParent: Boolean(meta.forceTreeParent ?? isTreeParent),
+    isTreeChild: Boolean(meta.forceTreeChild ?? isTreeChild),
+    hasChildren,
   })
 }
 
-function collectWorkItemPartLines(plan, wi) {
+/**
+ * @param {'full'|'topChildren'} depthMode full=计划全量 BOM；topChildren=工单仅顶级下一级
+ */
+function collectWorkItemPartLines(plan, wi, options = {}) {
   const lines = []
   if (!plan || !wi) return lines
+  const depthMode = options.depthMode || 'full'
   const tree = buildDisplayMaterialTree(wi, plan)
+  const issuedIndex = options.issuedIndex || null
+  const woKeys =
+    options.woKeys ||
+    (options.workOrderId || options.workOrderNo
+      ? [options.workOrderId, options.workOrderNo].filter(Boolean)
+      : collectRelatedWorkOrderKeys(plan, wi))
+  const lineMeta = { issuedIndex, woKeys }
 
-  function walk(nodes, parentLevelNo = '') {
+  function walkFull(nodes, parentLevelNo = '') {
     if (!nodes?.length) return
     nodes.forEach((m, idx) => {
       const isRootTop = String(m.id || '').startsWith('top-')
       const levelNo = isRootTop ? '0' : nextBomLevelNo(parentLevelNo, idx)
       const skipRootRow = isRootTop && m.children?.length
-      if (!skipRootRow) pushPartLine(lines, plan, wi, m, levelNo)
-      if (m.children?.length) walk(m.children, isRootTop ? '0' : levelNo)
+      if (!skipRootRow) {
+        pushPartLine(lines, plan, wi, m, levelNo, {
+          ...lineMeta,
+          forceTreeParent: Boolean(m.children?.length),
+          forceTreeChild: String(levelNo).includes('.'),
+        })
+      }
+      if (m.children?.length) walkFull(m.children, isRootTop ? '0' : levelNo)
     })
   }
 
-  walk(Array.isArray(tree) ? tree : tree ? [tree] : [])
+  function walkTopChildren(nodes) {
+    if (!nodes?.length) return
+    nodes.forEach((m) => {
+      const isRootTop = String(m.id || '').startsWith('top-')
+      if (isRootTop) {
+        ;(m.children || []).forEach((child, cidx) => {
+          const levelNo = nextBomLevelNo('0', cidx)
+          pushPartLine(lines, plan, wi, child, levelNo, {
+            ...lineMeta,
+            forceTreeParent: false,
+            forceTreeChild: false,
+          })
+        })
+        return
+      }
+      // 无虚拟顶级时：只取第一层
+      const levelNo = nextBomLevelNo('0', lines.length)
+      pushPartLine(lines, plan, wi, m, levelNo, {
+        ...lineMeta,
+        forceTreeParent: false,
+        forceTreeChild: false,
+      })
+    })
+  }
+
+  const roots = Array.isArray(tree) ? tree : tree ? [tree] : []
+  if (depthMode === 'topChildren') walkTopChildren(roots)
+  else walkFull(roots)
   return lines
 }
 
-function collectPlanPartLines(plan) {
+function collectPlanPartLines(plan, options = {}) {
   const lines = []
   ;(plan?.workItems || []).forEach((wi) => {
-    lines.push(...collectWorkItemPartLines(plan, wi))
+    lines.push(...collectWorkItemPartLines(plan, wi, { ...options, depthMode: 'full' }))
   })
   return lines
+}
+
+/** 已领料的齐套行：自动释放对应手动占用（有锁才写审计） */
+function releaseManualLocksForIssuedLines(kittingRows = []) {
+  const active = listActiveKitLocks()
+  if (!active.length) return
+  ;(kittingRows || []).forEach((row) => {
+    ;(row.allLines || []).forEach((line) => {
+      if (!line?.id || !line.itemCode) return
+      if (num(line.requisitionQty) <= 0) return
+      const hasLock = active.some(
+        (l) => l.itemCode === line.itemCode && l.targetKey === line.id && l.status === 'active',
+      )
+      if (!hasLock) return
+      releaseKitLocksForTarget(line.itemCode, line.id, {
+        reason: '工单已领料，自动释放手动占用',
+      })
+    })
+  })
 }
 
 function summarizeKitGroup({
@@ -312,6 +491,7 @@ function resolvePlanSalesOrderNo(plan) {
 
 function buildKittingByPlan(plans) {
   const rows = []
+  const issuedIndex = buildRequisitionIssuedIndex()
   plans.forEach((plan) => {
     const planNo = plan.orderNo || plan.id
     const salesOrderNo = resolvePlanSalesOrderNo(plan)
@@ -337,7 +517,11 @@ function buildKittingByPlan(plans) {
       return
     }
     workItems.forEach((wi) => {
-      const lines = collectWorkItemPartLines(plan, wi)
+      // 计划维：全量物料清单（含外购/外协），层级完整
+      const lines = collectWorkItemPartLines(plan, wi, {
+        depthMode: 'full',
+        issuedIndex,
+      })
       const qty = num(wi.planQty ?? wi.orderQty ?? wi.salesQty)
       const unit = resolveWorkItemUnit(wi)
       const urgencyMeta = resolvePlanRowUrgencyMeta(plan)
@@ -440,13 +624,24 @@ function buildKittingByWorkOrder(plans, source = 'production') {
   const readyStatusLabel = isAssembly ? '可装配' : '可生产'
   const rows = []
   const linkedWiKeys = new Set()
+  const issuedIndex = buildRequisitionIssuedIndex()
 
   woList.forEach((wo) => {
     const woNo = resolveWorkOrderNo(wo)
     if (!woNo) return
     const plan = findPlanForWorkOrder(plans, wo)
     const wi = plan ? findWorkItemForWorkOrder(plan, wo) : null
-    const lines = plan && wi ? collectWorkItemPartLines(plan, wi) : []
+    // 工单维：仅顶级物料下一级（含外购/外协），不展开更深 BOM
+    const lines =
+      plan && wi
+        ? collectWorkItemPartLines(plan, wi, {
+            depthMode: 'topChildren',
+            issuedIndex,
+            workOrderId: wo.id,
+            workOrderNo: woNo,
+            woKeys: [wo.id, woNo, wo.code, wo.orderNo, wo.workOrderNo].filter(Boolean),
+          })
+        : []
     if (plan && wi) linkedWiKeys.add(`${plan.id}::${wi.id}`)
     const qty = num(wo.scheduleQty ?? wo.planQty ?? wi?.planQty ?? wi?.orderQty ?? wi?.salesQty)
     const unit = resolveWorkItemUnit(wi || { unit: wo.unit })
@@ -485,7 +680,10 @@ function buildKittingByWorkOrder(plans, source = 'production') {
   plans.forEach((plan) => {
     ;(plan.workItems || []).forEach((wi) => {
       if (linkedWiKeys.has(`${plan.id}::${wi.id}`)) return
-      const lines = collectWorkItemPartLines(plan, wi)
+      const lines = collectWorkItemPartLines(plan, wi, {
+        depthMode: 'topChildren',
+        issuedIndex,
+      })
       const qty = num(wi.planQty ?? wi.orderQty ?? wi.salesQty)
       const unit = resolveWorkItemUnit(wi)
       rows.push(
@@ -950,6 +1148,8 @@ export function buildKitSupplyDashboard(filters = {}) {
   } else {
     kittingAll = buildKittingByPlan(plans)
   }
+  // 已领料则先释放对应手动占用，再做优先级分摊
+  releaseManualLocksForIssuedLines(kittingAll)
   // 全量行上做优先级占用，再筛选（避免过滤后重分摊失真）
   const { snapshot: kitAllocSnapshot } = applyKitPriorityAllocationToRows(kittingAll)
   // 列表展示与占用分摊同一优先级：紧急度高 → 计划日期早 → 创建时间早 → 单号
