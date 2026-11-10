@@ -16,6 +16,7 @@
             <a-button type="primary" size="small" @click="onApprove">审核通过</a-button>
             <a-button danger size="small" @click="onReject">审核驳回</a-button>
           </template>
+          <a-button v-if="record" size="small" @click="openPrint">打印</a-button>
           <a-button size="small" @click="goBack">返回列表</a-button>
         </a-space>
       </div>
@@ -179,6 +180,8 @@
         </template>
       </div>
     </template>
+
+    <MaterialRequisitionPrintModal v-model:open="printModalOpen" :record="record" />
   </div>
 </template>
 
@@ -211,10 +214,12 @@ import {
 } from '@/utils/outboundIssueLines'
 import { formatQty } from '@/utils/numberFormat'
 import MaterialRequisitionBasicInfoSection from './components/MaterialRequisitionBasicInfoSection.vue'
+import MaterialRequisitionPrintModal from './components/MaterialRequisitionPrintModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const activeTab = ref('basic')
+const printModalOpen = ref(false)
 
 const record = computed(() => getMobileMaterialReqById(String(route.params.id || '')))
 
@@ -325,6 +330,14 @@ onMounted(() => {
 
 function goBack() {
   router.push('/production/material-requisition')
+}
+
+function openPrint() {
+  if (!record.value) {
+    message.warning('申请单不存在，无法打印')
+    return
+  }
+  printModalOpen.value = true
 }
 
 function goOutbound(link) {

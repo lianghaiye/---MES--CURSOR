@@ -89,6 +89,13 @@
   border-right: none;
 }
 
+/* 跨后两列：如「申请时间」值区约占三个小值格宽度 */
+.purchase-order-print-preview-page .meta-item-span-2,
+.purchase-order-print-iframe-body .meta-item-span-2 {
+  grid-column: span 2;
+  border-right: none;
+}
+
 .purchase-order-print-preview-page .meta-label,
 .purchase-order-print-iframe-body .meta-label {
   flex: 0 0 88px;

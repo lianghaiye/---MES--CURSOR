@@ -81,6 +81,10 @@
     <div class="toolbar-row">
       <a-space wrap :size="8">
         <a-button type="primary" size="small" @click="goCreate">申请领料</a-button>
+        <a-button size="small" @click="openPrintModal">
+          <PrinterOutlined />
+          打印领料单
+        </a-button>
         <a-button size="small" @click="openExportModal">导出</a-button>
       </a-space>
       <a-space :size="4" class="toolbar-icons">
@@ -156,6 +160,7 @@
           <template v-else-if="column.key === 'action'">
             <a-space :size="4">
               <a-button type="link" size="small" @click="goDetail(record)">详情</a-button>
+              <a-button type="link" size="small" @click="openPrintOne(record)">打印</a-button>
               <template v-if="record.auditStatus === MATERIAL_REQ_AUDIT.PENDING">
                 <a-button type="link" size="small" @click="onApprove(record)">通过</a-button>
                 <a-button type="link" size="small" danger @click="onReject(record)">驳回</a-button>
@@ -187,6 +192,12 @@
       :selected-count="selectedExportRowCount"
       @export="doExport"
     />
+
+    <MaterialRequisitionPrintModal
+      v-model:open="printModalOpen"
+      :record="printRecord"
+      :records="printRecords"
+    />
   </div>
 </template>
 
@@ -198,7 +209,7 @@ export default { name: 'MaterialRequisitionManagementView' }
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { ReloadOutlined } from '@ant-design/icons-vue'
+import { PrinterOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import {
   listMobileMaterialReqs,
   refreshMobileMaterialReqs,
@@ -212,6 +223,7 @@ import {
   isMaterialOutboundSkipApproval,
 } from '@/store/mobileMaterialReqStore'
 import ExportExcelModal from '@/components/ExportExcelModal.vue'
+import MaterialRequisitionPrintModal from '@/views/production/components/MaterialRequisitionPrintModal.vue'
 import { useListExport } from '@/composables/useListExport'
 import {
   flattenMaterialRequisitionRows,
@@ -272,8 +284,12 @@ const columns = [
   { title: '申请人', dataIndex: 'applicant', key: 'applicant', width: 90 },
   { title: '申请时间', dataIndex: 'createdAt', key: 'createdAt', width: 170 },
   { title: '数量', key: 'qty', width: 110 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' },
+  { title: '操作', key: 'action', width: 200, fixed: 'right' },
 ]
+
+const printModalOpen = ref(false)
+const printRecord = ref(null)
+const printRecords = ref([])
 
 const allList = computed(() => listMobileMaterialReqs())
 
@@ -395,6 +411,32 @@ function goCreate() {
 
 function goDetail(record) {
   router.push(`/production/material-requisition/${record.id}`)
+}
+
+function openPrintOne(record) {
+  if (!record) return
+  printRecord.value = record
+  printRecords.value = []
+  printModalOpen.value = true
+}
+
+function openPrintModal() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先选择要打印的领料申请')
+    return
+  }
+  const targets = filteredList.value.filter((r) => selectedRowKeys.value.includes(r.id))
+  if (!targets.length) {
+    message.warning('未找到可打印的领料申请')
+    return
+  }
+  if (targets.length === 1) {
+    openPrintOne(targets[0])
+    return
+  }
+  printRecord.value = null
+  printRecords.value = targets
+  printModalOpen.value = true
 }
 
 function goOutbound(linkOrRecord) {

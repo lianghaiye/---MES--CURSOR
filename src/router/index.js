@@ -129,6 +129,12 @@ const routes = [
     meta: { title: '出库单预览', standalone: true },
   },
   {
+    path: '/production/material-requisition/preview',
+    name: 'production-material-requisition-preview',
+    component: () => import('@/views/production/MaterialRequisitionPrintPreviewView.vue'),
+    meta: { title: '领料单预览', standalone: true },
+  },
+  {
     path: '/inventory/inbound/preview',
     name: 'inventory-inbound-preview',
     component: () => import('@/views/inventory/InboundOrderPrintPreviewView.vue'),
