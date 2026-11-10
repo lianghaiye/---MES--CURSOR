@@ -26,6 +26,7 @@ import { PENDING_OUTBOUND_STATUSES } from '@/utils/pendingOutboundLines'
 import { STOCKTAKE_STATUS, normalizeStocktakeStatus } from '@/mock/stocktakeOptions'
 import { TRANSFER_STATUS } from '@/mock/transferOptions'
 import { ECN_STATUS } from '@/constants/ecn'
+import { mobileMaterialReqState, MATERIAL_REQ_AUDIT } from '@/store/mobileMaterialReqStore'
 
 const PENDING_DISPATCH = '待下发'
 const PENDING_APPROVE = '待审核'
@@ -35,6 +36,7 @@ const WORK_ORDER_BADGE_PATHS = [
   '/production/assembly-work-orders',
   '/production/disassembly-work-orders',
   '/production/qc-work-orders',
+  '/production/material-requisition',
 ]
 
 const ORDER_APPROVE_BADGE_PATHS = [
@@ -156,6 +158,16 @@ function countEcnPendingReview() {
     .length
 }
 
+/** 领料申请「待审核」数量 */
+function countMaterialReqPendingApprove() {
+  return (mobileMaterialReqState.items || []).filter((row) => {
+    const status =
+      row?.auditStatus ||
+      (row?.outboundId ? MATERIAL_REQ_AUDIT.APPROVED : MATERIAL_REQ_AUDIT.PENDING)
+    return status === MATERIAL_REQ_AUDIT.PENDING
+  }).length
+}
+
 export function countPendingByPath(path) {
   switch (path) {
     case '/production/work-orders':
@@ -166,6 +178,8 @@ export function countPendingByPath(path) {
       return disassemblyWorkOrderState.orders.filter((o) => o.status === PENDING_DISPATCH).length
     case '/production/qc-work-orders':
       return qcWorkOrderState.orders.filter((o) => o.status === PENDING_DISPATCH).length
+    case '/production/material-requisition':
+      return countMaterialReqPendingApprove()
     case '/sales/orders':
       return countSalesPendingApprove()
     case '/sales/order-changes':
@@ -200,7 +214,7 @@ export function countPendingByPath(path) {
   }
 }
 
-/** 侧栏待办数字：工单待下发、订单待审核、出入库/盘点/调拨/质检/ECN 待办 */
+/** 侧栏待办数字：工单待下发、领料待审核、订单待审核、出入库/盘点/调拨/质检/ECN 待办 */
 export function useWorkOrderMenuBadges() {
   const badges = computed(() => {
     // 显式触达 store，保证单据状态变更后角标刷新
@@ -215,6 +229,7 @@ export function useWorkOrderMenuBadges() {
     void assemblyWorkOrderState.orders
     void disassemblyWorkOrderState.orders
     void qcWorkOrderState.orders
+    void mobileMaterialReqState.items
     void salesOrderState.orders
     void salesContractState.contracts
     void salesContractChangeState.changes
