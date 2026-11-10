@@ -25,14 +25,18 @@ function getProcessIdByName(name) {
   return proc?.id || `proc-unknown-${name}`
 }
 
-function cell(processId, processFileId = '') {
-  return processFileId ? { processId, processFileId } : { processId }
+function cell(processId, processFileId = '', qcOverride = '') {
+  const row = { processId }
+  if (processFileId) row.processFileId = processFileId
+  if (qcOverride) row.qcOverride = qcOverride
+  return row
 }
 
 function buildSerialDemoGrid() {
   const p = getProcessIdByName
   const pairs = [
     [1, 1, p('下料'), 'pdoc-004'],
+    // 粗车主数据已配质检 → 继承工序（相对并行演示路线「本路线不检」）
     [2, 1, p('粗车')],
     [3, 1, p('钻孔')],
     [4, 1, p('铣削')],
@@ -42,8 +46,8 @@ function buildSerialDemoGrid() {
   const maxStep = 6
   const maxRow = 1
   const grid = createEmptyGrid(maxStep, maxRow)
-  pairs.forEach(([step, row, processId, fileId]) => {
-    grid[step - 1][row - 1] = cell(processId, fileId)
+  pairs.forEach(([step, row, processId, fileId, qcOverride]) => {
+    grid[step - 1][row - 1] = cell(processId, fileId, qcOverride)
   })
   return grid
 }
@@ -66,7 +70,8 @@ function buildSerialDemoRoute() {
     status: '使用中',
     applyScope: '全部产品',
     productDisplay: '',
-    remark: '纯串行：下料→粗车→钻孔→铣削→质检→入库；下发页「步骤」列为 1～6',
+    remark:
+      '纯串行：下料→粗车→钻孔→铣削→质检→入库；粗车继承工序质检。对照并行演示路线粗车「本路线不检」',
     grid,
     stepPolicies,
     creator: '张工艺',

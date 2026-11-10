@@ -194,6 +194,23 @@
                   <template v-else>—</template>
                 </span>
               </div>
+              <div v-if="selectedMeta.masterHasQc" class="info-row info-row--qc-override">
+                <span class="k">本路线质检：</span>
+                <span class="v">
+                  <a-select
+                    v-if="!readonly"
+                    :value="selectedMeta.qcOverride"
+                    size="small"
+                    style="width: 100%; max-width: 200px"
+                    :options="routeQcOverrideOpts"
+                    @change="onQcOverrideChange"
+                  />
+                  <template v-else>{{
+                    formatRouteQcOverrideLabel(selectedMeta.qcOverride)
+                  }}</template>
+                  <div class="qc-override-hint">{{ selectedQcOverrideHint }}</div>
+                </span>
+              </div>
               <div class="info-row">
                 <span class="k">所属步骤：</span>
                 <span class="v">{{ selectedStepPosText }}</span>
@@ -286,6 +303,11 @@ import {
   countProcessesInStep,
   normalizeCompletionMode,
   formatCompletionModeLabel,
+  normalizeRouteQcOverride,
+  formatRouteQcOverrideLabel,
+  ROUTE_QC_OVERRIDE_OPTIONS,
+  ROUTE_QC_INHERIT,
+  ROUTE_QC_OFF,
 } from '@/utils/processRouteGrid'
 
 const props = defineProps({
@@ -377,6 +399,16 @@ const selectedProcessFileName = computed(() => {
   return getProcessDocById(id)?.name || docOpts.value.find((d) => d.value === id)?.label || '—'
 })
 
+const routeQcOverrideOpts = ROUTE_QC_OVERRIDE_OPTIONS
+
+const selectedQcOverrideHint = computed(() => {
+  const m = selectedMeta.value
+  if (!m?.masterHasQc) return ''
+  const mode = normalizeRouteQcOverride(m.qcOverride)
+  if (mode === ROUTE_QC_OFF) return '本路线不生成该工序质检任务'
+  return '沿用工序主数据的质检配置'
+})
+
 const docDetailOpen = ref(false)
 const docDetail = ref(null)
 
@@ -460,11 +492,19 @@ function placeProcess(step, row, processId) {
   }
   const proc = getProcessById(processId)
   if (!localGrid.value[step]) localGrid.value[step] = []
-  localGrid.value[step][row] = {
+  const masterHasQc = Boolean(
+    proc?.operations?.opQc ||
+    (Array.isArray(proc?.qcConfigs) && proc.qcConfigs.some((c) => c?.enabled !== false)),
+  )
+  const prevOverride = normalizeRouteQcOverride(localGrid.value[step][row]?.qcOverride)
+  const next = {
     processId,
     processName: proc?.name,
     processFileId: localGrid.value[step][row]?.processFileId || '',
   }
+  // 仅工序已配质检时保留「本路线不检」；否则清掉覆盖
+  if (masterHasQc && prevOverride === ROUTE_QC_OFF) next.qcOverride = ROUTE_QC_OFF
+  localGrid.value[step][row] = next
   emitGrid()
   normalizePoliciesForSparseSteps()
   emit('update:selectedStep', step)
@@ -621,6 +661,21 @@ function onDocChange(docId) {
   const cell = localGrid.value[step]?.[row]
   if (!cell) return
   cell.processFileId = docId || ''
+  emitGrid()
+}
+
+function onQcOverrideChange(value) {
+  if (props.readonly) return
+  const step = props.selectedStep
+  const row = props.selectedRow
+  const cell = localGrid.value[step]?.[row]
+  if (!cell) return
+  const next = normalizeRouteQcOverride(value)
+  if (next === ROUTE_QC_INHERIT) {
+    delete cell.qcOverride
+  } else {
+    cell.qcOverride = next
+  }
   emitGrid()
 }
 
@@ -1009,6 +1064,13 @@ function startResize(e) {
 
 .config-tag {
   margin-bottom: 4px;
+}
+
+.qc-override-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(0, 0, 0, 0.45);
 }
 
 .file-form {

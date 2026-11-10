@@ -59,7 +59,7 @@ const COLLABORATIVE_DURATION_PROCESSES = new Set(['装配', '热处理', '整机
 export function createProcessConfigSeed() {
   const defs = [
     ['机械', '下料', { opStart: true, opFinish: true, opFeeding: true }, ['张三', '李四']],
-    ['机械', '粗车', { opStart: true, opFinish: true }, ['张三']],
+    ['机械', '粗车', { opStart: true, opFinish: true, opQc: true }, ['张三']],
     ['机械', '精车', { opStart: true, opFinish: true }],
     ['机械', '钻孔', { opStart: true, opFinish: true }],
     ['机械', '铣削', { opStart: true, opFinish: true }],

@@ -5,8 +5,21 @@ import { ensureSerialRouteDemo } from '@/mock/serialRouteDispatchDemoSeed'
 import { ensureParallelRouteDemo } from '@/mock/parallelRouteDispatchDemoSeed'
 import { processConfigState } from '@/store/processConfigStore'
 import { normalizeGrid, syncStepPolicies, validateProcessRouteGrid } from '@/utils/processRouteGrid'
+import { defaultQcConfigsFromOperations } from '@/utils/qcProcessConfig'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 import { getUser } from '@/utils/auth'
+
+/** 演示：保证「粗车」已配质检，路线侧可出现「本路线质检」覆盖项 */
+function ensureRoughTurningHasQc() {
+  const proc = processConfigState.processes.find((p) => p.name === '粗车')
+  if (!proc) return
+  const hasQc =
+    Boolean(proc.operations?.opQc) ||
+    (Array.isArray(proc.qcConfigs) && proc.qcConfigs.some((c) => c?.enabled !== false))
+  if (hasQc) return
+  proc.operations = { ...(proc.operations || {}), opQc: true }
+  proc.qcConfigs = defaultQcConfigsFromOperations(proc.operations)
+}
 
 function resolveOperatorName() {
   const user = getUser()
@@ -75,6 +88,7 @@ export const processRouteState = reactive({
 
 // 本地已有路线缓存时，仍补齐串行/并行演示路线
 try {
+  ensureRoughTurningHasQc()
   ensureSerialRouteDemo()
   ensureParallelRouteDemo()
 } catch (e) {

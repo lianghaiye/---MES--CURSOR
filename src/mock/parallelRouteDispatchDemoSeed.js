@@ -25,15 +25,19 @@ function getProcessIdByName(name) {
   return proc?.id || `proc-unknown-${name}`
 }
 
-function cell(processId, processFileId = '') {
-  return processFileId ? { processId, processFileId } : { processId }
+function cell(processId, processFileId = '', qcOverride = '') {
+  const row = { processId }
+  if (processFileId) row.processFileId = processFileId
+  if (qcOverride) row.qcOverride = qcOverride
+  return row
 }
 
 function buildParallelDemoGrid() {
   const p = getProcessIdByName
   const pairs = [
     [1, 1, p('下料'), 'pdoc-004'],
-    [2, 1, p('粗车')],
+    // 演示：本路线不检（相对串行演示路线粗车「继承工序」）
+    [2, 1, p('粗车'), '', 'off'],
     [2, 2, p('钻孔')],
     [3, 1, p('铣削')],
     [4, 1, p('质检'), 'pdoc-005'],
@@ -42,8 +46,8 @@ function buildParallelDemoGrid() {
   const maxStep = 5
   const maxRow = 2
   const grid = createEmptyGrid(maxStep, maxRow)
-  pairs.forEach(([step, row, processId, fileId]) => {
-    grid[step - 1][row - 1] = cell(processId, fileId)
+  pairs.forEach(([step, row, processId, fileId, qcOverride]) => {
+    grid[step - 1][row - 1] = cell(processId, fileId, qcOverride)
   })
   return grid
 }
@@ -65,7 +69,7 @@ function buildParallelDemoRoute() {
     status: '使用中',
     applyScope: '全部产品',
     productDisplay: '',
-    remark: '第2步粗车/钻孔并行且全部完成；下发页两行步骤号均为 2，完成方式均为「全部完成」',
+    remark: '第2步粗车/钻孔并行；粗车「本路线不检」。对照串行演示路线粗车「继承工序」',
     grid,
     stepPolicies,
     creator: '李工艺',

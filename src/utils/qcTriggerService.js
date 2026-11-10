@@ -14,6 +14,7 @@ import {
 } from '@/utils/inboundQcRequirement'
 import { isMinimalProductionQcEnabled } from '@/utils/qcProductionMode'
 import { defaultQcConfigsFromOperations, normalizeProcessQcConfigs } from '@/utils/qcProcessConfig'
+import { normalizeRouteQcOverride, ROUTE_QC_OFF } from '@/utils/processRouteGrid'
 
 function receiptLineItemCode(line = {}) {
   return line.itemCode || line.productCode || line.materialCode || ''
@@ -34,6 +35,9 @@ function getProcessConfigByNameOrCode(process = {}) {
 }
 
 export function resolveProcessQcConfigs(process = {}) {
+  const override = normalizeRouteQcOverride(process.routeQcOverride ?? process.qcOverride)
+  if (override === ROUTE_QC_OFF) return []
+
   const procConfig = getProcessConfigByNameOrCode(process)
   if (procConfig && Array.isArray(procConfig.qcConfigs)) {
     return normalizeProcessQcConfigs(procConfig.qcConfigs).filter((c) => c.enabled)

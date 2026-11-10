@@ -10,6 +10,7 @@ import {
   createEmptyGrid,
   normalizeCompletionMode,
   normalizeGrid,
+  normalizeRouteQcOverride,
   syncStepPolicies,
   validateProcessRouteGrid,
 } from '@/utils/processRouteGrid'
@@ -50,11 +51,13 @@ export function buildGridFromWorkOrderProcesses(processes, stepPolicies = null) 
     const master = p.processId ? null : getProcessByName(p.name)
     const processId = p.processId || master?.id || ''
     if (processId || p.name) {
+      const qcOverride = normalizeRouteQcOverride(p.routeQcOverride ?? p.qcOverride)
       grid[si][ri] = {
         processId,
         processName: p.name || master?.name || '',
         processFileId: p.processFileId || '',
         processFileName: p.processFileName || '',
+        ...(qcOverride !== 'inherit' ? { qcOverride } : {}),
       }
     }
   }

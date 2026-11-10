@@ -19,6 +19,30 @@ export const COMPLETION_MODE_OPTIONS = [
   { value: COMPLETION_MODE_ANY, label: '选做完成' },
 ]
 
+/**
+ * 本路线质检覆盖（挂在网格 cell，非工序主数据）
+ * 仅当工序主数据已配置质检时可选：
+ * - inherit：继承工序主数据质检配置
+ * - off：本路线不质检
+ */
+export const ROUTE_QC_INHERIT = 'inherit'
+export const ROUTE_QC_OFF = 'off'
+export const ROUTE_QC_OVERRIDE_OPTIONS = [
+  { value: ROUTE_QC_INHERIT, label: '继承工序' },
+  { value: ROUTE_QC_OFF, label: '本路线不检' },
+]
+
+export function normalizeRouteQcOverride(value) {
+  if (value === ROUTE_QC_OFF || value === 'off') return ROUTE_QC_OFF
+  // 历史「本路线要检 / force」归一为继承
+  return ROUTE_QC_INHERIT
+}
+
+export function formatRouteQcOverrideLabel(value) {
+  const mode = normalizeRouteQcOverride(value)
+  return ROUTE_QC_OVERRIDE_OPTIONS.find((o) => o.value === mode)?.label || '继承工序'
+}
+
 /** 工序调度策略：一期仅手动调度 */
 export const DISPATCH_STRATEGY_MANUAL = 'manual'
 export const DISPATCH_STRATEGY_LABELS = {
@@ -218,6 +242,7 @@ export function flattenGridToSteps(grid, stepPolicies = null) {
         taskExecutionMode: normalizeTaskExecutionMode(proc?.taskExecutionMode),
         processFileId: cell.processFileId || '',
         processFileName: doc?.name || cell.processFileName || '',
+        routeQcOverride: normalizeRouteQcOverride(cell.qcOverride),
       })
     })
   })
@@ -246,6 +271,7 @@ export function buildWorkOrderProcessesFromGrid(grid, routeId = '', stepPolicies
     taskExecutionMode: step.taskExecutionMode || 'single_claim',
     processFileId: step.processFileId,
     processFileName: step.processFileName,
+    routeQcOverride: normalizeRouteQcOverride(step.routeQcOverride),
     executors: resolveDefaultExecutors(getProcessById(step.processId)),
     ...createEmptyWorkOrderProcessExtras(),
     opOutsource: Boolean(step.opOutsource),
@@ -307,6 +333,10 @@ export function getSelectedCellMeta(grid, stepIndex, rowIndex) {
   if (!cell?.processId) return null
   const proc = getProcessById(cell.processId)
   const configLabels = [...(proc?.isBlanking ? ['下料'] : []), ...getOperationLabels(proc)]
+  const masterHasQc = Boolean(
+    proc?.operations?.opQc ||
+    (Array.isArray(proc?.qcConfigs) && proc.qcConfigs.some((c) => c?.enabled !== false)),
+  )
   return {
     stepNo: stepIndex + 1,
     rowNo: rowIndex + 1,
@@ -315,6 +345,8 @@ export function getSelectedCellMeta(grid, stepIndex, rowIndex) {
     processCode: proc?.code || '',
     processId: cell.processId,
     processFileId: cell.processFileId || undefined,
+    qcOverride: normalizeRouteQcOverride(cell.qcOverride),
+    masterHasQc,
     resourceType: proc?.resourceType || '',
     reportMode: proc?.reportMode || '',
     isBlanking: Boolean(proc?.isBlanking),
