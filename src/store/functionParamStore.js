@@ -1,5 +1,10 @@
 import { reactive, watch } from 'vue'
 import { persistJson } from '@/utils/safeStorage'
+import {
+  STOCK_FULFILLMENT_MODE,
+  STOCK_FULFILLMENT_MODE_OPTIONS,
+  normalizeStockFulfillmentMode,
+} from '@/utils/salesStockFulfillment'
 
 const STORAGE_KEY = 'i_doms_function_params'
 /** 尺寸辅助默认从「全关」升级为「全开」的一次性迁移版本 */
@@ -240,10 +245,21 @@ function normalizePaymentLinkMode(mode) {
   return PAYMENT_LINK_MODES.BOTH
 }
 
+function normalizeSalesOrderStockFulfillmentDefault(mode) {
+  return normalizeStockFulfillmentMode(mode || STOCK_FULFILLMENT_MODE.PREFER_STOCK)
+}
+
 export const ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION =
   '开启：销售订单可使用折扣策略（无折扣 / 仅明细折扣 / 仅整单折扣）、行折扣与整单优惠。' +
   '关闭：新建/编辑订单不展示上述折扣能力，按成交单价计价；合同仍只写入协议单价，不把协议折扣写进行折扣。' +
   '默认开启。'
+
+/** 新建销售订单明细行「库存履约」默认值（与行级可选值一致） */
+export { STOCK_FULFILLMENT_MODE_OPTIONS as SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_OPTIONS }
+
+export const SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_DESCRIPTION =
+  '新建销售订单时，明细行「库存履约」的初始值。' +
+  '可在下单时逐行修改；不影响已保存订单。默认「优先现货」。'
 
 /** 质检门控：按业务类型配置（强管控阻断 / 弱管控仅预警） */
 export const QC_GATE_POLICY_PARAM_OPTIONS = [
@@ -418,7 +434,7 @@ export const FUNCTION_PARAM_CATEGORIES = [
   {
     key: 'sales',
     label: '销售',
-    description: '销售订单计价、折扣与回款挂接相关配置。',
+    description: '销售订单计价、折扣、库存履约默认值与回款挂接相关配置。',
   },
   {
     key: 'production',
@@ -630,6 +646,12 @@ export const FUNCTION_PARAM_ROWS = [
     description: ENABLE_SALES_ORDER_DISCOUNT_DESCRIPTION,
   },
   {
+    key: 'salesOrderStockFulfillmentDefault',
+    category: 'sales',
+    scenario: '销售订单库存履约默认值',
+    description: SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_DESCRIPTION,
+  },
+  {
     key: 'paymentLinkMode',
     category: 'sales',
     scenario: '回款挂接对象',
@@ -827,6 +849,9 @@ function loadFromStorage() {
           enableBomLevelMts: parsed.enableBomLevelMts === true,
           enableSequentialProcessTask: parsed.enableSequentialProcessTask === true,
           enableSalesOrderDiscount: parsed.enableSalesOrderDiscount !== false,
+          salesOrderStockFulfillmentDefault: normalizeSalesOrderStockFulfillmentDefault(
+            parsed.salesOrderStockFulfillmentDefault,
+          ),
           paymentLinkMode: normalizePaymentLinkMode(parsed.paymentLinkMode),
           qcDefaultGatePolicy: normalizeQcGatePolicyParam(parsed.qcDefaultGatePolicy),
           qcGatePolicyByBizScope: normalizeQcGatePolicyMap(parsed.qcGatePolicyByBizScope),
@@ -873,6 +898,7 @@ export const functionParamState = reactive({
     enableBomLevelMts: false,
     enableSequentialProcessTask: false,
     enableSalesOrderDiscount: true,
+    salesOrderStockFulfillmentDefault: STOCK_FULFILLMENT_MODE.PREFER_STOCK,
     paymentLinkMode: PAYMENT_LINK_MODES.BOTH,
     qcDefaultGatePolicy: 'soft',
     qcGatePolicyByBizScope: normalizeQcGatePolicyMap(),
@@ -1169,6 +1195,19 @@ export function isSalesOrderDiscountEnabled() {
 
 export function setEnableSalesOrderDiscount(enabled) {
   functionParamState.params.enableSalesOrderDiscount = Boolean(enabled)
+  return { ok: true }
+}
+
+/** 新建销售订单明细「库存履约」默认值 */
+export function getSalesOrderStockFulfillmentDefault() {
+  return normalizeSalesOrderStockFulfillmentDefault(
+    functionParamState.params.salesOrderStockFulfillmentDefault,
+  )
+}
+
+export function setSalesOrderStockFulfillmentDefault(mode) {
+  const normalized = normalizeSalesOrderStockFulfillmentDefault(mode)
+  functionParamState.params.salesOrderStockFulfillmentDefault = normalized
   return { ok: true }
 }
 

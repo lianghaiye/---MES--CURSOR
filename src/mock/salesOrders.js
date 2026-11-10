@@ -1,7 +1,13 @@
 import dayjs from 'dayjs'
+import { getSalesOrderStockFulfillmentDefault } from '@/store/functionParamStore'
+import { normalizeStockFulfillmentMode } from '@/utils/salesStockFulfillment'
 
 function createLineItem(partial = {}) {
   const salesQty = partial.salesQty ?? partial.qty ?? 1
+  const hasExplicitMode = Object.prototype.hasOwnProperty.call(partial, 'stockFulfillmentMode')
+  const stockFulfillmentMode = normalizeStockFulfillmentMode(
+    hasExplicitMode ? partial.stockFulfillmentMode : getSalesOrderStockFulfillmentDefault(),
+  )
   return {
     id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     productAttr: '',
@@ -40,8 +46,6 @@ function createLineItem(partial = {}) {
     attachment: '',
     lineAttachments: [],
     deliveryMode: '整件',
-    /** 库存履约：prefer_stock | force_mto | stock_only */
-    stockFulfillmentMode: 'prefer_stock',
     /** 优先现货时：占用现货数；空=尽量占满自由备货 */
     preferStockTakeQty: null,
     stockTakeQty: null,
@@ -66,6 +70,8 @@ function createLineItem(partial = {}) {
     ...partial,
     salesQty,
     qty: salesQty,
+    /** 库存履约：prefer_stock | force_mto | stock_only；新建默认取功能参数 */
+    stockFulfillmentMode,
   }
 }
 

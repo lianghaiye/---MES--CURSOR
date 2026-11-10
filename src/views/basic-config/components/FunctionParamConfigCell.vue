@@ -143,6 +143,20 @@
     />
 
     <a-radio-group
+      v-else-if="record.key === 'salesOrderStockFulfillmentDefault'"
+      :value="salesOrderStockFulfillmentDefault"
+      @change="(e) => onSalesOrderStockFulfillmentDefaultChange(e.target.value)"
+    >
+      <a-radio
+        v-for="option in SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+      >
+        {{ option.label }}
+      </a-radio>
+    </a-radio-group>
+
+    <a-radio-group
       v-else-if="record.key === 'paymentLinkMode'"
       :value="paymentLinkMode"
       @change="(e) => onPaymentLinkModeChange(e.target.value)"
@@ -265,6 +279,9 @@ import {
   setEnableSequentialProcessTask,
   isSalesOrderDiscountEnabled,
   setEnableSalesOrderDiscount,
+  SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_OPTIONS,
+  getSalesOrderStockFulfillmentDefault,
+  setSalesOrderStockFulfillmentDefault,
   getPaymentLinkMode,
   setPaymentLinkMode,
   isTransferRequireInboundConfirm,
@@ -290,6 +307,7 @@ const dualUnitIssueStrategy = computed(() => getDualUnitIssueStrategy())
 const enableBomLevelMts = computed(() => isBomLevelMtsEnabled())
 const enableSequentialProcessTask = computed(() => isSequentialProcessTaskEnabled())
 const enableSalesOrderDiscount = computed(() => isSalesOrderDiscountEnabled())
+const salesOrderStockFulfillmentDefault = computed(() => getSalesOrderStockFulfillmentDefault())
 const paymentLinkMode = computed(() => getPaymentLinkMode())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
 const stocktakeAutoPostOnApprove = computed(() => isStocktakeAutoPostOnApprove())
@@ -376,6 +394,9 @@ function onEnableSalesOrderDiscountChange(checked) {
     setEnableSalesOrderDiscount(checked),
     checked ? '已开启销售订单价格折扣' : '已关闭销售订单价格折扣',
   )
+}
+function onSalesOrderStockFulfillmentDefaultChange(mode) {
+  toastSave(setSalesOrderStockFulfillmentDefault(mode), '已更新销售订单库存履约默认值')
 }
 function onPaymentLinkModeChange(mode) {
   toastSave(setPaymentLinkMode(mode))

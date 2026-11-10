@@ -121,7 +121,10 @@ export function enrichShipAccessoryStock(row, warehouse = '') {
   row.warehouseStockQty = available
   row.availableStock = available
   row.gapQty = round4(Math.max(0, need - available))
-  row.stockFulfillmentMode = normalizeStockFulfillmentMode(row.stockFulfillmentMode)
+  row.stockFulfillmentMode = normalizeStockFulfillmentMode(
+    row.stockFulfillmentMode ||
+      require('@/store/functionParamStore').getSalesOrderStockFulfillmentDefault(),
+  )
   row.fulfillQty = accessoryFulfillQty(row)
   row.supplyForm =
     row.supplyForm || master?.supplyForm || master?.supplyType || master?.supply || '外购件'

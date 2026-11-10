@@ -104,7 +104,7 @@
           <template v-else-if="column.key === 'stockFulfillmentMode'">
             <a-select
               v-if="!readonly"
-              :value="record.stockFulfillmentMode || 'prefer_stock'"
+              :value="record.stockFulfillmentMode || defaultStockFulfillmentMode"
               size="small"
               style="width: 100%"
               :options="fulfillmentOpts"
@@ -299,6 +299,7 @@ import {
   normalizeStockFulfillmentMode,
   stockFulfillmentModeLabel,
 } from '@/utils/salesStockFulfillment'
+import { getSalesOrderStockFulfillmentDefault } from '@/store/functionParamStore'
 import { useTabs } from '@/composables/useTabs'
 import { useTableScrollY } from '@/composables/useTableScrollY'
 import ListFilterBar from '@/components/ListFilterBar.vue'
@@ -317,6 +318,7 @@ const emit = defineEmits(['change'])
 const router = useRouter()
 const { openTab } = useTabs()
 const converting = ref(false)
+const defaultStockFulfillmentMode = computed(() => getSalesOrderStockFulfillmentDefault())
 const packageOpen = ref(false)
 const { tableWrapRef, tableScrollY, bindTableResize, unbindTableResize } = useTableScrollY()
 const pickerOpen = ref(false)
