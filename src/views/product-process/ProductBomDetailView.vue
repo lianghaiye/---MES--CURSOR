@@ -202,6 +202,7 @@ import {
   defaultBomColumnSettings,
   isShipBomType,
   normalizeBomType,
+  normalizeBomMaterialColumnSettings,
 } from '@/mock/bomMaterialColumns'
 import {
   bomWorkspaceDetailPath,
@@ -266,7 +267,9 @@ const shipConflictOpen = ref(false)
 const shipConflictKind = ref('single')
 const shipConflictRows = ref([])
 const pendingShipEnable = ref(false)
-const columnSettings = ref(JSON.parse(JSON.stringify(defaultBomColumnSettings)))
+const columnSettings = ref(
+  normalizeBomMaterialColumnSettings(JSON.parse(JSON.stringify(defaultBomColumnSettings))),
+)
 const overviewColumnSettings = ref(loadOverviewColumnSettings())
 
 function loadOverviewColumnSettings() {

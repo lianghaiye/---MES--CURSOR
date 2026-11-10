@@ -347,7 +347,7 @@ import {
 import { resolveSpuTemplateBomForSku } from '@/utils/designBomBaseline'
 import {
   defaultBomColumnSettings,
-  restoreBomBlankSizeColumn,
+  normalizeBomMaterialColumnSettings,
   bomTypeSelectOptions,
   BOM_TYPE,
   normalizeBomType,
@@ -856,7 +856,7 @@ function restoreNewBomDraft() {
     Boolean(draft.form?.itemId) ||
     (draft.flatNodes || []).length > 0
   if (draft.columnSettings) {
-    columnSettings.value = restoreBomBlankSizeColumn(draft.columnSettings)
+    columnSettings.value = normalizeBomMaterialColumnSettings(draft.columnSettings)
   }
   if (typeof draft.basicInfoExpanded === 'boolean')
     basicInfoExpanded.value = draft.basicInfoExpanded
@@ -1697,7 +1697,9 @@ function loadEditBom(id) {
   selectedNodeId.value = nodes.find((n) => n.isRoot)?.id || ROOT_ID
   templateRef.value = bom.templateRef || null
   columnSettings.value = bom.columnSettings?.length
-    ? restoreBomBlankSizeColumn(mergeColumnSettings(defaultBomColumnSettings, bom.columnSettings))
+    ? normalizeBomMaterialColumnSettings(
+        mergeColumnSettings(defaultBomColumnSettings, bom.columnSettings),
+      )
     : JSON.parse(JSON.stringify(defaultBomColumnSettings))
 
   editVersion.value = bom.version || ''

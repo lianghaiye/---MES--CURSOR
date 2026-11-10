@@ -62,7 +62,7 @@
         size="small"
         bordered
         :pagination="{ pageSize: 10, size: 'small', showSizeChanger: true }"
-        :scroll="{ x: 960 }"
+        :scroll="{ x: 1180 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'scopes'">
@@ -70,6 +70,12 @@
               <a-tag v-if="record.scopes.includes('inventory')" color="blue">库存</a-tag>
               <a-tag v-if="record.scopes.includes('purchase')" color="green">采购</a-tag>
             </a-space>
+          </template>
+          <template v-else-if="column.key === 'precision'">
+            {{ record.precision ?? 0 }}
+          </template>
+          <template v-else-if="column.key === 'roundingRule'">
+            {{ formatUnitRoundingRule(record.roundingRule) }}
           </template>
           <template v-else-if="column.key === 'status'">
             <a-badge
@@ -104,6 +110,7 @@ import {
   unitState,
   deleteUnit,
   setUnitStatus,
+  formatUnitRoundingRule,
 } from '@/store/unitStore'
 import UnitFormModal from './components/UnitFormModal.vue'
 
@@ -121,6 +128,8 @@ const statusOpts = [
 const columns = [
   { title: '单位编码', dataIndex: 'code', width: 110 },
   { title: '单位名称', dataIndex: 'name', width: 100 },
+  { title: '精度位数', key: 'precision', width: 96, align: 'right' },
+  { title: '取舍规则', key: 'roundingRule', width: 110 },
   { title: '适用类型', key: 'scopes', width: 140 },
   { title: '状态', key: 'status', width: 90 },
   { title: '排序', dataIndex: 'sort', width: 72, align: 'right' },

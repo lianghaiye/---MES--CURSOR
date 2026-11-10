@@ -19,6 +19,38 @@ export const UNIT_STATUS = {
   DISABLED: '停用',
 }
 
+/** 取舍规则 */
+export const UNIT_ROUNDING = {
+  HALF_UP: 'round',
+  CEIL: 'ceil',
+  FLOOR: 'floor',
+}
+
+export const UNIT_ROUNDING_OPTIONS = [
+  { label: '四舍五入', value: UNIT_ROUNDING.HALF_UP },
+  { label: '向上保留', value: UNIT_ROUNDING.CEIL },
+  { label: '向下保留', value: UNIT_ROUNDING.FLOOR },
+]
+
+export const UNIT_ROUNDING_LABEL = {
+  [UNIT_ROUNDING.HALF_UP]: '四舍五入',
+  [UNIT_ROUNDING.CEIL]: '向上保留',
+  [UNIT_ROUNDING.FLOOR]: '向下保留',
+}
+
+const DECIMAL_UNIT_NAMES = new Set(['kg', 'g', 't', 'm', '米', 'cm', 'mm', '㎡', 'm²', 'L', 'ml'])
+
+function defaultPrecisionForName(name) {
+  return DECIMAL_UNIT_NAMES.has(String(name || '').trim()) ? 2 : 0
+}
+
+function defaultRoundingForName(name) {
+  // 称重/长度类默认向上保留，计数类默认四舍五入（对齐常见现场口径）
+  return DECIMAL_UNIT_NAMES.has(String(name || '').trim())
+    ? UNIT_ROUNDING.CEIL
+    : UNIT_ROUNDING.HALF_UP
+}
+
 function seedUnits() {
   const now = dayjs().format('YYYY-MM-DD HH:mm')
   const rows = [
@@ -35,18 +67,22 @@ function seedUnits() {
     { code: 'UNIT011', name: '张', scopes: ['inventory', 'purchase'], sort: 110 },
     { code: 'UNIT012', name: '㎡', scopes: ['inventory', 'purchase'], sort: 120 },
   ]
-  return rows.map((r, i) => ({
-    id: `unit-${i + 1}`,
-    code: r.code,
-    name: r.name,
-    scopes: [...r.scopes],
-    status: UNIT_STATUS.ENABLED,
-    remark: '',
-    sort: r.sort,
-    creator: 'admin',
-    createdAt: now,
-    updatedAt: now,
-  }))
+  return rows.map((r, i) =>
+    normalizeUnit({
+      id: `unit-${i + 1}`,
+      code: r.code,
+      name: r.name,
+      scopes: [...r.scopes],
+      status: UNIT_STATUS.ENABLED,
+      precision: defaultPrecisionForName(r.name),
+      roundingRule: defaultRoundingForName(r.name),
+      remark: '',
+      sort: r.sort,
+      creator: 'admin',
+      createdAt: now,
+      updatedAt: now,
+    }),
+  )
 }
 
 /** 确保板材相关单位存在（兼容旧 localStorage） */
@@ -88,6 +124,21 @@ function loadFromStorage() {
   return seedUnits()
 }
 
+function normalizeRoundingRule(value, unitName) {
+  const v = String(value || '').trim()
+  if (v === UNIT_ROUNDING.HALF_UP || v === '四舍五入') return UNIT_ROUNDING.HALF_UP
+  if (v === UNIT_ROUNDING.CEIL || v === '向上保留' || v === '向上取整') return UNIT_ROUNDING.CEIL
+  if (v === UNIT_ROUNDING.FLOOR || v === '向下保留' || v === '向下取整') return UNIT_ROUNDING.FLOOR
+  return defaultRoundingForName(unitName)
+}
+
+function normalizePrecision(value, unitName) {
+  if (value === '' || value == null) return defaultPrecisionForName(unitName)
+  const n = Number(value)
+  if (!Number.isFinite(n)) return defaultPrecisionForName(unitName)
+  return Math.min(6, Math.max(0, Math.round(n)))
+}
+
 function normalizeUnit(row) {
   const scopes = Array.isArray(row.scopes)
     ? row.scopes.filter((s) => s === UNIT_SCOPE.INVENTORY || s === UNIT_SCOPE.PURCHASE)
@@ -98,12 +149,15 @@ function normalizeUnit(row) {
     if (row.forPurchase) scopes.push(UNIT_SCOPE.PURCHASE)
     if (!scopes.length) scopes.push(UNIT_SCOPE.INVENTORY)
   }
+  const name = String(row.name || '').trim()
   return {
     id: row.id,
     code: String(row.code || '').trim(),
-    name: String(row.name || '').trim(),
+    name,
     scopes: [...new Set(scopes)],
     status: row.status === UNIT_STATUS.DISABLED ? UNIT_STATUS.DISABLED : UNIT_STATUS.ENABLED,
+    precision: normalizePrecision(row.precision, name),
+    roundingRule: normalizeRoundingRule(row.roundingRule, name),
     remark: row.remark || '',
     sort: Number.isFinite(Number(row.sort)) ? Number(row.sort) : 0,
     creator: row.creator || 'admin',
@@ -111,6 +165,27 @@ function normalizeUnit(row) {
     updatedAt: row.updatedAt || '',
     lastModifier: row.lastModifier || '',
   }
+}
+
+export function formatUnitRoundingRule(rule) {
+  return UNIT_ROUNDING_LABEL[rule] || UNIT_ROUNDING_LABEL[UNIT_ROUNDING.HALF_UP]
+}
+
+/** 按单位精度与取舍规则格式化数量（业务侧可选调用） */
+export function roundQtyByUnit(qty, unitOrName) {
+  const n = Number(qty)
+  if (!Number.isFinite(n)) return 0
+  const name = typeof unitOrName === 'string' ? unitOrName : unitOrName?.name
+  const unit =
+    (typeof unitOrName === 'object' && unitOrName) ||
+    unitState.units.find((u) => u.name === name) ||
+    null
+  const precision = unit ? Number(unit.precision) : defaultPrecisionForName(name)
+  const rule = unit ? unit.roundingRule : defaultRoundingForName(name)
+  const factor = 10 ** Math.min(6, Math.max(0, precision || 0))
+  if (rule === UNIT_ROUNDING.CEIL) return Math.ceil(n * factor - 1e-12) / factor
+  if (rule === UNIT_ROUNDING.FLOOR) return Math.floor(n * factor + 1e-12) / factor
+  return Math.round(n * factor) / factor
 }
 
 function persist() {
@@ -205,6 +280,8 @@ export function addUnit(payload, operator = 'admin') {
     name,
     scopes,
     status: payload.status || UNIT_STATUS.ENABLED,
+    precision: payload.precision,
+    roundingRule: payload.roundingRule,
     remark: payload.remark || '',
     sort: payload.sort ?? (unitState.units.length + 1) * 10,
     creator: operator,

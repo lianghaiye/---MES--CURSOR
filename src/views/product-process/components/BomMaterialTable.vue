@@ -88,6 +88,13 @@
                 />
               </div>
             </template>
+            <template v-else-if="column.key === 'stockQty'">
+              <a-tooltip
+                title="按当前库存台账实时展示（数量+库存单位），每次打开详情/编辑页重新读取"
+              >
+                <span>库存量</span>
+              </a-tooltip>
+            </template>
           </template>
           <template #emptyText>
             <div class="add-detail-empty">
@@ -146,7 +153,10 @@
               <span v-else>—</span>
             </template>
             <template v-else-if="readonly">
-              <template v-if="column.key === 'unitQty'">{{ formatQty(record.unitQty) }}</template>
+              <template v-if="column.key === 'stockQty'">{{ lineStockQtyText(record) }}</template>
+              <template v-else-if="column.key === 'unitQty'">{{
+                formatQty(record.unitQty)
+              }}</template>
               <template v-else-if="column.key === 'blankSizeText'">
                 <template v-if="record.blankSizeText">
                   {{ record.blankSizeText }}
@@ -227,6 +237,9 @@
                 {{ lineVariantDisplay(record) || '—' }}
               </a>
               <span v-else>{{ lineVariantDisplay(record) || '—' }}</span>
+            </template>
+            <template v-else-if="column.key === 'stockQty'">
+              <span class="stock-qty-cell">{{ lineStockQtyText(record) }}</span>
             </template>
             <template v-else-if="column.key === 'unitQty'">
               <a-input-number
@@ -435,10 +448,12 @@
 <script setup>
 import {
   formatQty,
+  formatQtyWithUnit,
   formatNumber as formatPrice,
   inputNumberFormatter,
   inputNumberParser,
 } from '@/utils/numberFormat'
+import { stockState } from '@/store/stockStore'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
@@ -721,6 +736,50 @@ function lineStockUnit(record) {
   return resolveLineStockUnit(record, lookupLineMaterial(record))
 }
 
+/**
+ * 一次聚合库存台账（O 台账行数），行渲染只查 Map，避免每行全表扫描拖慢打开。
+ * 无台账命中时再回退主数据 stockQty。
+ */
+const onHandQtyByCode = computed(() => {
+  const map = new Map()
+  ;(stockState.records || []).forEach((r) => {
+    const code = String(r?.itemCode || '').trim()
+    if (!code) return
+    map.set(code, (map.get(code) || 0) + (Number(r.qty) || 0))
+  })
+  return map
+})
+
+function lineOnHandQty(code) {
+  const key = String(code || '').trim()
+  if (!key) return 0
+  const fromLedger = onHandQtyByCode.value.get(key)
+  if (fromLedger != null && fromLedger > 0) return fromLedger
+  const product = productInfoState.products.find((p) => p.code === key)
+  if (product) {
+    const q = Number(product.stockQty ?? product.inventoryQty)
+    if (Number.isFinite(q)) return q
+  }
+  const material = materialInfoState.materials.find((m) => m.code === key)
+  if (material) {
+    const q = Number(material.stockQty ?? material.inventoryQty)
+    if (Number.isFinite(q)) return q
+  }
+  return 0
+}
+
+/** 库存量 = 现存量 + 库存单位 */
+function lineStockQtyText(record) {
+  void onHandQtyByCode.value
+  void materialInfoState.materials
+  void productInfoState.products
+  const code = String(record?.materialCode || '').trim()
+  if (!code) return '—'
+  const qty = lineOnHandQty(code)
+  const unit = lineStockUnit(record)
+  return formatQtyWithUnit(qty, unit && unit !== '—' ? unit : '')
+}
+
 const widthMap = {
   materialCode: 180,
   itemName: 280,
@@ -732,6 +791,7 @@ const widthMap = {
   material: 90,
   variantAttr: 140,
   drawingNo: 100,
+  stockQty: 120,
   unitQty: 100,
   blankSizeText: 200,
   unit: 72,
@@ -1295,6 +1355,10 @@ function customRow(record, index) {
     cursor: pointer;
   }
 
+  .stock-qty-cell {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
   .readonly-stock-unit {
     color: rgba(0, 0, 0, 0.88);
   }

@@ -22,6 +22,30 @@
         <a-checkbox-group v-model:value="form.scopes" :options="UNIT_SCOPE_OPTIONS" />
         <div class="field-hint">勾选后，该单位会出现在对应业务下拉中</div>
       </a-form-item>
+      <a-row :gutter="12">
+        <a-col :span="12">
+          <a-form-item label="精度位数" required>
+            <a-input-number
+              v-model:value="form.precision"
+              :min="0"
+              :max="6"
+              :precision="0"
+              style="width: 100%"
+              placeholder="0~6"
+            />
+            <div class="field-hint">数量保留的小数位数，如 kg 常用 2，个/件常用 0</div>
+          </a-form-item>
+        </a-col>
+        <a-col :span="12">
+          <a-form-item label="取舍规则" required>
+            <a-select
+              v-model:value="form.roundingRule"
+              :options="UNIT_ROUNDING_OPTIONS"
+              style="width: 100%"
+            />
+          </a-form-item>
+        </a-col>
+      </a-row>
       <a-form-item label="状态">
         <a-radio-group v-model:value="form.status">
           <a-radio value="启用">启用</a-radio>
@@ -47,7 +71,15 @@
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { UNIT_SCOPE, UNIT_SCOPE_OPTIONS, UNIT_STATUS, addUnit, updateUnit } from '@/store/unitStore'
+import {
+  UNIT_SCOPE,
+  UNIT_SCOPE_OPTIONS,
+  UNIT_STATUS,
+  UNIT_ROUNDING,
+  UNIT_ROUNDING_OPTIONS,
+  addUnit,
+  updateUnit,
+} from '@/store/unitStore'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -68,6 +100,8 @@ const form = reactive({
   name: '',
   scopes: [UNIT_SCOPE.INVENTORY, UNIT_SCOPE.PURCHASE],
   status: UNIT_STATUS.ENABLED,
+  precision: 0,
+  roundingRule: UNIT_ROUNDING.HALF_UP,
   sort: 10,
   remark: '',
 })
@@ -81,6 +115,8 @@ watch(
       form.name = props.record.name || ''
       form.scopes = [...(props.record.scopes || [])]
       form.status = props.record.status || UNIT_STATUS.ENABLED
+      form.precision = props.record.precision ?? 0
+      form.roundingRule = props.record.roundingRule || UNIT_ROUNDING.HALF_UP
       form.sort = props.record.sort ?? 10
       form.remark = props.record.remark || ''
     } else {
@@ -88,6 +124,8 @@ watch(
       form.name = ''
       form.scopes = [UNIT_SCOPE.INVENTORY, UNIT_SCOPE.PURCHASE]
       form.status = UNIT_STATUS.ENABLED
+      form.precision = 0
+      form.roundingRule = UNIT_ROUNDING.HALF_UP
       form.sort = 10
       form.remark = ''
     }
@@ -99,12 +137,22 @@ function handleCancel() {
 }
 
 function handleSave() {
+  if (form.precision == null || form.precision === '') {
+    message.warning('请填写精度位数')
+    return
+  }
+  if (!form.roundingRule) {
+    message.warning('请选择取舍规则')
+    return
+  }
   saving.value = true
   const payload = {
     code: form.code,
     name: form.name,
     scopes: [...form.scopes],
     status: form.status,
+    precision: form.precision,
+    roundingRule: form.roundingRule,
     sort: form.sort,
     remark: form.remark,
   }

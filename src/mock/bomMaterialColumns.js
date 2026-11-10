@@ -6,25 +6,57 @@ export const defaultBomColumnSettings = [
   { key: 'material', title: '材质', hidden: false, frozen: false, order: 3 },
   { key: 'variantAttr', title: '变体属性', hidden: false, frozen: false, order: 4 },
   { key: 'drawingNo', title: '图号', hidden: false, frozen: false, order: 5 },
-  { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 6 },
-  { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 7 },
-  { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 8 },
-  { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 9 },
-  { key: 'releaseStatus', title: '投产状态', hidden: false, frozen: false, order: 10 },
-  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 11 },
-  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 12 },
-  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 13 },
-  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 14 },
-  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 15 },
-  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 16 },
-  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 17 },
-  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 18 },
+  { key: 'stockQty', title: '库存量', hidden: false, frozen: false, order: 6 },
+  { key: 'unitQty', title: '单位用量', hidden: false, frozen: false, order: 7 },
+  { key: 'blankSizeText', title: '下料尺寸', hidden: false, frozen: false, order: 8 },
+  { key: 'unit', title: '库存单位', hidden: false, frozen: false, order: 9 },
+  { key: 'supplyForm', title: '供应型态', hidden: false, frozen: false, order: 10 },
+  { key: 'releaseStatus', title: '投产状态', hidden: false, frozen: false, order: 11 },
+  { key: 'categoryName', title: '物料类别', hidden: false, frozen: false, order: 12 },
+  { key: 'materialType', title: '物料类型', hidden: false, frozen: false, order: 13 },
+  { key: 'remark', title: '备注', hidden: false, frozen: false, order: 14 },
+  { key: 'substitutePart', title: '替代件', hidden: false, frozen: false, order: 15 },
+  { key: 'childBom', title: '子件BOM', hidden: false, frozen: false, order: 16 },
+  { key: 'processRoute', title: '工艺路线', hidden: false, frozen: false, order: 17 },
+  { key: 'processDocName', title: '工艺文件', hidden: false, frozen: false, order: 18 },
+  { key: 'unitPrice', title: '单价', hidden: false, frozen: false, order: 19 },
 ]
 
 /** 历史误藏「下料尺寸」列：合并配置时强制恢复可见（用户仍可再藏） */
 export function restoreBomBlankSizeColumn(settings) {
   if (!Array.isArray(settings)) return settings
   return settings.map((c) => (c?.key === 'blankSizeText' ? { ...c, hidden: false } : c))
+}
+
+/** 保证「库存量」在「单位用量」前（兼容旧列配置 / 草稿） */
+export function ensureBomStockQtyColumn(settings) {
+  if (!Array.isArray(settings)) return settings
+  const list = settings.map((c) => ({ ...c }))
+  const stockDef = {
+    key: 'stockQty',
+    title: '库存量',
+    hidden: false,
+    frozen: false,
+    order: 0,
+  }
+  let stockIdx = list.findIndex((c) => c.key === 'stockQty')
+  if (stockIdx < 0) {
+    const unitQtyIdx = list.findIndex((c) => c.key === 'unitQty')
+    if (unitQtyIdx >= 0) list.splice(unitQtyIdx, 0, { ...stockDef })
+    else list.push({ ...stockDef })
+  } else {
+    const [stock] = list.splice(stockIdx, 1)
+    stock.title = stock.title || '库存量'
+    const unitQtyIdx = list.findIndex((c) => c.key === 'unitQty')
+    if (unitQtyIdx >= 0) list.splice(unitQtyIdx, 0, stock)
+    else list.push(stock)
+  }
+  return list.map((c, i) => ({ ...c, order: i }))
+}
+
+/** BOM 物料清单列配置归一：补库存量列 + 恢复下料尺寸可见 */
+export function normalizeBomMaterialColumnSettings(settings) {
+  return ensureBomStockQtyColumn(restoreBomBlankSizeColumn(settings))
 }
 
 /** 子件 BOM 展示：BOM 名称 + 版本号 */
