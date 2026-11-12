@@ -1057,6 +1057,12 @@ const routes = [
         meta: { title: '采购申请' },
       },
       {
+        path: 'procurement/pending-purchase',
+        name: 'procurement-pending-purchase',
+        component: () => import('@/views/procurement/PendingPurchaseListView.vue'),
+        meta: { title: '待采购清单' },
+      },
+      {
         path: 'procurement/purchase-req/generate-po',
         name: 'procurement-purchase-req-generate-po',
         component: () => import('@/views/procurement/GeneratePurchaseOrderView.vue'),

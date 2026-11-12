@@ -171,6 +171,52 @@
     </a-radio-group>
 
     <a-switch
+      v-else-if="record.key === 'pendingPurchaseListEnabled'"
+      :checked="pendingPurchaseListEnabled"
+      checked-children="开"
+      un-checked-children="关"
+      @change="onPendingPurchaseListEnabledChange"
+    />
+
+    <a-radio-group
+      v-else-if="record.key === 'pendingPurchaseMergeMode'"
+      :value="pendingPurchaseMergeMode"
+      @change="(e) => onPendingPurchaseMergeModeChange(e.target.value)"
+    >
+      <a-radio
+        v-for="option in PURCHASE_MERGE_MODE_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+        :disabled="option.disabled"
+      >
+        {{ option.label }}
+      </a-radio>
+    </a-radio-group>
+
+    <a-switch
+      v-else-if="record.key === 'purchaseOrderMergeEnabled'"
+      :checked="purchaseOrderMergeEnabled"
+      checked-children="开"
+      un-checked-children="关"
+      @change="onPurchaseOrderMergeEnabledChange"
+    />
+
+    <a-radio-group
+      v-else-if="record.key === 'purchaseOrderMergeMode'"
+      :value="purchaseOrderMergeMode"
+      @change="(e) => onPurchaseOrderMergeModeChange(e.target.value)"
+    >
+      <a-radio
+        v-for="option in PURCHASE_MERGE_MODE_OPTIONS"
+        :key="option.value"
+        :value="option.value"
+        :disabled="option.disabled"
+      >
+        {{ option.label }}
+      </a-radio>
+    </a-radio-group>
+
+    <a-switch
       v-else-if="record.key === 'transferRequireInboundConfirm'"
       :checked="transferRequireInboundConfirm"
       checked-children="需要"
@@ -246,6 +292,7 @@ import { computed } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   PAYMENT_LINK_MODE_OPTIONS,
+  PURCHASE_MERGE_MODE_OPTIONS,
   SALARY_PUSH_OPTIONS,
   AUTO_GENERATE_DOC_OPTIONS,
   AUTO_APPROVE_OPTIONS,
@@ -284,6 +331,14 @@ import {
   setSalesOrderStockFulfillmentDefault,
   getPaymentLinkMode,
   setPaymentLinkMode,
+  isPendingPurchaseListEnabled,
+  setPendingPurchaseListEnabled,
+  getPendingPurchaseMergeMode,
+  setPendingPurchaseMergeMode,
+  isPurchaseOrderMergeEnabled,
+  setPurchaseOrderMergeEnabled,
+  getPurchaseOrderMergeMode,
+  setPurchaseOrderMergeMode,
   isTransferRequireInboundConfirm,
   setTransferRequireInboundConfirm,
   isStocktakeAutoPostOnApprove,
@@ -309,6 +364,10 @@ const enableSequentialProcessTask = computed(() => isSequentialProcessTaskEnable
 const enableSalesOrderDiscount = computed(() => isSalesOrderDiscountEnabled())
 const salesOrderStockFulfillmentDefault = computed(() => getSalesOrderStockFulfillmentDefault())
 const paymentLinkMode = computed(() => getPaymentLinkMode())
+const pendingPurchaseListEnabled = computed(() => isPendingPurchaseListEnabled())
+const pendingPurchaseMergeMode = computed(() => getPendingPurchaseMergeMode())
+const purchaseOrderMergeEnabled = computed(() => isPurchaseOrderMergeEnabled())
+const purchaseOrderMergeMode = computed(() => getPurchaseOrderMergeMode())
 const transferRequireInboundConfirm = computed(() => isTransferRequireInboundConfirm())
 const stocktakeAutoPostOnApprove = computed(() => isStocktakeAutoPostOnApprove())
 
@@ -400,6 +459,24 @@ function onSalesOrderStockFulfillmentDefaultChange(mode) {
 }
 function onPaymentLinkModeChange(mode) {
   toastSave(setPaymentLinkMode(mode))
+}
+function onPendingPurchaseListEnabledChange(checked) {
+  toastSave(
+    setPendingPurchaseListEnabled(checked),
+    checked ? '已开启待采购清单' : '已关闭待采购清单',
+  )
+}
+function onPendingPurchaseMergeModeChange(mode) {
+  toastSave(setPendingPurchaseMergeMode(mode), '已更新待采购合并方式')
+}
+function onPurchaseOrderMergeEnabledChange(checked) {
+  toastSave(
+    setPurchaseOrderMergeEnabled(checked),
+    checked ? '已开启采购订单合并' : '已关闭采购订单合并',
+  )
+}
+function onPurchaseOrderMergeModeChange(mode) {
+  toastSave(setPurchaseOrderMergeMode(mode), '已更新订单合并方式')
 }
 function onTransferRequireInboundConfirmChange(checked) {
   toastSave(

@@ -27,6 +27,9 @@ import { STOCKTAKE_STATUS, normalizeStocktakeStatus } from '@/mock/stocktakeOpti
 import { TRANSFER_STATUS } from '@/mock/transferOptions'
 import { ECN_STATUS } from '@/constants/ecn'
 import { mobileMaterialReqState, MATERIAL_REQ_AUDIT } from '@/store/mobileMaterialReqStore'
+import { purchaseRequisitionState } from '@/store/purchaseRequisitionStore'
+import { countPendingPurchaseLines } from '@/utils/pendingPurchaseList'
+import { isPendingPurchaseListEnabled } from '@/store/functionParamStore'
 
 const PENDING_DISPATCH = '待下发'
 const PENDING_APPROVE = '待审核'
@@ -44,6 +47,7 @@ const ORDER_APPROVE_BADGE_PATHS = [
   '/sales/order-changes',
   '/contracts',
   '/contracts/changes',
+  '/procurement/pending-purchase',
   '/procurement/purchase-orders',
   '/procurement/outsourcing-orders',
 ]
@@ -188,6 +192,8 @@ export function countPendingByPath(path) {
       return countContractPendingApprove()
     case '/contracts/changes':
       return countContractChangePendingApprove()
+    case '/procurement/pending-purchase':
+      return isPendingPurchaseListEnabled() ? countPendingPurchaseLines() : 0
     case '/procurement/purchase-orders':
       return countPurchasePendingApprove()
     case '/procurement/outsourcing-orders':
@@ -235,6 +241,7 @@ export function useWorkOrderMenuBadges() {
     void salesContractChangeState.changes
     void purchaseOrderState.orders
     void outsourcingOrderState.orders
+    void purchaseRequisitionState.requisitions
 
     const map = {}
     BADGE_PATHS.forEach((path) => {

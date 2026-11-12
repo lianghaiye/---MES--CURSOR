@@ -126,6 +126,14 @@
           审核
         </a-button>
         <a-button size="small" @click="handleBatchSubmit">批量提交</a-button>
+        <a-button
+          v-if="purchaseOrderMergeEnabled"
+          size="small"
+          :disabled="selectedRowKeys.length < 2"
+          @click="openMergeBySupplier"
+        >
+          按供应商合并
+        </a-button>
         <a-button size="small" @click="openToolbarPriceChangeApprove">审核订单变更</a-button>
         <a-button size="small" @click="openReceiptModal">
           <CheckCircleOutlined />
@@ -372,6 +380,12 @@
       @done="onPriceChangeDone"
     />
 
+    <MergePurchaseOrdersModal
+      v-model:open="mergeModalOpen"
+      :order-ids="mergeOrderIds"
+      @merged="onMergeDone"
+    />
+
     <TableColumnSettingDrawer
       v-model:open="columnDrawerOpen"
       v-model:settings="columnSettings"
@@ -438,6 +452,7 @@ import GenerateInboundOrderModal from './components/GenerateInboundOrderModal.vu
 import PurchaseOrderPrintModal from './components/PurchaseOrderPrintModal.vue'
 import PurchaseOrderStatsPanel from './components/PurchaseOrderStatsPanel.vue'
 import PurchasePriceChangeModal from './components/PurchasePriceChangeModal.vue'
+import MergePurchaseOrdersModal from './components/MergePurchaseOrdersModal.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
 import { useTableColumnSettings } from '@/composables/useTableColumnSettings'
@@ -446,6 +461,8 @@ import { openCreateTab } from '@/utils/openCreateTab'
 import { findCreatePageByListPath } from '@/config/createPages'
 import { formatDateTimeMinute, resolveApprovalTime } from '@/utils/dateTimeDisplay'
 import { formatQty } from '@/utils/numberFormat'
+import { functionParamState, isPurchaseOrderMergeEnabled } from '@/store/functionParamStore'
+import { previewMergePurchaseOrders } from '@/utils/purchaseOrderMerge'
 import {
   canApplyPurchasePriceChange,
   getPendingPurchasePriceChange,
@@ -481,6 +498,12 @@ const printOrders = ref([])
 const priceChangeOpen = ref(false)
 const priceChangeOrder = ref(null)
 const priceChangePending = computed(() => getPendingPurchasePriceChange(priceChangeOrder.value?.id))
+const mergeModalOpen = ref(false)
+const mergeOrderIds = ref([])
+const purchaseOrderMergeEnabled = computed(() => {
+  void functionParamState.params.purchaseOrderMergeEnabled
+  return isPurchaseOrderMergeEnabled()
+})
 const pagination = reactive({ current: 1, pageSize: 10 })
 
 function applyFiltersFromRouteQuery() {
@@ -691,6 +714,29 @@ onMounted(() => {
 
 function stubAction(name) {
   message.info(`${name}功能开发中`)
+}
+
+function openMergeBySupplier() {
+  if (!purchaseOrderMergeEnabled.value) {
+    message.warning('未启用采购订单合并，请在功能参数中开启')
+    return
+  }
+  if (selectedRowKeys.value.length < 2) {
+    message.warning('请至少勾选 2 张采购订单')
+    return
+  }
+  const preview = previewMergePurchaseOrders(selectedRowKeys.value)
+  if (!preview.ok) {
+    message.warning(preview.message || '无法合并')
+    return
+  }
+  mergeOrderIds.value = [...selectedRowKeys.value]
+  mergeModalOpen.value = true
+}
+
+function onMergeDone() {
+  selectedRowKeys.value = []
+  handleSearch()
 }
 
 function onBatchMenuClick({ key }) {
@@ -1222,7 +1268,7 @@ function onInboundSaved() {
 
 .summary-bar {
   margin-bottom: 8px;
-  padding: 6px 12px;
+  padding: 4px 12px;
 
   :deep(.ant-alert-message) {
     font-size: 13px;

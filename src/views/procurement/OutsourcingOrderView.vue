@@ -1169,7 +1169,7 @@ function onInboundSaved() {
 
 .summary-bar {
   margin-bottom: 8px;
-  padding: 6px 12px;
+  padding: 4px 12px;
 
   :deep(.ant-alert-message) {
     font-size: 13px;

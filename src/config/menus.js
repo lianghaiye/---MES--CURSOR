@@ -169,6 +169,7 @@ export const sideMenus = {
   ],
   procurement: [
     { key: 'purchase-req', label: '采购申请', path: '/procurement/purchase-req' },
+    { key: 'pending-purchase', label: '待采购清单', path: '/procurement/pending-purchase' },
     { key: 'purchase-orders', label: '采购订单', path: '/procurement/purchase-orders' },
     { key: 'purchase-receipts', label: '采购收货', path: '/procurement/purchase-receipts' },
     { key: 'purchase-returns', label: '采购退货', path: '/procurement/purchase-returns' },
@@ -569,6 +570,7 @@ export const routeTitles = {
   '/system/function-params': '功能参数',
   '/system/message-notify': '消息通知配置',
   '/procurement/purchase-req': '采购申请',
+  '/procurement/pending-purchase': '待采购清单',
   '/procurement/purchase-orders': '采购订单',
   '/procurement/purchase-orders/:id/edit': '编辑采购单',
   '/procurement/purchase-orders/:id/approve': '审核采购单',

@@ -139,6 +139,44 @@
             >
               <template #bodyCell="{ column, record, index }">
                 <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'productName'">
+                  <span
+                    v-if="lineItemCode(record)"
+                    class="item-name-text"
+                    :title="lineProductName(record)"
+                  >
+                    {{ lineProductName(record) || '—' }}
+                  </span>
+                  <span
+                    v-else-if="isSpuLine(record)"
+                    class="item-name-text"
+                    :title="record.productName || record.spuName"
+                  >
+                    {{ record.productName || record.spuName || '—' }}
+                  </span>
+                  <InventoryLineItemSelect
+                    v-else
+                    :value="record.productCode || record.inventoryCode"
+                    :fallback-name="lineProductName(record)"
+                    placeholder="搜索名称"
+                    @select="(item) => onLineItemSelect(record, item)"
+                    @clear="onLineItemClear(record)"
+                  />
+                </template>
+                <template v-else-if="column.key === 'productCode'">
+                  <span v-if="lineItemCode(record)" :title="lineItemCode(record)">
+                    {{ lineItemCode(record) }}
+                  </span>
+                  <InventoryLineItemSelect
+                    v-else-if="!isSpuLine(record)"
+                    :value="record.productCode || record.inventoryCode"
+                    :fallback-name="lineProductName(record)"
+                    placeholder="搜索编码"
+                    @select="(item) => onLineItemSelect(record, item)"
+                    @clear="onLineItemClear(record)"
+                  />
+                  <span v-else>—</span>
+                </template>
                 <template v-else-if="column.key === 'specModel'">
                   <a
                     v-if="isSpuLine(record)"
@@ -349,6 +387,7 @@ import BomBlankSizeModal from '@/views/product-process/components/BomBlankSizeMo
 import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSalesSpuVariantModal.vue'
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import InventoryLineTableFooter from '@/views/inventory/components/InventoryLineTableFooter.vue'
+import InventoryLineItemSelect from '@/views/inventory/components/InventoryLineItemSelect.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -581,6 +620,72 @@ function resolveStockQty(code) {
 
 function lineItemCode(line) {
   return line.productCode || line.inventoryCode || ''
+}
+
+function lineProductName(line) {
+  return line.productName || line.inventoryName || ''
+}
+
+function onLineItemSelect(record, item) {
+  if (item?.pickType === 'spu' || item?.isSpuTemplate) {
+    const spuId = item.spuId || item.id
+    if (!spuId) return
+    const dup = form.lineItems.some(
+      (line) =>
+        line.id !== record.id && isSpuLine(line) && line.spuId === spuId && !lineItemCode(line),
+    )
+    if (dup) {
+      message.warning('该产品族已在明细中（待配置变体）')
+      return
+    }
+    const draft = createSpuLineDraft(item)
+    const preserved = {
+      id: record.id,
+      planPurchaseQty: record.planPurchaseQty ?? 1,
+      receivingWarehouse: record.receivingWarehouse || form.receivingWarehouse || '',
+      salesOrderNo: record.salesOrderNo || form.salesOrderNo || '',
+      remark: record.remark || '',
+    }
+    Object.assign(
+      record,
+      createLineItem({
+        ...draft,
+        ...preserved,
+        inventoryName: draft.productName,
+        inventoryCode: '',
+        demandQty: 1,
+        stockQty: 0,
+      }),
+    )
+    return
+  }
+  const code = item?.code || ''
+  if (!code) return
+  const duplicate = form.lineItems.find((l) => l.id !== record.id && lineItemCode(l) === code)
+  if (duplicate) {
+    message.warning('该物品已在明细中')
+    return
+  }
+  const mapped = mapPickerToLineItem(item)
+  const preserved = {
+    id: record.id,
+    planPurchaseQty: record.planPurchaseQty ?? mapped.planPurchaseQty,
+    receivingWarehouse: record.receivingWarehouse || mapped.receivingWarehouse,
+    salesOrderNo: record.salesOrderNo || mapped.salesOrderNo,
+    remark: record.remark ?? mapped.remark,
+  }
+  Object.assign(record, { ...mapped, ...preserved })
+}
+
+function onLineItemClear(record) {
+  const preserved = {
+    id: record.id,
+    planPurchaseQty: record.planPurchaseQty,
+    receivingWarehouse: record.receivingWarehouse,
+    salesOrderNo: record.salesOrderNo,
+    remark: record.remark,
+  }
+  Object.assign(record, createLineItem(preserved))
 }
 
 function openProductPicker() {
@@ -1014,6 +1119,13 @@ function handleSave() {
   &:hover {
     color: #4096ff;
   }
+}
+
+.item-name-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .qty-with-unit-edit {

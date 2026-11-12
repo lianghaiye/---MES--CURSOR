@@ -43,13 +43,44 @@
   font-size: 13px;
 }
 
-.list-page .summary-bar {
+/**
+ * 列表选中提示条：全局统一矮高度（各页 a-alert.summary-bar）
+ * 页面 scoped 若写了 padding: 6px 请改为 4px，或删掉 padding 走本处
+ */
+.ant-alert.summary-bar,
+.list-page .summary-bar.ant-alert {
   margin-bottom: 8px;
-  padding: 6px 12px;
+  padding: 4px 12px;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 0;
+  line-height: 22px;
 }
 
-.list-page .summary-bar .ant-alert-message {
+.ant-alert.summary-bar .ant-alert-icon,
+.list-page .summary-bar.ant-alert .ant-alert-icon {
+  margin-top: 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.ant-alert.summary-bar .ant-alert-content,
+.list-page .summary-bar.ant-alert .ant-alert-content {
+  min-width: 0;
+}
+
+.ant-alert.summary-bar .ant-alert-message,
+.list-page .summary-bar.ant-alert .ant-alert-message {
   font-size: 13px;
+  line-height: 22px;
+  margin-bottom: 0;
+}
+
+.ant-alert.summary-bar .ant-btn-link,
+.list-page .summary-bar.ant-alert .ant-btn-link {
+  height: 22px;
+  padding: 0 4px;
+  line-height: 22px;
 }
 
 .list-page .table-pagination {

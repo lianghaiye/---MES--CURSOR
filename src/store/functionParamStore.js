@@ -261,6 +261,34 @@ export const SALES_ORDER_STOCK_FULFILLMENT_DEFAULT_DESCRIPTION =
   '新建销售订单时，明细行「库存履约」的初始值。' +
   '可在下单时逐行修改；不影响已保存订单。默认「优先现货」。'
 
+/** 采购：待采购清单 / 订单合并 */
+export const PURCHASE_MERGE_MODES = {
+  MANUAL: 'manual',
+  AUTO: 'auto',
+}
+
+export const PURCHASE_MERGE_MODE_OPTIONS = [
+  { value: PURCHASE_MERGE_MODES.MANUAL, label: '手动' },
+  { value: PURCHASE_MERGE_MODES.AUTO, label: '自动（二期）', disabled: true },
+]
+
+export const PENDING_PURCHASE_LIST_ENABLED_DESCRIPTION =
+  '开启后侧栏显示「待采购清单」，汇总采购申请未转完的可采明细，可按供应商勾选生成采购订单。默认开启。'
+
+export const PENDING_PURCHASE_MERGE_MODE_DESCRIPTION =
+  '待采购清单合并方式。手动：在清单勾选后生成；自动：定时按供应商合并（二期，本期仅预留开关）。默认手动。'
+
+export const PURCHASE_ORDER_MERGE_ENABLED_DESCRIPTION =
+  '开启后采购订单列表可「按供应商合并」未执行订单（待提交 / 待审核 / 已拒绝）。默认开启。'
+
+export const PURCHASE_ORDER_MERGE_MODE_DESCRIPTION =
+  '采购订单合并方式。手动：列表勾选后合并；自动：定时按供应商合并（二期，本期仅预留开关）。默认手动。'
+
+function normalizePurchaseMergeMode(mode) {
+  if (mode === PURCHASE_MERGE_MODES.AUTO || mode === PURCHASE_MERGE_MODES.MANUAL) return mode
+  return PURCHASE_MERGE_MODES.MANUAL
+}
+
 /** 质检门控：按业务类型配置（强管控阻断 / 弱管控仅预警） */
 export const QC_GATE_POLICY_PARAM_OPTIONS = [
   { value: 'soft', label: '弱管控（仅预警）' },
@@ -435,6 +463,11 @@ export const FUNCTION_PARAM_CATEGORIES = [
     key: 'sales',
     label: '销售',
     description: '销售订单计价、折扣、库存履约默认值与回款挂接相关配置。',
+  },
+  {
+    key: 'procurement',
+    label: '采购',
+    description: '待采购清单与采购订单合并相关配置。',
   },
   {
     key: 'production',
@@ -658,6 +691,32 @@ export const FUNCTION_PARAM_ROWS = [
     description: PAYMENT_LINK_MODE_DESCRIPTION,
   },
   {
+    key: 'pendingPurchaseListEnabled',
+    category: 'procurement',
+    scenario: '待采购清单',
+    description: PENDING_PURCHASE_LIST_ENABLED_DESCRIPTION,
+    controlType: 'switch',
+  },
+  {
+    key: 'pendingPurchaseMergeMode',
+    category: 'procurement',
+    scenario: '待采购合并方式',
+    description: PENDING_PURCHASE_MERGE_MODE_DESCRIPTION,
+  },
+  {
+    key: 'purchaseOrderMergeEnabled',
+    category: 'procurement',
+    scenario: '采购订单合并',
+    description: PURCHASE_ORDER_MERGE_ENABLED_DESCRIPTION,
+    controlType: 'switch',
+  },
+  {
+    key: 'purchaseOrderMergeMode',
+    category: 'procurement',
+    scenario: '订单合并方式',
+    description: PURCHASE_ORDER_MERGE_MODE_DESCRIPTION,
+  },
+  {
     key: 'enableBomLevelMts',
     category: 'production',
     scenario: '生产计划启用 BOM 级 MTS',
@@ -853,6 +912,10 @@ function loadFromStorage() {
             parsed.salesOrderStockFulfillmentDefault,
           ),
           paymentLinkMode: normalizePaymentLinkMode(parsed.paymentLinkMode),
+          pendingPurchaseListEnabled: parsed.pendingPurchaseListEnabled !== false,
+          pendingPurchaseMergeMode: normalizePurchaseMergeMode(parsed.pendingPurchaseMergeMode),
+          purchaseOrderMergeEnabled: parsed.purchaseOrderMergeEnabled !== false,
+          purchaseOrderMergeMode: normalizePurchaseMergeMode(parsed.purchaseOrderMergeMode),
           qcDefaultGatePolicy: normalizeQcGatePolicyParam(parsed.qcDefaultGatePolicy),
           qcGatePolicyByBizScope: normalizeQcGatePolicyMap(parsed.qcGatePolicyByBizScope),
           displayParams: normalizeDisplayParams(parsed.displayParams),
@@ -900,6 +963,10 @@ export const functionParamState = reactive({
     enableSalesOrderDiscount: true,
     salesOrderStockFulfillmentDefault: STOCK_FULFILLMENT_MODE.PREFER_STOCK,
     paymentLinkMode: PAYMENT_LINK_MODES.BOTH,
+    pendingPurchaseListEnabled: true,
+    pendingPurchaseMergeMode: PURCHASE_MERGE_MODES.MANUAL,
+    purchaseOrderMergeEnabled: true,
+    purchaseOrderMergeMode: PURCHASE_MERGE_MODES.MANUAL,
     qcDefaultGatePolicy: 'soft',
     qcGatePolicyByBizScope: normalizeQcGatePolicyMap(),
     displayParams: createDefaultDisplayParams(),
@@ -1218,6 +1285,42 @@ export function getPaymentLinkMode() {
 export function setPaymentLinkMode(mode) {
   const normalized = normalizePaymentLinkMode(mode)
   functionParamState.params.paymentLinkMode = normalized
+  return { ok: true }
+}
+
+export function isPendingPurchaseListEnabled() {
+  return functionParamState.params.pendingPurchaseListEnabled !== false
+}
+
+export function setPendingPurchaseListEnabled(enabled) {
+  functionParamState.params.pendingPurchaseListEnabled = Boolean(enabled)
+  return { ok: true }
+}
+
+export function getPendingPurchaseMergeMode() {
+  return normalizePurchaseMergeMode(functionParamState.params.pendingPurchaseMergeMode)
+}
+
+export function setPendingPurchaseMergeMode(mode) {
+  functionParamState.params.pendingPurchaseMergeMode = normalizePurchaseMergeMode(mode)
+  return { ok: true }
+}
+
+export function isPurchaseOrderMergeEnabled() {
+  return functionParamState.params.purchaseOrderMergeEnabled !== false
+}
+
+export function setPurchaseOrderMergeEnabled(enabled) {
+  functionParamState.params.purchaseOrderMergeEnabled = Boolean(enabled)
+  return { ok: true }
+}
+
+export function getPurchaseOrderMergeMode() {
+  return normalizePurchaseMergeMode(functionParamState.params.purchaseOrderMergeMode)
+}
+
+export function setPurchaseOrderMergeMode(mode) {
+  functionParamState.params.purchaseOrderMergeMode = normalizePurchaseMergeMode(mode)
   return { ok: true }
 }
 

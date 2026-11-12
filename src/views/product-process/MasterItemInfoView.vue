@@ -250,9 +250,6 @@
                 <template v-if="column.key === 'index'">
                   {{ rowIndex(index) }}
                 </template>
-                <template v-else-if="column.key === 'itemKind'">
-                  <a-tag>{{ record.itemKindLabel || '—' }}</a-tag>
-                </template>
                 <template v-else-if="column.key === 'businessType'">
                   <span class="attr-ellipsis">{{ formatProductBusinessType(record) }}</span>
                 </template>
@@ -267,9 +264,6 @@
                 </template>
                 <template v-else-if="column.key === 'supplyForm'">
                   {{ record.supplyForm || '—' }}
-                </template>
-                <template v-else-if="column.key === 'weight'">
-                  {{ formatWeight(record.weight) }}
                 </template>
                 <template v-else-if="column.key === 'inventoryUnit'">
                   <a-tag color="blue" class="unit-tag">{{ record.inventoryUnit || '—' }}</a-tag>
@@ -297,11 +291,6 @@
                 </template>
                 <template v-else-if="column.key === 'defaultOutsourceSupplier'">
                   {{ record.production?.defaultOutsourceSupplier || '—' }}
-                </template>
-                <template v-else-if="column.key === 'isProductMaterial'">
-                  <a-tag :color="record.isProductMaterial ? 'success' : 'error'">
-                    {{ record.isProductMaterial ? '是' : '否' }}
-                  </a-tag>
                 </template>
                 <template v-else-if="column.key === 'creator'">
                   {{ record.creator || '—' }}
@@ -987,26 +976,23 @@ const baseColumns = [
   },
   { title: '名称', dataIndex: 'name', width: 200, fixed: 'left', ellipsis: true },
   { title: '产品族', dataIndex: 'spuName', width: 100, ellipsis: true },
-  { title: '产品类型', key: 'itemKind', width: 96, align: 'center' },
   { title: '规格型号', dataIndex: 'specModel', width: 100 },
   { title: '材质', dataIndex: 'material', width: 80 },
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
-  { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
-  { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
   { title: '标准规范', dataIndex: 'standardSpec', width: 100, ellipsis: true },
   { title: '物料类型', key: 'materialType', width: 90 },
   { title: '供应型态', key: 'supplyForm', width: 90 },
   { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
   { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
-  { title: '重量', key: 'weight', width: 88, align: 'right' },
   { title: '库存单位', key: 'inventoryUnit', width: 88, align: 'center' },
   { title: '标准单价(不含税)', key: 'unitPrice', width: 120, align: 'right' },
   { title: 'BOM信息', key: 'bomInfo', width: 200, ellipsis: true },
   { title: '默认工作中心', key: 'defaultWorkCenter', width: 110 },
   { title: '默认采购供应商', key: 'defaultSupplier', width: 120, ellipsis: true },
   { title: '默认外协供应商', key: 'defaultOutsourceSupplier', width: 120, ellipsis: true },
-  { title: '产品物料', key: 'isProductMaterial', width: 90, align: 'center' },
+  { title: '业务类型', key: 'businessType', width: 140, ellipsis: true },
+  { title: '产品属性', key: 'productAttribute', width: 110, ellipsis: true },
   { title: '创建日期', dataIndex: 'createdAt', width: 110 },
   { title: '更新日期', dataIndex: 'updatedAt', width: 110 },
   { title: '创建人', key: 'creator', width: 88 },
@@ -1015,7 +1001,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('master-item-list-v3', baseColumns, { minScrollX: 2920 })
+  useTableColumnSettings('master-item-list-v5', baseColumns, { minScrollX: 2720 })
 
 const tableColumns = computed(() =>
   displayColumns.value.map((col) => {
@@ -1058,11 +1044,6 @@ function rowIndex(index) {
 }
 
 function formatPrice(val) {
-  if (val === '' || val == null) return ''
-  return Number(val).toFixed(2)
-}
-
-function formatWeight(val) {
   if (val === '' || val == null) return ''
   return Number(val).toFixed(2)
 }

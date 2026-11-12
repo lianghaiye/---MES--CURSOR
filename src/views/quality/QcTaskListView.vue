@@ -1094,7 +1094,7 @@ function handleTerminate() {
 
 .summary-bar {
   margin-bottom: 8px;
-  padding: 6px 12px;
+  padding: 4px 12px;
 }
 
 .table-card {

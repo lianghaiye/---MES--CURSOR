@@ -24,6 +24,7 @@ import { Badge } from 'ant-design-vue'
 import { sideMenus, resolveModuleKey, findSideMenuItemByPath } from '@/config/menus'
 import { useTabs } from '@/composables/useTabs'
 import { useWorkOrderMenuBadges } from '@/composables/useWorkOrderMenuBadges'
+import { functionParamState, isPendingPurchaseListEnabled } from '@/store/functionParamStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -64,7 +65,18 @@ function mapMenuItem(item) {
   }
 }
 
-const menuItems = computed(() => (sideMenus[moduleKey.value] || []).map(mapMenuItem))
+function visibleSideMenus() {
+  void functionParamState.params.pendingPurchaseListEnabled
+  const menus = sideMenus[moduleKey.value] || []
+  return menus.filter((item) => {
+    if (item.path === '/procurement/pending-purchase') {
+      return isPendingPurchaseListEnabled()
+    }
+    return true
+  })
+}
+
+const menuItems = computed(() => visibleSideMenus().map(mapMenuItem))
 
 function flattenMenuPaths(menus) {
   const paths = []
