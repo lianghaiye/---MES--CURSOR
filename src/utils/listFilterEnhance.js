@@ -129,6 +129,8 @@ function applyVisibility(container) {
 function enhanceContainer(container) {
   if (!container) return
   if (container.closest?.('.list-filter-bar')) return
+  // 页面自行管理展开/收起时跳过，避免与 Vue 状态互抢
+  if (container.closest?.('[data-list-filter-manual]')) return
 
   const cols = fieldChildren(container)
   const fieldCols = cols.filter((c) => !isActionItem(c))

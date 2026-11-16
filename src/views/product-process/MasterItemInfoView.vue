@@ -55,8 +55,21 @@
 
       <div class="main-panel">
         <div class="filter-card">
-          <a-form :model="filters" layout="inline" class="filter-form horizontal-form">
-            <a-row :gutter="[12, 8]" style="width: 100%">
+          <a-form
+            :model="filters"
+            layout="inline"
+            class="filter-form horizontal-form"
+            data-list-filter-manual="1"
+          >
+            <a-row
+              :gutter="[12, 8]"
+              class="list-filter-grid-row"
+              :class="{
+                'is-filter-collapsed': !filterExpanded,
+                'is-filter-compact': filterFieldCount < 10,
+              }"
+              style="width: 100%"
+            >
               <a-col :xs="24" :sm="12" :md="8" :lg="4">
                 <a-form-item label="编号">
                   <a-input
@@ -89,13 +102,24 @@
                 </a-form-item>
               </a-col>
               <a-col :xs="24" :sm="12" :md="8" :lg="4">
-                <a-form-item label="产品类型">
+                <a-form-item label="类型">
                   <a-select
-                    v-model:value="filters.itemKind"
+                    v-model:value="filters.materialType"
                     allow-clear
                     size="small"
-                    placeholder="请选择 产品类型"
-                    :options="itemKindFilterOpts"
+                    placeholder="请选择 类型"
+                    :options="materialTypeFilterOpts"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :sm="12" :md="8" :lg="4">
+                <a-form-item label="供应型态">
+                  <a-select
+                    v-model:value="filters.supplyForm"
+                    allow-clear
+                    size="small"
+                    placeholder="请选择 供应型态"
+                    :options="supplyFormFilterOpts"
                   />
                 </a-form-item>
               </a-col>
@@ -159,6 +183,18 @@
                       搜索
                     </a-button>
                     <a-button size="small" @click="handleReset">清空</a-button>
+                    <a-button
+                      v-if="filterFieldCount >= 5"
+                      type="link"
+                      size="small"
+                      class="list-filter-auto-toggle"
+                      @click="filterExpanded = !filterExpanded"
+                    >
+                      {{ filterExpanded ? '收起' : '展开' }}
+                      <span class="list-filter-auto-toggle-icon" aria-hidden="true">
+                        {{ filterExpanded ? '▴' : '▾' }}
+                      </span>
+                    </a-button>
                   </a-space>
                 </a-form-item>
               </a-col>
@@ -472,7 +508,12 @@ import {
   moveMaterialCategory,
 } from '@/store/materialCategoryStore'
 import { buildCategoryItemCountMap, sortCategoryTreeForDisplay } from '@/utils/categoryTreeSort'
-import { barcodeTypeOptions, workCenterOpts } from '@/mock/materialInfoOptions'
+import {
+  barcodeTypeOptions,
+  materialTypeOptions,
+  supplyFormOptions,
+  workCenterOpts,
+} from '@/mock/materialInfoOptions'
 import { productInfoState, archiveProduct, unarchiveProduct } from '@/store/productInfoStore'
 import {
   findDirectBomRefsForItem,
@@ -504,10 +545,8 @@ import { buildUnifiedListRows, filterUnifiedListRows } from '@/utils/masterItemL
 import {
   CATEGORY_TREE_ALL_ROOT,
   CATEGORY_TREE_MODE,
-  ITEM_KIND,
   decodeCategoryTreeKey,
   encodeCategoryTreeKey,
-  itemKindLabel,
   resolveBomItemTypeForKind,
 } from '@/utils/masterItemKind'
 import { saveMasterItem, deleteMasterItem, cloneMasterItem } from '@/utils/masterItemSave'
@@ -582,14 +621,18 @@ const filters = reactive({
   name: '',
   barcodeType: undefined,
   categoryKey: undefined,
+  materialType: undefined,
+  supplyForm: undefined,
   specModel: '',
   material: '',
   drawingNo: '',
   businessType: undefined,
   workCenter: undefined,
-  itemKind: undefined,
 })
 const appliedFilters = ref({ ...filters })
+/** 筛选展开：本页自行管理，避免自动增强与 Vue 重渲染互抢导致点不开 */
+const filterExpanded = ref(false)
+const filterFieldCount = 10
 const selectedRowKeys = ref([])
 const formModalOpen = ref(false)
 const editRecord = ref(null)
@@ -617,11 +660,8 @@ const businessTypeFilterOpts = MASTER_BUSINESS_TYPE_OPTIONS.map((o) => ({
   label: o.label,
   value: o.key,
 }))
-const itemKindFilterOpts = [
-  { label: itemKindLabel(ITEM_KIND.PRODUCT), value: ITEM_KIND.PRODUCT },
-  { label: itemKindLabel(ITEM_KIND.MATERIAL), value: ITEM_KIND.MATERIAL },
-  { label: itemKindLabel(ITEM_KIND.PRODUCT_MATERIAL), value: ITEM_KIND.PRODUCT_MATERIAL },
-]
+const materialTypeFilterOpts = materialTypeOptions.map((v) => ({ label: v, value: v }))
+const supplyFormFilterOpts = supplyFormOptions.map((v) => ({ label: v, value: v }))
 const workCenterFilterOpts = workCenterOpts
 
 const productCategoryCountMap = computed(() => {
@@ -981,7 +1021,7 @@ const baseColumns = [
   { title: '图号', dataIndex: 'drawingNo', width: 100, ellipsis: true },
   { title: '类别', dataIndex: 'categoryName', width: 88 },
   { title: '标准规范', dataIndex: 'standardSpec', width: 100, ellipsis: true },
-  { title: '物料类型', key: 'materialType', width: 90 },
+  { title: '类型', key: 'materialType', width: 90 },
   { title: '供应型态', key: 'supplyForm', width: 90 },
   { title: '技术参数', dataIndex: 'techParams', width: 120, ellipsis: true },
   { title: '配套要求', key: 'matchingRequirements', width: 120, ellipsis: true },
@@ -1001,7 +1041,7 @@ const baseColumns = [
 ]
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('master-item-list-v5', baseColumns, { minScrollX: 2720 })
+  useTableColumnSettings('master-item-list-v6', baseColumns, { minScrollX: 2720 })
 
 const tableColumns = computed(() =>
   displayColumns.value.map((col) => {
@@ -1067,12 +1107,13 @@ function handleReset() {
   filters.name = ''
   filters.barcodeType = undefined
   filters.categoryKey = undefined
+  filters.materialType = undefined
+  filters.supplyForm = undefined
   filters.specModel = ''
   filters.material = ''
   filters.drawingNo = ''
   filters.businessType = undefined
   filters.workCenter = undefined
-  filters.itemKind = undefined
   appliedFilters.value = { ...filters }
   pagination.current = 1
 }
