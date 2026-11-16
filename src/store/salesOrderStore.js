@@ -467,8 +467,12 @@ export function changeSalesOrderDeliveryMode(orderId, rows) {
   if (!check.ok) return check
 
   const planOps = applyDeliveryModeChanges(order, rows)
+  if (!planOps.length) {
+    return { ok: false, message: '变更未应用到销售明细，请刷新后重试' }
+  }
   syncProductionPlanDeliveryMode(order.orderNo, planOps)
   recalcOrderAmounts(order)
+  touchOrder(order)
 
   return { ok: true, message: '交付方式变更成功' }
 }

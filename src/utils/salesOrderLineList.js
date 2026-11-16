@@ -2,6 +2,7 @@ import dayjs from 'dayjs'
 import { calcSalesLineShippedQty } from '@/utils/salesLineShipped'
 import { normalizeSalesOrderProgressStatus } from '@/utils/salesOrderStatus'
 import { stockFulfillmentModeLabel } from '@/utils/salesStockFulfillment'
+import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 
 /** 行发货状态（与订单头发货状态口径一致） */
 export const SALES_LINE_DELIVERY_STATUS = {
@@ -74,7 +75,7 @@ export function flattenSalesOrderLines(orders = []) {
         shippedQty,
         unshippedQty: Math.max(0, salesQty - shippedQty),
         lineDeliveryStatus,
-        deliveryMode: line.deliveryMode || '',
+        deliveryMode: normalizeDeliveryMode(line, order),
         stockFulfillmentMode: line.stockFulfillmentMode || '',
         stockFulfillmentModeLabel: stockFulfillmentModeLabel(line.stockFulfillmentMode),
         preferStockTakeQty: line.preferStockTakeQty,

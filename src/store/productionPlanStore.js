@@ -1130,7 +1130,7 @@ export function syncProductionPlanDeliveryMode(salesOrderNo, planOps) {
       wi.deliveryMode = op.deliveryMode
       wi.salesQty = op.qty
       wi.orderQty = op.qty
-      enrichWorkItem(wi)
+      Object.assign(wi, enrichWorkItem(wi))
       return
     }
 
@@ -1157,7 +1157,7 @@ export function syncProductionPlanDeliveryMode(salesOrderNo, planOps) {
       newWi.salesQty = op.qty
       newWi.orderQty = op.qty
       newWi.shippedQty = 0
-      enrichWorkItem(newWi, op.line)
+      Object.assign(newWi, enrichWorkItem(newWi, op.line))
       plan.workItems.push(newWi)
     }
   })

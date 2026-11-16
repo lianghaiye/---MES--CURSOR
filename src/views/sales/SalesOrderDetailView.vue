@@ -286,8 +286,10 @@
                     }}
                   </template>
                   <template v-else-if="column.key === 'deliveryMode'">
-                    <a-tag :color="line.deliveryMode === '散件' ? 'orange' : 'blue'">
-                      {{ line.deliveryMode || '整件' }}
+                    <a-tag
+                      :color="normalizeDeliveryMode(line, order) === '散件' ? 'orange' : 'blue'"
+                    >
+                      {{ normalizeDeliveryMode(line, order) }}
                     </a-tag>
                   </template>
                   <template v-else-if="column.key === 'stockFulfillmentMode'">
@@ -1377,6 +1379,7 @@ import {
   readSalesOrderDetailTab,
 } from '@/utils/salesOrderDetailTab'
 import { buildExportFileName, exportRowsToExcel } from '@/utils/excelExport'
+import { normalizeDeliveryMode } from '@/utils/salesDeliveryMode'
 
 const route = useRoute()
 const router = useRouter()

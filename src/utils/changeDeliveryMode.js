@@ -130,19 +130,20 @@ export function collectDeliveryModeChangeWarnings(order, rows) {
   return warnings
 }
 
-function applySingleLineChange(lineItems, lineIndex, change) {
+function applySingleLineChange(lineItems, lineIndex, change, order) {
   const line = lineItems[lineIndex]
-  const shippedQty = change.shippedQty
   const orderQty = Number(line.salesQty ?? line.qty) || 0
   const changeQty = Number(change.changeQty) || 0
-  const availableQty = orderQty - shippedQty
-  const stayOldQty = shippedQty + (availableQty - changeQty)
+  /** 与弹窗「可变更数量」一致：剩余行数量 = 订单量 − 变更量（含已占用未发部分留在原行） */
+  const stayOldQty = orderQty - changeQty
   const newLineId = `line-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
 
   if (stayOldQty <= 0) {
     line.deliveryMode = change.newMode
     return [{ type: 'update', lineId: line.id, deliveryMode: change.newMode, qty: orderQty }]
   }
+
+  line.deliveryMode = normalizeDeliveryMode(line, order)
 
   scaleLineQty(line, stayOldQty)
 
@@ -170,18 +171,17 @@ function applySingleLineChange(lineItems, lineIndex, change) {
 
 /** 应用变更到销售明细，返回计划同步指令 */
 export function applyDeliveryModeChanges(order, rows) {
-  const lineItems = order.lineItems || []
+  if (!Array.isArray(order.lineItems)) {
+    order.lineItems = []
+  }
+  const lineItems = order.lineItems
   const planOps = []
 
   rows.forEach((row) => {
     const lineIndex = lineItems.findIndex((l) => l.id === row.lineId)
     if (lineIndex === -1) return
 
-    const meta = buildEligibleDeliveryModeLines(order).find((l) => l.lineId === row.lineId)
-    const ops = applySingleLineChange(lineItems, lineIndex, {
-      ...row,
-      shippedQty: meta?.shippedQty ?? calcSalesLineShippedQty(order, lineItems[lineIndex]),
-    })
+    const ops = applySingleLineChange(lineItems, lineIndex, row, order)
     planOps.push(...ops)
   })
 
