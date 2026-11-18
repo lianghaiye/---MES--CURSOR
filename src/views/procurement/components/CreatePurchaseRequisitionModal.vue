@@ -287,7 +287,11 @@
                   />
                 </template>
                 <template v-else-if="column.key === 'actions'">
-                  <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                  <a-space :size="4">
+                    <a @click="openLineEdit(record)">编辑</a>
+                    <a @click="cloneLine(record)">克隆</a>
+                    <a class="danger-link" @click="removeLine(record.id)">删除</a>
+                  </a-space>
                 </template>
                 <template v-else>
                   {{ record[column.dataIndex] ?? '—' }}
@@ -355,6 +359,13 @@
     :line="orderSizeModalLine"
     @confirm="onOrderSizeConfirm"
   />
+
+  <PurchaseRequisitionLineEditModal
+    v-model:open="lineEditOpen"
+    :line="lineEditTarget"
+    :warehouse-opts="warehouseOpts"
+    @save="onLineEditSave"
+  />
 </template>
 
 <script setup>
@@ -388,6 +399,7 @@ import ConfigureSalesSpuVariantModal from '@/views/sales/components/ConfigureSal
 import PlanSupplierSelect from '@/views/planning/components/PlanSupplierSelect.vue'
 import InventoryLineTableFooter from '@/views/inventory/components/InventoryLineTableFooter.vue'
 import InventoryLineItemSelect from '@/views/inventory/components/InventoryLineItemSelect.vue'
+import PurchaseRequisitionLineEditModal from './PurchaseRequisitionLineEditModal.vue'
 import FormCreateShell from '@/components/FormCreateShell.vue'
 import TableColumnSettingDrawer from '@/components/TableColumnSettingDrawer.vue'
 import TableColumnSettingButton from '@/components/TableColumnSettingButton.vue'
@@ -446,7 +458,7 @@ const salespersonOpts = salespersonOptions.map((v) => ({ label: v, value: v }))
 const CURRENT_USER = 'admin1'
 
 const { columnSettings, columnDrawerOpen, displayColumns, tableScrollX, defaultColumnSettings } =
-  useTableColumnSettings('purchase-req-form-lines-v7', purchaseRequisitionFormLineColumns, {
+  useTableColumnSettings('purchase-req-form-lines-v8', purchaseRequisitionFormLineColumns, {
     minScrollX: 1560,
     pinEdgeColumns: false,
     pinActionColumn: true,
@@ -891,6 +903,37 @@ function onQtyChange(record) {
 
 function removeLine(id) {
   form.lineItems = form.lineItems.filter((line) => line.id !== id)
+}
+
+const lineEditOpen = ref(false)
+const lineEditSourceId = ref(null)
+const lineEditTarget = ref(null)
+
+function openLineEdit(record) {
+  lineEditSourceId.value = record.id
+  lineEditTarget.value = { ...record }
+  lineEditOpen.value = true
+}
+
+function onLineEditSave(updated) {
+  const idx = form.lineItems.findIndex((l) => l.id === lineEditSourceId.value)
+  if (idx < 0) return
+  Object.assign(form.lineItems[idx], updated)
+  onUnitChange(form.lineItems[idx])
+  onQtyChange(form.lineItems[idx])
+}
+
+function cloneLine(record) {
+  const copy = createLineItem({
+    ...record,
+    id: undefined,
+    poGenStatus: '未生成采购',
+    purchaseOrderNos: '',
+  })
+  const idx = form.lineItems.findIndex((l) => l.id === record.id)
+  if (idx >= 0) form.lineItems.splice(idx + 1, 0, copy)
+  else form.lineItems.push(copy)
+  message.success('已克隆一行明细')
 }
 
 function openOrderSizeEdit(record) {

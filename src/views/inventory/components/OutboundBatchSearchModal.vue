@@ -42,6 +42,9 @@
     >
       <template #bodyCell="{ column, record, index }">
         <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+        <template v-else-if="column.key === 'orderSizeText'">
+          {{ resolveBatchOrderSizeText(record) }}
+        </template>
         <template v-else-if="column.key === 'currentLength'">
           {{ formatQty(record.currentLength) }}{{ record.unit || unitLabel }}
         </template>
@@ -62,6 +65,7 @@ import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { listBatches, stockBatchState } from '@/store/stockBatchStore'
 import { formatQty } from '@/utils/numberFormat'
+import { resolveBatchOrderSizeText } from '@/utils/inboundOrderSize'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -82,6 +86,7 @@ const columns = [
   { title: '序号', key: 'index', width: 56, align: 'center' },
   { title: '物料名称', dataIndex: 'itemName', key: 'itemName', ellipsis: true },
   { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 140 },
+  { title: '尺寸', key: 'orderSizeText', width: 140, ellipsis: true },
   { title: '当前仓库数量', key: 'currentLength', width: 120 },
   { title: '入库时间', key: 'createdAt', width: 150 },
 ]
@@ -119,7 +124,9 @@ const filteredRows = computed(() => {
     .toLowerCase()
   if (kw) {
     list = list.filter((b) => {
-      const text = `${b.batchNo || ''} ${b.itemName || ''} ${b.itemCode || ''}`.toLowerCase()
+      const size = resolveBatchOrderSizeText(b)
+      const text =
+        `${b.batchNo || ''} ${b.itemName || ''} ${b.itemCode || ''} ${size || ''}`.toLowerCase()
       return text.includes(kw)
     })
   }

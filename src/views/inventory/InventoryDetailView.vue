@@ -337,7 +337,7 @@
           row-key="id"
           size="small"
           bordered
-          :scroll="{ x: 1200 }"
+          :scroll="{ x: 1340 }"
           :pagination="{ pageSize: 15 }"
         >
           <template #bodyCell="{ column, record }">
@@ -354,6 +354,9 @@
             </template>
             <template v-else-if="column.key === 'unitCost'">
               {{ formatInventoryMoney(record.unitCost) }}
+            </template>
+            <template v-else-if="column.key === 'orderSizeText'">
+              {{ resolveBatchOrderSizeText(record) }}
             </template>
           </template>
         </a-table>
@@ -529,6 +532,9 @@
               </template>
               <template v-else-if="column.key === 'convertActualUnitWeight'">
                 {{ formatConvertActualUnitWeight(record) }}
+              </template>
+              <template v-else-if="column.key === 'orderSizeText'">
+                {{ resolveBatchOrderSizeText(record) }}
               </template>
               <template v-else-if="column.key === 'status'">
                 <a-tag :color="record.status === '在库' ? 'green' : 'default'">
@@ -744,6 +750,7 @@ import {
   buildInventoryGroupRowSpans,
   inventoryGroupKey,
 } from '@/utils/inventoryLineMerge'
+import { resolveBatchOrderSizeText } from '@/utils/inboundOrderSize'
 import { hasBatchUomConvert } from '@/utils/batchUomConvert'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { formatQtyWithUnit, formatQty } from '@/utils/numberFormat'
@@ -1034,6 +1041,7 @@ const batchQueryColumns = [
   { title: '仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100 },
   { title: '产品编码', dataIndex: 'itemCode', key: 'itemCode', width: 130 },
   { title: '产品名称', dataIndex: 'itemName', key: 'itemName', width: 140, ellipsis: true },
+  { title: '尺寸', key: 'orderSizeText', width: 140, ellipsis: true },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 64 },
   { title: '在库数量', key: 'currentLength', width: 100, align: 'right' },
   { title: '批次成本', key: 'unitCost', width: 100, align: 'right' },
@@ -1243,6 +1251,7 @@ const drawerBatchColumns = computed(() => {
   cols.push(
     { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 100 },
     { title: '来源单号', dataIndex: 'sourceDocNo', key: 'sourceDocNo', width: 132, ellipsis: true },
+    { title: '尺寸', key: 'orderSizeText', width: 140, ellipsis: true },
     { title: '在库数量', key: 'currentLength', width: 110, align: 'right' },
     { title: '批次成本', key: 'unitCost', width: 100, align: 'right' },
     { title: '点收数量', key: 'inboundQty', width: 110, align: 'right' },

@@ -14,6 +14,8 @@ import {
 import { calcPoLineRemainInboundQty } from '@/utils/purchaseLineInbound'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { estimateSettleQty } from '@/utils/settleUnit'
+import { pickOrderSizeFields } from '@/utils/inboundOrderSize'
+import { displayOrderSizeText } from '@/utils/orderSize'
 import { persistJson, safeSetItem } from '@/utils/safeStorage'
 import { warehouseState } from '@/store/warehouseStore'
 import { applyInboundToStock } from '@/store/stockStore'
@@ -515,6 +517,15 @@ function prepareAndApplyInboundLine(order, line) {
       inboundEntryMode: line.inboundEntryMode,
       barcodeType: barcodeType || undefined,
       specModel: line.specModel || undefined,
+      orderSizeText: (() => {
+        let text = displayOrderSizeText(line)
+        if (!text && order.purchaseOrderId && line.poLineId) {
+          const po = purchaseOrderState.orders.find((o) => o.id === order.purchaseOrderId)
+          const poLine = (po?.lineItems || []).find((l) => l.id === line.poLineId)
+          text = displayOrderSizeText(poLine)
+        }
+        return text || undefined
+      })(),
     },
   }
   const lineUomConvert = buildLineUomConvert(line)
@@ -1081,6 +1092,10 @@ export function createInboundFromPurchaseOrder(purchaseOrderId, payload = {}) {
         standardUnitWeight: line.standardUnitWeight,
         settledSettleQty: Number(line.settledSettleQty) || 0,
         totalPrice: line.totalPrice ?? null,
+        ...pickOrderSizeFields({
+          ...(po.lineItems || []).find((l) => l.id === line.poLineId),
+          ...line,
+        }),
       }),
     )
     const remarkBase = payload.remark || `采购单 ${po.orderNo} 生成`
@@ -1588,6 +1603,7 @@ function createPurchaseInboundFromQcTask(task, receipt, qtyHints, enforceQtyCap)
       settleQty,
       standardUnitWeight: poLine.standardUnitWeight,
       settledSettleQty: 0,
+      ...pickOrderSizeFields(poLine),
     })
   })
 

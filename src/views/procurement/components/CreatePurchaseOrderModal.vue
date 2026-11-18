@@ -585,7 +585,7 @@
                   <template v-else-if="column.key === 'actions'">
                     <a-space :size="4">
                       <a @click="openLineEdit(record)">编辑</a>
-                      <a @click="copyLine(record)">复制</a>
+                      <a @click="copyLine(record)">克隆</a>
                       <a class="danger-link" @click="removeLine(record.id)">删除</a>
                     </a-space>
                   </template>
@@ -1638,7 +1638,7 @@ function copyLine(record) {
   const idx = form.lineItems.findIndex((l) => l.id === record.id)
   if (idx >= 0) form.lineItems.splice(idx + 1, 0, copy)
   else form.lineItems.push(copy)
-  message.success('已复制一行明细')
+  message.success('已克隆一行明细')
 }
 
 function syncLineDeliveryDates(dateStr) {

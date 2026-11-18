@@ -273,6 +273,7 @@ import {
   validateManualBatchAllocations,
 } from '@/utils/outboundBatchAllocate'
 import OutboundBatchSearchModal from './OutboundBatchSearchModal.vue'
+import { formatOutboundBatchPickLabel } from '@/utils/inboundOrderSize'
 
 function formatQty(val) {
   return formatNumber(val, 4, { empty: '0' })
@@ -386,7 +387,7 @@ const batchOpts = computed(() => {
       return String(a.batchNo || '').localeCompare(String(b.batchNo || ''), 'zh-CN')
     })
     .map((b) => ({
-      label: `${b.batchNo}（当前 ${formatQty(b.currentLength)}${unit}）`,
+      label: formatOutboundBatchPickLabel(b, unit),
       value: b.id,
     }))
 })

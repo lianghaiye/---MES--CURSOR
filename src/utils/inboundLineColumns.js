@@ -15,6 +15,13 @@ export const inboundFormLineColumns = [
     ellipsis: true,
   },
   { title: '图号', dataIndex: 'drawingNo', key: 'drawingNo', width: 90, ellipsis: true },
+  {
+    title: '订货尺寸',
+    dataIndex: 'orderSizeText',
+    key: 'orderSizeText',
+    width: 150,
+    ellipsis: true,
+  },
   { title: '条码类型', dataIndex: 'barcodeType', key: 'barcodeType', width: 96 },
   /** 点收数量：按采购单位计，如「3 根」；单单位时与入库数量同值 */
   { title: '点收数量', key: 'qty', width: 120 },

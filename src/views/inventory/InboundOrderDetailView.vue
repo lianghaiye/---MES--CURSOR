@@ -170,6 +170,9 @@
                   <template v-else-if="column.key === 'totalPrice'">
                     {{ line.totalPrice != null && line.totalPrice !== '' ? line.totalPrice : '—' }}
                   </template>
+                  <template v-else-if="column.key === 'orderSizeText'">
+                    {{ resolveInboundLineOrderSizeText(line, record) }}
+                  </template>
                   <template v-else>
                     {{ (column.dataIndex && line[column.dataIndex]) || '—' }}
                   </template>
@@ -583,11 +586,14 @@
                   size="small"
                   bordered
                   :pagination="group.batches.length > 10 ? { pageSize: 10 } : false"
-                  :scroll="{ x: 780 }"
+                  :scroll="{ x: 920 }"
                   :expandable="batchExpandableFor(group.batches)"
                 >
                   <template #bodyCell="{ column, record: batch }">
-                    <template v-if="column.key === 'currentLength'">
+                    <template v-if="column.key === 'orderSizeText'">
+                      {{ resolveBatchOrderSizeText(batch) }}
+                    </template>
+                    <template v-else-if="column.key === 'currentLength'">
                       {{ formatQtyWithUnit(batch.currentLength, batch.unit || group.unit) }}
                       <span v-if="batch.attrs?.manageByPiece" class="piece-hint">
                         （{{ piecesOfBatch(batch.id).length }} 件）
@@ -722,6 +728,10 @@ import {
   resolveInboundQtyUnit,
   resolveInboundStockUnit,
 } from '@/utils/inboundLineHelpers'
+import {
+  resolveBatchOrderSizeText,
+  resolveInboundLineOrderSizeText,
+} from '@/utils/inboundOrderSize'
 import { hasSettleUnit } from '@/utils/settleUnit'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
 import { InfoCircleOutlined } from '@ant-design/icons-vue'
@@ -773,6 +783,13 @@ const lineScrollX = computed(() => lineColumns.reduce((s, c) => s + (c.width || 
 
 const batchColumns = [
   { title: '批次号', dataIndex: 'batchNo', key: 'batchNo', width: 130 },
+  {
+    title: '尺寸',
+    key: 'orderSizeText',
+    dataIndex: 'orderSizeText',
+    width: 140,
+    ellipsis: true,
+  },
   { title: '销售订单号', key: 'salesOrderNo', dataIndex: 'salesOrderNo', width: 130 },
   { title: '归属', key: 'ownership', width: 88 },
   { title: '仓库', dataIndex: 'warehouse', key: 'warehouse', width: 100 },

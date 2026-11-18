@@ -720,6 +720,7 @@ import {
 } from '@/utils/outboundLineHelpers'
 import { createOutboundLine } from '@/mock/outboundOrders'
 import { getBatchById, listBatches, stockBatchState } from '@/store/stockBatchStore'
+import { formatOutboundBatchPickLabel } from '@/utils/inboundOrderSize'
 import {
   getOutboundIssueRule,
   isSalesOutboundByOrder,
@@ -1379,7 +1380,7 @@ function batchOptionsFor(record) {
       return String(a.batchNo || '').localeCompare(String(b.batchNo || ''), 'zh-CN')
     })
     .map((b) => ({
-      label: `${b.batchNo}（当前 ${formatQty(b.currentLength)}${unit}）`,
+      label: formatOutboundBatchPickLabel(b, unit),
       value: b.id,
     }))
 }

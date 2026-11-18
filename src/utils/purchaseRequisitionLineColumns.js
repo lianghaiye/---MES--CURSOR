@@ -33,7 +33,7 @@ export const purchaseRequisitionFormLineColumns = [
   { title: '收货仓库', key: 'receivingWarehouse', width: 130 },
   { title: '销售单号', dataIndex: 'salesOrderNo', key: 'salesOrderNo', width: 140, ellipsis: true },
   { title: '备注', key: 'remark', width: 140, ellipsis: true },
-  { title: '操作', key: 'actions', width: 80 },
+  { title: '操作', key: 'actions', width: 140, fixed: 'right' },
 ]
 
 /** 采购申请详情页明细列（与表单一致，只读，不含操作列） */

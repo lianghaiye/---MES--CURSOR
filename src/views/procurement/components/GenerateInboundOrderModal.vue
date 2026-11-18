@@ -507,6 +507,7 @@ import { createIncomingQcFromReceipt } from '@/store/qcTaskStore'
 import { resolveDefaultWarehouseByMaterialCode } from '@/utils/warehouseResolver'
 import { resolveEditableInboundQcRequirement } from '@/utils/inboundQcRequirement'
 import { inboundFormLineColumns } from '@/utils/inboundLineColumns'
+import { pickOrderSizeFields } from '@/utils/inboundOrderSize'
 import { syncInboundLineTotalFromUnit } from '@/utils/inboundLineHelpers'
 import { estimateSettleQty } from '@/utils/settleUnit'
 import { formatDateTimeMinute } from '@/utils/dateTimeDisplay'
@@ -968,6 +969,7 @@ function buildPurchaseInboundLine(line, order) {
       : undefined,
     standardUnitWeight: line.standardUnitWeight,
     settledSettleQty: 0,
+    ...pickOrderSizeFields(line),
   }
   syncInboundLineTotalFromUnit(next)
   return next
@@ -1142,6 +1144,7 @@ function mapSubmitLine(line) {
     standardUnitWeight: line.standardUnitWeight,
     settledSettleQty: 0,
     inboundQcRequirement: line.inboundQcRequirement || '',
+    ...pickOrderSizeFields(line),
   }
 }
 
