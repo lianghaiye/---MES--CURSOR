@@ -1,17 +1,26 @@
 /**
  * 采购入库明细 / 库存批次的订货尺寸解析（展示用，只读）
+ * 入库/采购 store 仅在函数内 require，避免被 outboundBatchAllocate 等早期模块拉起循环依赖。
  */
 import { displayOrderSizeText, pickOrderSizeFields } from '@/utils/orderSize'
-import { getPurchaseOrderById, purchaseOrderState } from '@/store/purchaseOrderStore'
-import { inboundOrderState } from '@/store/inboundOrderStore'
 import { formatQty } from '@/utils/numberFormat'
 
 export { pickOrderSizeFields }
 
+function getInboundOrderState() {
+  return require('@/store/inboundOrderStore').inboundOrderState
+}
+
+function getPurchaseOrderApi() {
+  return require('@/store/purchaseOrderStore')
+}
+
 function findInboundByDocNo(docNo) {
   const key = String(docNo || '').trim()
   if (!key) return null
-  return (inboundOrderState.orders || []).find((o) => String(o.docNo || '').trim() === key) || null
+  return (
+    (getInboundOrderState().orders || []).find((o) => String(o.docNo || '').trim() === key) || null
+  )
 }
 
 function findPoLine(po, line) {
@@ -21,6 +30,7 @@ function findPoLine(po, line) {
 
 function resolvePoForInbound(inbound) {
   if (!inbound) return null
+  const { getPurchaseOrderById, purchaseOrderState } = getPurchaseOrderApi()
   if (inbound.purchaseOrderId) {
     const po = getPurchaseOrderById(inbound.purchaseOrderId)
     if (po) return po

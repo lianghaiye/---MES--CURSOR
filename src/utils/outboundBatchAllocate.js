@@ -14,7 +14,6 @@ import {
   getDualUnitIssueStrategy,
 } from '@/store/functionParamStore'
 import { resolveNeedsBlankingSettle } from '@/utils/blankingSettleMaterial'
-import { resolveBatchOrderSizeText } from '@/utils/inboundOrderSize'
 
 /**
  * 行级发料策略（仅「需要下料结算」能力物料读功能参数；普通料恒为 partial）：
@@ -380,15 +379,15 @@ export function allocateOutboundBatches({
   return { ok: true, allocations, available }
 }
 
-/** 预览文案：将扣哪些批次（有订货尺寸时只读带出） */
+/** 预览文案：将扣哪些批次（有批次快照订货尺寸时只读带出；不回溯入库/采购，避免拉起 store 循环依赖） */
 export function formatBatchAllocationPreview(allocations = [], unit = '') {
   if (!allocations.length) return ''
   const u = unit || allocations[0]?.unit || ''
   return allocations
     .map((a) => {
       const batch = a.batchId ? getBatchById(a.batchId) : null
-      const size = batch ? resolveBatchOrderSizeText(batch) : '—'
-      const sizePart = size && size !== '—' ? `[${size}]` : ''
+      const size = String(batch?.attrs?.orderSizeText || '').trim()
+      const sizePart = size ? `[${size}]` : ''
       return `${a.batchNo}${sizePart}×${a.qty}${u}`
     })
     .join('；')
